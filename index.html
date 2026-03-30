@@ -27,7 +27,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 /* ── PAGE SYSTEM ── */
 .page{position:fixed;inset:0;max-width:480px;margin:0 auto;background:var(--bg);display:none;flex-direction:column;z-index:10;}
 .page.active{display:flex;}
-.page-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));}
+.page-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));}#page-login{overflow-y:auto;}
 .page-body::-webkit-scrollbar{display:none;}
 
 /* ── TOP BAR ── */
@@ -39,7 +39,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .topbar-action{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:6px 10px;border-radius:var(--r-sm);touch-action:manipulation;}
 
 /* ── LOGIN PAGE ── */
-.login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;padding-bottom:calc(32px + env(safe-area-inset-bottom,0px));}
+.login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;padding-bottom:calc(32px + env(safe-area-inset-bottom,0px));overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .login-logo{width:72px;height:72px;border-radius:20px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;}
 .login-title{font-size:26px;font-weight:700;margin-bottom:6px;letter-spacing:-0.5px;}
 .login-title span{color:var(--accent);}
@@ -693,40 +693,59 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 <!-- ════════════════ DOCS PAGE ════════════════ -->
 <div class="page" id="page-docs">
   <div class="topbar">
-    <button class="topbar-back" onclick="goBack()">←</button>
+    <button class="topbar-back" onclick="docsGoBack()">←</button>
     <div class="topbar-title" id="docs-page-title">문서 <span>생성</span></div>
+    <div class="topbar-right">
+      <!-- 편집모드: 미리보기 버튼 / 미리보기모드: 편집 버튼 -->
+      <button class="topbar-action" id="docs-mode-btn" onclick="toggleDocsMode()" style="background:var(--accent);color:white;border-radius:var(--r-sm);padding:6px 12px;font-weight:600;">👁️ 미리보기</button>
+    </div>
   </div>
-  <div class="page-body">
-    <div class="form-group" style="margin-bottom:10px;">
-      <label class="form-label">작업 선택</label>
-      <select class="form-select" id="doc-job-sel" onchange="renderDocPreviewCurrent()"></select>
-    </div>
-    <div id="doc-type-tabs" style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px;">
-      <button class="btn btn-secondary btn-sm" id="tab-estimate" onclick="setDocType('estimate')">📋 견적서</button>
-      <button class="btn btn-secondary btn-sm" id="tab-opinion" onclick="setDocType('opinion')">📝 소견서</button>
-      <button class="btn btn-secondary btn-sm" id="tab-insurance" onclick="setDocType('insurance')">🏛️ 보험서류</button>
-    </div>
-    <!-- 편집 모드 바 -->
-    <div class="edit-mode-bar">
-      <div class="edit-mode-label">
-        <span id="edit-mode-icon">👁️</span>
-        <span id="edit-mode-text">미리보기 모드</span>
+
+  <!-- ── 편집 모드 (기본) ── -->
+  <div id="docs-edit-mode" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div class="page-body">
+      <div class="form-group" style="margin-bottom:10px;">
+        <label class="form-label">작업 선택</label>
+        <select class="form-select" id="doc-job-sel" onchange="onDocJobChange()"></select>
       </div>
-      <button class="edit-toggle-btn off" id="edit-toggle-btn" onclick="toggleEditMode()">✏️ 편집</button>
-    </div>
-    <div class="edit-hint" id="edit-hint" style="display:none;">💡 문서의 텍스트를 직접 터치해서 수정하세요</div>
-    <div id="doc-preview-area"></div>
-    <div class="share-bar">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500;">공유 및 내보내기</div>
-      <div class="share-btns">
-        <button class="share-btn kakao" onclick="shareDoc()">카카오톡</button>
-        <button class="share-btn" onclick="shareDoc()">📱 문자</button>
-        <button class="share-btn pdf-btn" onclick="downloadPDF()">📄 PDF 저장</button>
-        <button class="share-btn" onclick="shareImage()">🖼️ 이미지</button>
-        <button class="share-btn" onclick="printDoc()" style="grid-column:1/-1;background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄 (A4)</button>
+      <div id="doc-type-tabs" style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
+        <button class="btn btn-secondary btn-sm" id="tab-estimate" onclick="setDocType('estimate')">📋 견적서</button>
+        <button class="btn btn-secondary btn-sm" id="tab-opinion" onclick="setDocType('opinion')">📝 소견서</button>
+        <button class="btn btn-secondary btn-sm" id="tab-insurance" onclick="setDocType('insurance')">🏛️ 보험서류</button>
       </div>
+      <!-- 편집 폼 영역 -->
+      <div id="docs-edit-form">
+        <!-- JS로 채워짐 -->
+      </div>
+      <div style="height:20px;"></div>
     </div>
-    <div style="height:20px;"></div>
+  </div>
+
+  <!-- ── 미리보기 모드 (버튼 누르면 표시) ── -->
+  <div id="docs-preview-mode" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <div class="page-body">
+      <!-- 편집 모드 바 (미리보기에서 직접 수정) -->
+      <div class="edit-mode-bar">
+        <div class="edit-mode-label">
+          <span id="edit-mode-icon">👁️</span>
+          <span id="edit-mode-text">A4 미리보기</span>
+        </div>
+        <button class="edit-toggle-btn off" id="edit-toggle-btn" onclick="toggleEditMode()">✏️ 직접수정</button>
+      </div>
+      <div class="edit-hint" id="edit-hint" style="display:none;">💡 문서의 텍스트를 직접 터치해서 수정하세요</div>
+      <div id="doc-preview-area"></div>
+      <div class="share-bar">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500;">공유 및 내보내기</div>
+        <div class="share-btns">
+          <button class="share-btn kakao" onclick="shareDoc()">카카오톡</button>
+          <button class="share-btn" onclick="shareDoc()">📱 문자</button>
+          <button class="share-btn pdf-btn" onclick="downloadPDF()">📄 PDF 저장</button>
+          <button class="share-btn" onclick="shareImage()">🖼️ 이미지</button>
+          <button class="share-btn" onclick="printDoc()" style="grid-column:1/-1;background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄 (A4)</button>
+        </div>
+      </div>
+      <div style="height:20px;"></div>
+    </div>
   </div>
 </div>
 
@@ -1878,15 +1897,56 @@ function addCostRow2(tbodyId){
   t.appendChild(tr);
 }
 
+// 문서 모드 상태
+let isPreviewMode=false;
+
+function docsGoBack(){
+  // 미리보기 모드면 편집모드로, 편집모드면 뒤로
+  if(isPreviewMode){
+    setDocsEditMode();
+  } else {
+    goBack();
+  }
+}
+
+function setDocsEditMode(){
+  isPreviewMode=false;
+  document.getElementById('docs-edit-mode').style.display='flex';
+  document.getElementById('docs-preview-mode').style.display='none';
+  const btn=document.getElementById('docs-mode-btn');
+  if(btn){btn.textContent='👁️ 미리보기';btn.style.background='var(--accent)';}
+  // 편집모드로 돌아올 때 직접수정 모드 해제
+  if(isEditMode) toggleEditMode();
+}
+
+function setDocsPreviewMode(){
+  isPreviewMode=true;
+  document.getElementById('docs-edit-mode').style.display='none';
+  document.getElementById('docs-preview-mode').style.display='flex';
+  const btn=document.getElementById('docs-mode-btn');
+  if(btn){btn.textContent='✏️ 편집폼';btn.style.background='var(--bg3)';btn.style.color='var(--text2)';}
+  // 미리보기 렌더링
+  renderDocPreviewCurrent();
+  setTimeout(scaleA4,150);
+}
+
+function toggleDocsMode(){
+  if(isPreviewMode) setDocsEditMode();
+  else setDocsPreviewMode();
+}
+
 function initDocsPage(type){
   isEditMode=false;
+  isPreviewMode=false;
+  // 항상 편집모드로 시작
+  setDocsEditMode();
   const btn=document.getElementById('edit-toggle-btn');
   const icon=document.getElementById('edit-mode-icon');
   const txt=document.getElementById('edit-mode-text');
   const hint=document.getElementById('edit-hint');
-  if(btn){btn.textContent='✏️ 편집';btn.className='edit-toggle-btn off';}
+  if(btn){btn.textContent='✏️ 직접수정';btn.className='edit-toggle-btn off';}
   if(icon)icon.textContent='👁️';
-  if(txt)txt.textContent='미리보기 모드';
+  if(txt)txt.textContent='A4 미리보기';
   if(hint)hint.style.display='none';
   const jobs=loadJobs();
   const sel=document.getElementById('doc-job-sel');
@@ -1894,23 +1954,63 @@ function initDocsPage(type){
     ?jobs.sort((a,b)=>b.date>a.date?1:-1).map(j=>`<option value="${j.id}">${j.date} · ${j.name} · ${j.type}</option>`).join('')
     :'<option>저장된 작업 없음</option>';
   setDocType(type);
+  renderDocsEditForm(type);
+}
+
+// 편집 폼 렌더링 - 현재 선택된 작업의 정보를 폼으로 표시
+function renderDocsEditForm(type){
+  const j=getSelJob();
+  const el=document.getElementById('docs-edit-form');
+  if(!el)return;
+  if(!j){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>작업을 선택하면 문서 내용이 표시됩니다</div></div>';
+    return;
+  }
+  const labels={estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  el.innerHTML=`
+    <div class="form-card">
+      <div class="form-card-title">📋 ${labels[type]||'문서'} 정보 확인</div>
+      <div class="info-row"><div class="info-key">고객명</div><div class="info-val">${j.name}</div></div>
+      <div class="info-row"><div class="info-key">연락처</div><div class="info-val">${j.phone||'-'}</div></div>
+      <div class="info-row"><div class="info-key">주소</div><div class="info-val">${j.addr}</div></div>
+      <div class="info-row"><div class="info-key">작업일</div><div class="info-val">${j.date}</div></div>
+      <div class="info-row"><div class="info-key">유형</div><div class="info-val">${j.type}</div></div>
+      ${type==='estimate'?`
+      <div class="info-row"><div class="info-key">합계</div><div class="info-val" style="color:var(--accent);font-weight:700;">${fmtMoney(jobTotal(j))}</div></div>`:''}
+      ${j.before?`<div class="info-row"><div class="info-key">조치전</div><div class="info-val" style="font-size:12px;">${j.before}</div></div>`:''}
+      ${j.action?`<div class="info-row"><div class="info-key">조치</div><div class="info-val" style="font-size:12px;">${j.action}</div></div>`:''}
+      ${j.expertOpinion?`<div class="info-row"><div class="info-key">전문가소견</div><div class="info-val" style="font-size:12px;">${j.expertOpinion}</div></div>`:''}
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r-sm);padding:12px;font-size:12px;color:var(--text2);margin-bottom:12px;">
+      💡 내용을 수정하려면 <strong style="color:var(--text);">현장관리 → 해당 작업 수정</strong>에서 변경하세요.<br>
+      문서에서 직접 수정하려면 <strong style="color:var(--accent);">미리보기 → 직접수정</strong> 버튼을 사용하세요.
+    </div>
+    <button class="btn btn-primary" onclick="setDocsPreviewMode()" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">
+      👁️ A4 미리보기로 보기
+    </button>`;
 }
 function setDocType(type){
   currentDocType=type;
   isEditMode=false;
   const btn=document.getElementById('edit-toggle-btn');
-  if(btn){btn.textContent='✏️ 편집';btn.className='edit-toggle-btn off';}
+  if(btn){btn.textContent='✏️ 직접수정';btn.className='edit-toggle-btn off';}
   const hint=document.getElementById('edit-hint');
   if(hint)hint.style.display='none';
   const titles={estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
   document.getElementById('docs-page-title').innerHTML=titles[type]+' <span style="color:var(--accent)">생성</span>';
   ['estimate','opinion','insurance'].forEach(t=>{
     const b=document.getElementById('tab-'+t);
+    if(!b)return;
     b.style.background=t===type?'var(--accent)':'var(--bg3)';
     b.style.color=t===type?'white':'var(--text)';
     b.style.border=t===type?'none':'1px solid var(--border)';
   });
-  renderDocPreviewCurrent();
+  renderDocsEditForm(type);
+  if(typeof isPreviewMode!=='undefined'&&isPreviewMode) renderDocPreviewCurrent();
+}
+function onDocJobChange(){
+  renderDocsEditForm(currentDocType);
+  if(isPreviewMode) renderDocPreviewCurrent();
 }
 function renderDocPreviewCurrent(){renderDocPreview(currentDocType);setTimeout(scaleA4,100);}
 function getSelJob(){

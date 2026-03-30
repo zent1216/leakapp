@@ -394,6 +394,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .toast{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(16px);background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 20px;border-radius:24px;font-size:13px;z-index:9999;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-overflow:ellipsis;overflow:hidden;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB1TNFuLwoOODj1h5YlZtUhLLy5WsXt8-U",
+    authDomain: "leakapp-c603d.firebaseapp.com",
+    projectId: "leakapp-c603d",
+    storageBucket: "leakapp-c603d.firebasestorage.app",
+    messagingSenderId: "622725609169",
+    appId: "1:622725609169:web:05f81513d953675626f7f0"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const googleProvider = new firebase.auth.GoogleAuthProvider();
+  </script>
 </head>
 <body>
 
@@ -414,7 +433,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       <input class="login-input" type="password" id="login-pw" placeholder="비밀번호" value="1234">
       <button class="login-btn" onclick="window.doLogin&&window.doLogin()">로그인</button>
       <div class="login-divider"><span>또는</span></div>
-      <button class="login-btn google" onclick="window.doLogin&&window.doLogin()">
+      <button class="login-btn google" onclick="window.doGoogleLogin&&window.doGoogleLogin()">
         <span style="font-size:18px;">G</span> Google 계정으로 로그인
       </button>
       <div class="login-footer">계정이 없으신가요? <a onclick="window.doLogin&&window.doLogin()">회원가입</a></div>
@@ -842,13 +861,54 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 
 <script>
 // ══ DB ══
-const DB='leakjobs_v3',BIZ='leakbiz_v1',AUTH='leakauth_v1';
-const loadJobs=()=>{try{return JSON.parse(localStorage.getItem(DB)||'[]');}catch{return[];}};
-const saveJobs=j=>localStorage.setItem(DB,JSON.stringify(j));
-const loadBiz=()=>{try{return JSON.parse(localStorage.getItem(BIZ)||'{}');}catch{return{};}};
-const saveBiz=b=>localStorage.setItem(BIZ,JSON.stringify(b));
-const loadAuth=()=>{try{return JSON.parse(localStorage.getItem(AUTH)||'null');}catch{return null;}};
-const saveAuth=a=>localStorage.setItem(AUTH,JSON.stringify(a));
+// ══ FIREBASE DATA LAYER ══
+let _cachedJobs=null, _cachedBiz={}, _currentUid=null;
+const getUid=()=>_currentUid;
+
+// Firestore 경로 헬퍼
+const userDoc=(col)=>db.collection('users').doc(getUid()).collection(col);
+
+// Jobs - 캐시 기반 (빠른 UI), Firestore 동기화
+const loadJobs=()=>_cachedJobs||[];
+const saveJobsAsync=async(jobs)=>{
+  _cachedJobs=jobs;
+  if(!getUid())return;
+  try{
+    const batch=db.batch();
+    const ref=db.collection('users').doc(getUid());
+    batch.set(ref,{jobs:JSON.stringify(jobs),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    await batch.commit();
+  }catch(e){console.warn('Firestore save error:',e);}
+};
+const saveJobs=(jobs)=>{_cachedJobs=jobs;saveJobsAsync(jobs);};
+const loadBiz=()=>_cachedBiz||{};
+const saveBizAsync=async(b)=>{
+  _cachedBiz=b;
+  if(!getUid())return;
+  try{
+    await db.collection('users').doc(getUid()).set({biz:JSON.stringify(b)},{merge:true});
+  }catch(e){console.warn('Biz save error:',e);}
+};
+const saveBiz=(b)=>{_cachedBiz=b;saveBizAsync(b);};
+const loadAuth=()=>null; // Firebase Auth가 담당
+const saveAuth=()=>{}; // Firebase Auth가 담당
+
+// Firestore에서 유저 데이터 로드
+async function loadUserData(uid){
+  _currentUid=uid;
+  try{
+    const doc=await db.collection('users').doc(uid).get();
+    if(doc.exists){
+      const data=doc.data();
+      if(data.jobs){try{_cachedJobs=JSON.parse(data.jobs);}catch{_cachedJobs=[];}}
+      else _cachedJobs=[];
+      if(data.biz){try{_cachedBiz=JSON.parse(data.biz);}catch{_cachedBiz={};}}
+      else _cachedBiz={};
+    } else {
+      _cachedJobs=[];_cachedBiz={};
+    }
+  }catch(e){console.warn('Load error:',e);_cachedJobs=[];_cachedBiz={};}
+}
 const getNextId=()=>{const j=loadJobs();return j.length?Math.max(...j.map(x=>x.id||0))+1:1;};
 
 // ══ STATE ══
@@ -860,28 +920,14 @@ let extraSpotCount=0;
 let pageHistory=[];
 let currentDocType='estimate';
 
-// ══ SEED ══
-function seedData(){
-  if(loadJobs().length>0)return;
-  saveJobs([
-    {id:1,date:'2026-03-05',name:'김민준',phone:'010-1234-5678',addr:'서울 강남구 역삼동 123',location:'302호 주방',type:'배관 누수',status:'done',before:'주방 하부 배관 연결부 지속 누수',action:'PVC 커플링 교체 및 실링',afterDesc:'완전 차단 확인',materials:[{name:'PVC 커플링',qty:'1개'}],inspectCost:300000,baseCost:800000,extraSpots:0,materialCost:35000,memo:'',photosBefore:[],photosAfter:[]},
-    {id:2,date:'2026-03-12',name:'이수진',phone:'010-9876-5432',addr:'서울 서초구 방배동 45',location:'402호 화장실',type:'화장실 누수',status:'done',before:'변기 하부 소량 누수, 아래층 천장 얼룩',action:'변기 배수관 패킹 교체',afterDesc:'누수 완전 차단',materials:[{name:'변기 패킹',qty:'1개'}],inspectCost:300000,baseCost:800000,extraSpots:0,materialCost:18000,memo:'아래층 도배 권고',photosBefore:[],photosAfter:[]},
-    {id:3,date:'2026-03-18',name:'박정호',phone:'010-5555-7777',addr:'서울 마포구 합정동 78',location:'옥상',type:'옥상 방수',status:'pending',before:'방수층 균열 외벽 누수',action:'방수 모르타르 타설 진행',afterDesc:'',materials:[{name:'방수 모르타르',qty:'5kg'}],inspectCost:400000,baseCost:1000000,extraSpots:1,materialCost:120000,memo:'우천 시 중단',photosBefore:[],photosAfter:[]},
-  ]);
-}
+// ══ SEED (Firebase 버전에서는 미사용) ══
+function seedData(){}
 
 // ══ INIT ══
 document.addEventListener('DOMContentLoaded',()=>{
-  seedData();
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
   addMaterialRow();
-  // 자동 로그인 체크
-  const auth=loadAuth();
-  if(auth){
-    showPage('page-main');
-    document.getElementById('main-user-name').textContent=auth.name||'사장님';
-    updateMainStats();
-  }
+  // Firebase Auth가 로그인 상태를 자동으로 감지합니다
 });
 
 // ══ UTILS ══
@@ -917,21 +963,51 @@ function goBack(){
 }
 
 // ══ AUTH ══
-window.doLogin=function doLogin(){
-  const email=document.getElementById('login-email').value||'demo@leakapp.kr';
-  const name=email.split('@')[0];
-  const auth={email,name};
-  saveAuth(auth);
-  document.getElementById('main-user-name').textContent=name;
-  showPage('page-main');
-  updateMainStats();
+window.doLogin=async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  if(!email||!pw){showToast('이메일과 비밀번호를 입력해주세요');return;}
+  try{
+    showToast('로그인 중...');
+    await auth.signInWithEmailAndPassword(email,pw);
+  }catch(e){
+    if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'){
+      // 계정 없으면 자동 회원가입
+      try{
+        await auth.createUserWithEmailAndPassword(email,pw);
+        showToast('새 계정이 생성됐습니다 ✓');
+      }catch(e2){showToast('오류: '+e2.message);}
+    } else {
+      showToast('로그인 실패: '+e.message);
+    }
+  }
 }
-window.doLogout=function doLogout(){
+window.doGoogleLogin=async function doGoogleLogin(){
+  try{
+    showToast('구글 로그인 중...');
+    await auth.signInWithPopup(googleProvider);
+  }catch(e){showToast('구글 로그인 실패: '+e.message);}
+}
+window.doLogout=async function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?'))return;
-  saveAuth(null);
+  await auth.signOut();
+  _cachedJobs=null;_cachedBiz={};_currentUid=null;
   pageHistory=[];
   showPage('page-login');
 }
+
+// Firebase Auth 상태 감지 - 앱 시작점
+auth.onAuthStateChanged(async(user)=>{
+  if(user){
+    showToast('데이터 불러오는 중...');
+    await loadUserData(user.uid);
+    document.getElementById('main-user-name').textContent=user.displayName||user.email.split('@')[0];
+    showPage('page-main');
+    updateMainStats();
+  } else {
+    showPage('page-login');
+  }
+});
 
 // ══ MAIN STATS ══
 function updateMainStats(){

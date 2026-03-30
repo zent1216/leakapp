@@ -201,8 +201,62 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .share-btn.pdf-btn{background:var(--red-bg);color:var(--red);border-color:rgba(239,68,68,0.3);}
 
 /* ── A4 문서 ── */
-.a4-preview{background:white;color:#111;width:100%;border-radius:var(--r);overflow:hidden;margin-bottom:12px;}
-#doc-render{background:white;padding:28px 30px;color:#111;}
+/* A4 = 210mm x 297mm, 96dpi 기준 794px x 1123px */
+.a4-preview{
+  background:#e8e8e8;
+  color:#111;
+  width:100%;
+  border-radius:var(--r);
+  overflow:hidden;
+  margin-bottom:12px;
+  padding:8px;
+}
+.a4-preview > div,
+#doc-render,
+.ins-page > div {
+  background:white;
+  color:#111;
+  width:794px;          /* A4 너비 정확히 */
+  min-height:1123px;    /* A4 높이 */
+  padding:60px 56px;    /* 상하 여백 20mm, 좌우 여백 20mm */
+  margin:0 auto;
+  box-sizing:border-box;
+  font-size:11pt;       /* 인쇄 표준 폰트 크기 */
+  font-family:'Noto Sans KR', sans-serif;
+  transform-origin:top left;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 모바일에서 A4를 화면에 맞게 축소 */
+.a4-preview{overflow-x:auto;}
+.a4-scaler{
+  width:794px;
+  transform-origin:top left;
+}
+
+/* 인쇄 스타일 */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0; top: 0;
+    width: 210mm;
+  }
+  #doc-render, .ins-page > div {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    padding: 20mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    page-break-after: always;
+  }
+  .a4-preview { background: white !important; padding: 0 !important; }
+  .edit-mode-bar, .share-bar, .ins-page-divider,
+  .topbar, .page-body > *:not(#doc-preview-area),
+  .add-row-btn, .td-del, .th-del { display: none !important; }
+}
 .doc-co-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a3a6e;padding-bottom:14px;margin-bottom:18px;}
 .doc-co-name{font-size:17px;font-weight:700;color:#1a3a6e;}
 .doc-co-info{font-size:10px;color:#555;line-height:1.7;text-align:right;}
@@ -646,6 +700,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
         <button class="share-btn" onclick="shareDoc()">📱 문자</button>
         <button class="share-btn pdf-btn" onclick="downloadPDF()">📄 PDF 저장</button>
         <button class="share-btn" onclick="shareImage()">🖼️ 이미지</button>
+        <button class="share-btn" onclick="printDoc()" style="grid-column:1/-1;background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄 (A4)</button>
       </div>
     </div>
     <div style="height:20px;"></div>
@@ -926,6 +981,7 @@ function seedData(){}
 // ══ INIT ══
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  window.addEventListener('resize', scaleA4);
   addMaterialRow();
   // Firebase Auth가 로그인 상태를 자동으로 감지합니다
 });
@@ -1211,6 +1267,7 @@ function saveJob(){
 function resetForm(){
   ['f-name','f-phone','f-addr','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-inspect','f-base','f-material-cost','f-memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  window.addEventListener('resize', scaleA4);
   document.getElementById('f-status').value='pending';
   document.getElementById('f-type').selectedIndex=0;
 
@@ -1832,7 +1889,7 @@ function setDocType(type){
   });
   renderDocPreviewCurrent();
 }
-function renderDocPreviewCurrent(){renderDocPreview(currentDocType);}
+function renderDocPreviewCurrent(){renderDocPreview(currentDocType);setTimeout(scaleA4,100);}
 function getSelJob(){
   const sel=document.getElementById('doc-job-sel');if(!sel)return null;
   return loadJobs().find(j=>j.id===parseInt(sel.value))||null;
@@ -1909,7 +1966,7 @@ function renderDocPreview(type){
     </div></div>`;
 
   } else if(type==='opinion'){
-    el.innerHTML=`<div class="a4-preview"><div id="doc-render" style="background:white;padding:28px 30px;">
+    el.innerHTML=`<div class="a4-preview"><div id="doc-render" style="background:white;">
       <div class="doc-co-header">
         <div>
           <div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div>
@@ -1948,7 +2005,7 @@ function renderDocPreview(type){
     el.innerHTML=`
     <!-- ═══ 1페이지: 보험처리 신청서 ═══ -->
     <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">1페이지 — 보험처리 신청서</span><div class="ins-page-divider-line"></div></div>
-    <div class="ins-page"><div id="doc-render" style="background:white;padding:28px 30px;">
+    <div class="ins-page"><div id="doc-render" style="background:white;">
       <div class="doc-co-header">
         <div><div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div></div>
         <div class="doc-co-info" data-ed contenteditable="${ce}">작성일: ${today}<br>문서번호: INS-${j.id}-${Date.now().toString().slice(-6)}</div>
@@ -2050,7 +2107,7 @@ function renderDocPreview(type){
     <!-- ═══ 3페이지: 소견서 ═══ -->
     <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>
     <div class="ins-page" id="ins-page-opinion">
-      <div id="doc-render-opinion" style="background:white;padding:28px 30px;">
+      <div id="doc-render-opinion" style="background:white;">
         <div class="doc-co-header">
           <div>
             <div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div>
@@ -2146,6 +2203,50 @@ function insLoadJobPhotos(j){
       insPhotos[type][i]=p;
     });
   });
+}
+
+// ══ A4 자동 축소 (모바일 화면 맞춤) ══
+function scaleA4(){
+  const previews=document.querySelectorAll('.a4-preview');
+  previews.forEach(wrap=>{
+    const inner=wrap.querySelector('div');
+    if(!inner)return;
+    const availW=wrap.clientWidth-16; // padding 빼기
+    const scale=Math.min(1, availW/794);
+    inner.style.transform=`scale(${scale})`;
+    inner.style.transformOrigin='top left';
+    wrap.style.height=(1123*scale+16)+'px';
+  });
+}
+
+// ══ 인쇄 ══
+function printDoc(){
+  const area=document.getElementById('doc-preview-area');
+  if(!area)return;
+  const printWin=window.open('','_blank','width=900,height=700');
+  printWin.document.write(`
+    <html><head>
+    <meta charset="UTF-8">
+    <title>인쇄</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:'Noto Sans KR',sans-serif;background:white;}
+      @page{size:A4;margin:0;}
+      @media print{
+        body{margin:0;}
+        .page-break{page-break-after:always;}
+      }
+      /* 문서 스타일 복사 */
+      ${Array.from(document.styleSheets).map(s=>{try{return Array.from(s.cssRules).map(r=>r.cssText).join('\n');}catch{return '';}}).join('\n')}
+    </style>
+    </head><body>
+    ${area.innerHTML}
+    </body></html>
+  `);
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(()=>{printWin.print();},800);
 }
 
 // ══ PDF / SHARE ══

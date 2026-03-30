@@ -216,15 +216,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .ins-page > div {
   background:white;
   color:#111;
-  width:794px;          /* A4 너비 정확히 */
-  min-height:1123px;    /* A4 높이 */
-  padding:60px 56px;    /* 상하 여백 20mm, 좌우 여백 20mm */
+  width:794px;
+  min-height:1123px;    /* 최소 A4 높이 유지 */
+  padding:48px 52px;    /* 여백 약간 줄임 */
   margin:0 auto;
   box-sizing:border-box;
-  font-size:11pt;       /* 인쇄 표준 폰트 크기 */
+  font-size:10.5pt;
   font-family:'Noto Sans KR', sans-serif;
   transform-origin:top left;
   box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  /* 내용이 넘치면 자동으로 페이지 높이 늘어남 */
+  overflow:visible;
 }
 
 /* 모바일에서 A4를 화면에 맞게 축소 */
@@ -236,26 +238,47 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 
 /* 인쇄 스타일 */
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area {
-    position: absolute;
-    left: 0; top: 0;
-    width: 210mm;
+  @page {
+    size: A4;
+    margin: 15mm 15mm 15mm 15mm;
   }
-  #doc-render, .ins-page > div {
-    width: 210mm !important;
-    min-height: 297mm !important;
-    padding: 20mm !important;
+  body { margin: 0; padding: 0; background: white; }
+  .page { position: static !important; display: block !important; }
+  .page:not(#page-docs) { display: none !important; }
+  .topbar, .edit-mode-bar, .share-bar,
+  .ins-page-divider, .add-row-btn,
+  .td-del, .th-del,
+  .form-group, .page-body > *:not(#doc-preview-area) { display: none !important; }
+  #doc-preview-area { display: block !important; }
+  .a4-preview {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  .a4-preview > div,
+  #doc-render,
+  .ins-page > div {
+    width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
     transform: none !important;
-    page-break-after: always;
+    font-size: 10pt !important;
   }
-  .a4-preview { background: white !important; padding: 0 !important; }
-  .edit-mode-bar, .share-bar, .ins-page-divider,
-  .topbar, .page-body > *:not(#doc-preview-area),
-  .add-row-btn, .td-del, .th-del { display: none !important; }
+  .ins-page {
+    page-break-before: always;
+    break-before: page;
+  }
+  .ins-page:first-of-type {
+    page-break-before: auto;
+    break-before: auto;
+  }
+  /* 표가 페이지 넘길 때 자연스럽게 */
+  .doc-table { page-break-inside: auto; }
+  .doc-table tr { page-break-inside: avoid; }
+  .doc-section-h { page-break-after: avoid; }
 }
 .doc-co-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a3a6e;padding-bottom:14px;margin-bottom:18px;}
 .doc-co-name{font-size:17px;font-weight:700;color:#1a3a6e;}
@@ -2211,11 +2234,14 @@ function scaleA4(){
   previews.forEach(wrap=>{
     const inner=wrap.querySelector('div');
     if(!inner)return;
-    const availW=wrap.clientWidth-16; // padding 빼기
+    const availW=wrap.clientWidth-16;
     const scale=Math.min(1, availW/794);
     inner.style.transform=`scale(${scale})`;
     inner.style.transformOrigin='top left';
-    wrap.style.height=(1123*scale+16)+'px';
+    // 실제 내용 높이에 맞게 wrap 높이 설정 (넘치면 2페이지만큼)
+    const actualH=inner.scrollHeight||inner.offsetHeight||1123;
+    wrap.style.height=(actualH*scale+16)+'px';
+    wrap.style.overflow='hidden';
   });
 }
 

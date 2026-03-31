@@ -983,6 +983,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       </div>
     </div>
 
+    <!-- 사업자등록증 -->
+    <div class="form-card">
+      <div class="form-card-title">🏢 사업자등록증 사본</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">업로드하면 보험청구 서류에 자동 첨부됩니다</div>
+      <div id="biz-reg-preview" style="display:none;position:relative;margin-bottom:10px;">
+        <img id="biz-reg-img" style="width:100%;border-radius:var(--r-sm);border:1px solid var(--border);">
+        <button onclick="removeBizReg()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.65);color:white;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>
+      <div id="biz-reg-empty" style="border:1.5px dashed var(--border2);border-radius:var(--r-sm);padding:24px;text-align:center;cursor:pointer;background:var(--bg2);" onclick="document.getElementById('biz-reg-input').click()">
+        <div style="font-size:32px;margin-bottom:8px;">📄</div>
+        <div style="font-size:13px;color:var(--text2);">터치해서 사업자등록증 업로드</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">JPG, PNG 가능</div>
+      </div>
+      <input type="file" id="biz-reg-input" accept="image/*" style="display:none" onchange="handleBizRegUpload(event)">
+    </div>
     <button class="btn btn-primary" onclick="saveBizInfo()">💾 전체 저장</button>
     <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
       <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">⚠️ 위험 구역</div>
@@ -1581,6 +1596,27 @@ function handlePhotoSelect(e){
 }
 
 // ══ BIZ ══
+function handleBizRegUpload(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const biz=loadBiz();biz.regImg=ev.target.result;saveBiz(biz);
+    showBizRegImg(ev.target.result);showToast('사업자등록증이 저장됐습니다 ✓');
+  };reader.readAsDataURL(file);
+}
+function showBizRegImg(src){
+  document.getElementById('biz-reg-img').src=src;
+  document.getElementById('biz-reg-preview').style.display='block';
+  document.getElementById('biz-reg-empty').style.display='none';
+}
+function removeBizReg(){
+  if(!confirm('사업자등록증을 삭제하시겠습니까?'))return;
+  const biz=loadBiz();delete biz.regImg;saveBiz(biz);
+  document.getElementById('biz-reg-preview').style.display='none';
+  document.getElementById('biz-reg-empty').style.display='block';
+  document.getElementById('biz-reg-input').value='';
+  showToast('삭제됐습니다');
+}
 function loadBizForm(){
   const b=loadBiz();
   ['name','ceo','reg','tel','addr','email','bank','tech'].forEach(k=>{
@@ -2452,154 +2488,162 @@ function renderDocPreview(type){
     </div></div>`;
 
   } else {
-    // 보험서류: 3페이지 구성
+    // 보험서류 미리보기: 4페이지 구성
+    const insTotal=jobTotal(j);
+    const extraCost=(j.extraSpots||0)*200000;
+    const bPh=(j.photosBefore||[]).filter(Boolean);
+    const aPh=(j.photosAfter||[]).filter(Boolean);
+    const bizReg=biz.regImg||null;
+    const receipts=window.__insReceipts||[];
+
     el.innerHTML=`
-    <!-- ═══ 1페이지: 보험처리 신청서 ═══ -->
-    <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">1페이지 — 보험처리 신청서</span><div class="ins-page-divider-line"></div></div>
-    <div class="ins-page"><div id="doc-render" style="background:white;">
-      <div class="doc-co-header">
-        <div><div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div></div>
-        <div class="doc-co-info" data-ed contenteditable="${ce}">작성일: ${today}<br>문서번호: INS-${j.id}-${Date.now().toString().slice(-6)}</div>
-      </div>
-      <div class="doc-title-block">
-        <div class="doc-main-title" style="font-size:20px;letter-spacing:4px;" data-ed contenteditable="${ce}">보험처리 신청서류</div>
-      </div>
-      <div class="doc-client-box">
-        <div class="doc-client-row">
-          <div class="doc-client-key">성명</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.name}</div>
-          <div class="doc-client-key">연락처</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.phone||'-'}</div>
+    <!-- 1페이지: 보험청구 신청서 -->
+    <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">1페이지 — 보험청구 신청서</span><div class="ins-page-divider-line"></div></div>
+    <div class="a4-preview"><div id="doc-render" style="background:white;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자: ${biz.reg||'-'} | TEL: ${biz.tel||'-'}</div>
         </div>
-        <div class="doc-client-row">
-          <div class="doc-client-key">주소</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.addr}</div>
-        </div>
+        <div style="font-size:10px;color:#555;text-align:right;" contenteditable="${ce}">작성일: ${today}</div>
       </div>
-      <div class="doc-section-h" data-ed contenteditable="${ce}">사고 내역</div>
-      <table class="doc-table">
-        <thead><tr><th style="width:28%">항목</th><th>내용</th><th class="th-del"></th></tr></thead>
-        <tbody id="ins-tbody">
-          <tr><td data-ed contenteditable="${ce}">사고일자</td><td data-ed contenteditable="${ce}">${j.date}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td data-ed contenteditable="${ce}">사고유형</td><td data-ed contenteditable="${ce}">${j.type}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td data-ed contenteditable="${ce}">사고장소</td><td data-ed contenteditable="${ce}">${j.location||j.addr}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td data-ed contenteditable="${ce}">사고경위</td><td data-ed contenteditable="${ce}">${j.before||'-'}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:19px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">보 험 청 구 신 청 서</div>
+        <div style="font-size:10px;color:#888;margin-top:3px;">수분 및 누수 피해 보험 청구용</div>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;color:white;background:#1a3a6e;padding:4px 8px;margin-bottom:0;">① 신청인 정보</div>
+      <table class="doc-table" style="margin-bottom:10px;">
+        <tr><td style="width:22%;background:#f0f5ff;font-weight:600;">성명</td><td contenteditable="${ce}">${j.name}</td><td style="width:18%;background:#f0f5ff;font-weight:600;">연락처</td><td contenteditable="${ce}">${j.phone||'-'}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">사고 주소</td><td colspan="3" contenteditable="${ce}">${j.addr}${j.location?' ('+j.location+')':''}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">보험사명</td><td contenteditable="${ce}"> </td><td style="background:#f0f5ff;font-weight:600;">증권번호</td><td contenteditable="${ce}"> </td></tr>
+      </table>
+
+      <div style="font-size:11px;font-weight:700;color:white;background:#1a3a6e;padding:4px 8px;margin-bottom:0;">② 사고 내역</div>
+      <table class="doc-table" style="margin-bottom:10px;">
+        <tr><td style="width:22%;background:#f0f5ff;font-weight:600;">사고 발생일</td><td contenteditable="${ce}">${j.date}</td><td style="width:18%;background:#f0f5ff;font-weight:600;">누수 유형</td><td contenteditable="${ce}">${j.type}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">사고 장소</td><td colspan="3" contenteditable="${ce}">${j.location||j.addr}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">사고 경위</td><td colspan="3" contenteditable="${ce}">${j.before||' '}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">조치 내용</td><td colspan="3" contenteditable="${ce}">${j.action||' '}</td></tr>
+      </table>
+
+      <div style="font-size:11px;font-weight:700;color:white;background:#1a3a6e;padding:4px 8px;margin-bottom:0;">③ 수리 비용 명세</div>
+      <table class="doc-table" style="margin-bottom:6px;">
+        <thead><tr><th style="width:50%">항목</th><th style="text-align:center;width:18%">수량</th><th style="text-align:right;">금액(원)</th></tr></thead>
+        <tbody>
+          <tr><td contenteditable="${ce}">누수 탐지 검사비</td><td style="text-align:center;" contenteditable="${ce}">1식</td><td style="text-align:right;" contenteditable="${ce}">${(j.inspectCost||0).toLocaleString()}</td></tr>
+          <tr><td contenteditable="${ce}">누수 보수 공사비</td><td style="text-align:center;" contenteditable="${ce}">1식</td><td style="text-align:right;" contenteditable="${ce}">${(j.baseCost||0).toLocaleString()}</td></tr>
+          ${(j.extraSpots||0)>0?`<tr><td contenteditable="${ce}">추가 구간 (${j.extraSpots}개소)</td><td style="text-align:center;" contenteditable="${ce}">${j.extraSpots}개소</td><td style="text-align:right;" contenteditable="${ce}">${extraCost.toLocaleString()}</td></tr>`:''}
+          <tr><td contenteditable="${ce}">자재비</td><td style="text-align:center;" contenteditable="${ce}">1식</td><td style="text-align:right;" contenteditable="${ce}">${(j.materialCost||0).toLocaleString()}</td></tr>
         </tbody>
       </table>
-      <button class="add-row-btn" onclick="addWorkRow('ins-tbody')">+ 사고내역 항목 추가</button>
-      <div class="doc-section-h" data-ed contenteditable="${ce}">수리 비용 명세</div>
-      <table class="doc-table">
-        <thead><tr><th>항목</th><th style="text-align:right;">금액</th><th class="th-del"></th></tr></thead>
-        <tbody id="ins-cost-tbody">
-          <tr><td data-ed contenteditable="${ce}">검사비</td><td data-ed contenteditable="${ce}" style="text-align:right;">${(j.inspectCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td data-ed contenteditable="${ce}">공사비 (기본+추가)</td><td data-ed contenteditable="${ce}" style="text-align:right;">${((j.baseCost||0)+((j.extraSpots||0)*200000)).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td data-ed contenteditable="${ce}">자재비</td><td data-ed contenteditable="${ce}" style="text-align:right;">${(j.materialCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-        </tbody>
+      <div class="doc-total-section" style="margin-bottom:10px;"><span class="doc-total-label">청구 합계 (VAT 포함)</span><span class="doc-total-val" contenteditable="${ce}">${insTotal.toLocaleString()}원</span></div>
+
+      <div style="font-size:11px;font-weight:700;color:white;background:#1a3a6e;padding:4px 8px;margin-bottom:6px;">④ 첨부서류 확인</div>
+      <div style="border:1px solid #c8d8f0;border-radius:4px;padding:8px;margin-bottom:10px;">
+        <table style="width:100%;font-size:10px;border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 견적서</td><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 소견서</td><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 현장사진(전/후)</td></tr>
+          <tr><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 영수증</td><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 사업자등록증</td><td style="padding:4px 8px;border:1px solid #e0e8f0;text-align:center;">☑ 신분증 사본</td></tr>
+        </table>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;color:white;background:#1a3a6e;padding:4px 8px;margin-bottom:0;">⑤ 입금 계좌</div>
+      <table class="doc-table" style="margin-bottom:10px;">
+        <tr><td style="width:22%;background:#f0f5ff;font-weight:600;">은행명</td><td contenteditable="${ce}"> </td><td style="width:18%;background:#f0f5ff;font-weight:600;">예금주</td><td contenteditable="${ce}">${j.name}</td></tr>
+        <tr><td style="background:#f0f5ff;font-weight:600;">계좌번호</td><td colspan="3" contenteditable="${ce}"> </td></tr>
       </table>
-      <button class="add-row-btn" onclick="addCostRow2('ins-cost-tbody')">+ 비용 항목 추가</button>
-      <table class="doc-table" style="margin-top:4px;">
-        <tr style="background:#1a3a6e;color:white;">
-          <td style="padding:8px 10px;font-weight:700;" data-ed contenteditable="${ce}">합계</td>
-          <td style="padding:8px 10px;text-align:right;font-weight:700;" data-ed contenteditable="${ce}">${total.toLocaleString()}원</td>
-        </tr>
-      </table>
-      <div class="doc-section-h" data-ed contenteditable="${ce}">첨부 서류 목록</div>
-      <div style="font-size:12px;line-height:2;padding:8px 0;" data-ed contenteditable="${ce}">☑ 현장 사진 (2페이지) &nbsp; ☑ 소견서 (3페이지) &nbsp; □ 견적서 &nbsp; □ 사업자등록증</div>
-      <div class="doc-sign-row">
-        ${getSignHtml('시공업체 확인')}
+
+      <div style="border:1px solid #c8d8f0;border-radius:4px;padding:10px;">
+        <div style="font-size:10px;color:#555;margin-bottom:8px;">위 내용이 사실임을 확인하며 보험금 청구를 신청합니다.</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+          <div style="flex:1;"><div style="font-size:10px;color:#888;">신청일</div><div style="border-bottom:1px solid #999;padding-bottom:2px;min-width:80px;" contenteditable="${ce}">${today}</div></div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:#888;margin-bottom:3px;">신청인 서명</div>
+            <div style="width:90px;height:44px;border:1px solid #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:white;">
+              ${biz.signatureImg?`<img src="${biz.signatureImg}" style="max-height:40px;max-width:86px;object-fit:contain;">`:'<span style="font-size:9px;color:#ccc;">서명</span>'}
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:#888;margin-bottom:3px;">업체 도장</div>
+            <div style="width:50px;height:50px;border:1px solid #ccc;border-radius:50%;display:flex;align-items:center;justify-content:center;background:white;">
+              ${biz.stampImg?`<img src="${biz.stampImg}" style="width:46px;height:46px;object-fit:contain;">`:'<span style="font-size:9px;color:#ccc;">도장</span>'}
+            </div>
+          </div>
+        </div>
       </div>
     </div></div>
 
-    <!-- ═══ 2페이지: 현장 사진 ═══ -->
+    <!-- 2페이지: 현장 사진 -->
     <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">2페이지 — 현장 사진</span><div class="ins-page-divider-line"></div></div>
-    <div class="ins-page" id="ins-page-photos">
-      <div class="ins-photo-section">
-        <div class="doc-co-header" style="margin-bottom:14px;">
-          <div><div class="doc-co-name">${co}</div><div style="font-size:10px;color:#555;">현장 사진 기록</div></div>
-          <div class="doc-co-info">${j.name} | ${j.date}</div>
-        </div>
-        <div class="doc-title-block" style="margin-bottom:16px;">
-          <div style="font-size:16px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">현 장 사 진</div>
-        </div>
+    <div class="a4-preview"><div style="background:white;padding:40px 36px;">
+      <div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:14px;">현 장 사 진</div>
+      <div style="font-size:11px;color:#555;margin-bottom:14px;">고객: <strong>${j.name}</strong> | 작업일: <strong>${j.date}</strong> | 주소: <strong>${j.addr}</strong></div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:8px;padding-left:6px;border-left:3px solid #4f8ef7;">조치 전 현장</div>
+      ${bPh.length>0?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        ${bPh.map((p,i)=>`<div><img src="${p}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid #e0e8f0;"><div style="font-size:9px;color:#888;text-align:center;margin-top:2px;">조치전 ${i+1}</div></div>`).join('')}
+      </div>`:`<div style="height:120px;border:1px dashed #c8d8f0;border-radius:4px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:#aaa;font-size:11px;">현장관리에서 사진을 등록해주세요</div>`}
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:8px;padding-left:6px;border-left:3px solid #4f8ef7;">조치 후 현장</div>
+      ${aPh.length>0?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        ${aPh.map((p,i)=>`<div><img src="${p}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid #e0e8f0;"><div style="font-size:9px;color:#888;text-align:center;margin-top:2px;">조치후 ${i+1}</div></div>`).join('')}
+      </div>`:`<div style="height:120px;border:1px dashed #c8d8f0;border-radius:4px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:#aaa;font-size:11px;">현장관리에서 사진을 등록해주세요</div>`}
+    </div></div>
 
-        <!-- 현장 사진 -->
-        <div class="ins-photo-group">
-          <div class="ins-photo-group-title">📍 현장 사진</div>
-          <div class="ins-photo-grid" id="ins-scene-grid">
-            <div class="ins-photo-slot" onclick="insAddPhoto('scene',0)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('scene',1)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('scene',2)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('scene',3)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-          </div>
-        </div>
-
-        <!-- 조치 전 -->
-        <div class="ins-photo-group">
-          <div class="ins-photo-group-title">🔴 조치 전</div>
-          <div class="ins-photo-grid" id="ins-before-grid">
-            <div class="ins-photo-slot" onclick="insAddPhoto('before',0)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('before',1)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('before',2)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('before',3)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-          </div>
-        </div>
-
-        <!-- 조치 후 -->
-        <div class="ins-photo-group">
-          <div class="ins-photo-group-title">🟢 조치 후</div>
-          <div class="ins-photo-grid" id="ins-after-grid">
-            <div class="ins-photo-slot" onclick="insAddPhoto('after',0)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('after',1)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('after',2)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-            <div class="ins-photo-slot" onclick="insAddPhoto('after',3)"><div class="ins-add-icon">📷</div><div class="ins-add-label">사진 추가</div></div>
-          </div>
-        </div>
-        <div style="font-size:10px;color:#999;text-align:center;margin-top:8px;">사진을 터치하면 추가/변경할 수 있습니다</div>
-      </div>
-    </div>
-
-    <!-- ═══ 3페이지: 소견서 ═══ -->
+    <!-- 3페이지: 소견서 -->
     <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>
-    <div class="ins-page" id="ins-page-opinion">
-      <div id="doc-render-opinion" style="background:white;">
-        <div class="doc-co-header">
-          <div>
-            <div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div>
-            <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${biz.tel||'-'}</div>
-          </div>
-          <div class="doc-co-info" data-ed contenteditable="${ce}">작성일: ${today}</div>
-        </div>
-        <div class="doc-title-block"><div class="doc-main-title" data-ed contenteditable="${ce}">소  견  서</div></div>
-        <div class="doc-client-box">
-          <div class="doc-client-row">
-            <div class="doc-client-key">고객명</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.name}</div>
-            <div class="doc-client-key">점검일</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.date}</div>
-          </div>
-          <div class="doc-client-row">
-            <div class="doc-client-key">현장주소</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.addr}</div>
-          </div>
-          <div class="doc-client-row">
-            <div class="doc-client-key">누수 유형</div><div class="doc-client-val" data-ed contenteditable="${ce}">${j.type}</div>
-          </div>
-        </div>
-        <div class="doc-section-h" data-ed contenteditable="${ce}">누수 원인 및 발생 경위</div>
-        <div class="doc-text-editable" data-ed contenteditable="${ce}">${j.before||'내용을 입력하세요'}</div>
-        <div class="doc-section-h" data-ed contenteditable="${ce}">조치 내역</div>
-        <div class="doc-text-editable" data-ed contenteditable="${ce}">${j.action||'내용을 입력하세요'}</div>
-        <div class="doc-section-h" data-ed contenteditable="${ce}">조치 후 상태</div>
-        <div class="doc-text-editable" data-ed contenteditable="${ce}">${j.afterDesc||'내용을 입력하세요'}</div>
-        <div class="doc-section-h" data-ed contenteditable="${ce}" style="border-left-color:#e74c3c;color:#c0392b;">전문가 소견</div>
-        <div class="doc-text-editable" data-ed contenteditable="${ce}" style="border-color:#f5c6cb;background:#fff8f8;min-height:80px;">${j.expertOpinion||'본 기술자는 현장 점검 결과, 상기 내용과 같이 누수가 발생하였음을 확인하며 전문가로서 다음과 같이 소견합니다.\n\n(전문가 소견을 직접 입력하세요)'}</div>
-        <div class="doc-sign-row">
-          ${getTechSignHtml('작성자 (기술자)')}
-        </div>
+    <div class="a4-preview"><div id="doc-render-opinion" style="background:white;">
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
+        <div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div><div style="font-size:10px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'}</div></div>
+        <div style="font-size:10px;color:#555;" contenteditable="${ce}">작성일: ${today}</div>
       </div>
-    </div>
-    <input type="file" id="ins-photo-input" accept="image/*" style="display:none" onchange="insHandlePhoto(event)">
+      <div style="text-align:center;margin-bottom:14px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소  견  서</div></div>
+      <div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;">
+        <div style="display:flex;gap:8px;margin-bottom:3px;"><span style="color:#555;min-width:52px;">고객명</span><span contenteditable="${ce}">${j.name}</span><span style="color:#555;min-width:40px;margin-left:8px;">점검일</span><span contenteditable="${ce}">${j.date}</span></div>
+        <div style="display:flex;gap:8px;margin-bottom:3px;"><span style="color:#555;min-width:52px;">현장주소</span><span contenteditable="${ce}">${j.addr}</span></div>
+        <div style="display:flex;gap:8px;"><span style="color:#555;min-width:52px;">누수 유형</span><span contenteditable="${ce}">${j.type}</span></div>
+      </div>
+      <div class="doc-section-h">누수 원인 및 발생 경위</div>
+      <div class="doc-text-editable" contenteditable="${ce}">${j.before||' '}</div>
+      <div class="doc-section-h">조치 내역</div>
+      <div class="doc-text-editable" contenteditable="${ce}">${j.action||' '}</div>
+      <div class="doc-section-h">조치 후 상태</div>
+      <div class="doc-text-editable" contenteditable="${ce}">${j.afterDesc||' '}</div>
+      <div class="doc-section-h" style="color:#c0392b;border-left-color:#e74c3c;">전문가 소견</div>
+      <div class="doc-text-editable" style="background:#fff8f8;border-color:#f5c6cb;" contenteditable="${ce}">${j.expertOpinion||'본 기술자는 현장 점검 결과, 상기 내용과 같이 누수가 발생하였음을 확인하며 전문가로서 소견합니다.'}</div>
+      <div class="doc-sign-row">
+        <div class="doc-sign-box">
+          <div>작성자 (기술자)</div>
+          ${biz.signatureImg?`<img class="doc-sign-img" src="${biz.signatureImg}">`:'<div class="doc-sign-line"></div>'}
+          <div contenteditable="${ce}">${biz.ceo||''}</div>
+        </div>
+        ${biz.stampImg?`<div class="doc-sign-box"><img class="doc-stamp-img" src="${biz.stampImg}"></div>`:''}
+      </div>
+    </div></div>
+
+    <!-- 4페이지: 사업자등록증 + 영수증 -->
+    ${(bizReg||receipts.length>0)?`
+    <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 사업자등록증 · 영수증</span><div class="ins-page-divider-line"></div></div>
+    <div class="a4-preview"><div style="background:white;padding:40px 36px;">
+      <div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">첨부 서류</div>
+      ${bizReg?`
+      <div style="margin-bottom:24px;">
+        <div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:6px;border-left:3px solid #4f8ef7;">사업자등록증 사본</div>
+        <img src="${bizReg}" style="max-width:100%;border:1px solid #e0e8f0;border-radius:4px;">
+      </div>`:''}
+      ${receipts.length>0?`
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:6px;border-left:3px solid #4f8ef7;">영수증 (카드전표 / 이체확인서)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${receipts.map((src,i)=>`<div><img src="${src}" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;"><div style="font-size:9px;color:#888;text-align:center;margin-top:3px;">영수증 ${i+1}</div></div>`).join('')}
+        </div>
+      </div>`:''}
+    </div></div>`:''}
     `;
-    // 기존 작업 사진 로드
-    setTimeout(()=>insLoadJobPhotos(j), 50);
+    setTimeout(()=>scaleA4(),150);
   }
 }
 
-// ══ 보험서류 사진 관리 ══
 let insPhotoTarget={type:null,idx:null};
 const insPhotos={scene:[null,null,null,null],before:[null,null,null,null],after:[null,null,null,null]};
 
@@ -2829,4 +2873,165 @@ function renderStats(){
 }
 </script>
 </body>
-</html>
+</html>  } else {
+    // 보험서류 편집 - 현장데이터 자동 스크랩 + 영수증 첨부
+    const insTotal=jobTotal(j);
+    const extraCost=(j.extraSpots||0)*200000;
+    const bPh=j.photosBefore||[];
+    const aPh=j.photosAfter||[];
+    const hasPh=bPh.some(Boolean)||aPh.some(Boolean);
+    el.innerHTML=`
+    <div style="background:white;color:#111;border-radius:12px;padding:20px 16px;font-size:13px;">
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a6e;padding-bottom:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1a3a6e;" contenteditable="true">${co}</div>
+          <div style="font-size:11px;color:#555;" contenteditable="true">대표: ${biz.ceo||'-'} | 사업자번호: ${biz.reg||'-'}</div>
+          <div style="font-size:11px;color:#555;" contenteditable="true">TEL: ${biz.tel||'-'}</div>
+        </div>
+        <div style="font-size:11px;color:#555;text-align:right;" contenteditable="true">작성일: ${today}</div>
+      </div>
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">보 험 청 구 신 청 서</div>
+      </div>
+
+      <!-- ① 신청인 정보 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">① 신청인 정보</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:26%;">성명</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.name}</td><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:22%;">생년월일</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td></tr>
+        <tr><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">연락처</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.phone||''}</td><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">이메일</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td></tr>
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 주소</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.addr}${j.location?' ('+j.location+')':''}</td></tr>
+        <tr><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">보험사명</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">증권번호</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td></tr>
+      </table>
+
+      <!-- ② 사고 내역 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">② 사고 내역</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:26%;">사고 발생일</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.date}</td><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:22%;">누수 유형</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.type}</td></tr>
+        <tr><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 장소</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.location||j.addr}</td></tr>
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 경위</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;min-height:40px;" contenteditable="true">${j.before||''}</td></tr>
+        <tr><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">피해 범위</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td></tr>
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">조치 내용</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.action||''}</td></tr>
+      </table>
+
+      <!-- ③ 수리 비용 명세 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">③ 수리 비용 명세</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;border:1px solid #c8d8f0;">
+        <thead><tr style="background:#e8f0fe;"><th style="padding:6px 10px;text-align:left;border:1px solid #c8d8f0;">항목</th><th style="padding:6px 10px;text-align:center;width:18%;border:1px solid #c8d8f0;">수량</th><th style="padding:6px 10px;text-align:right;width:26%;border:1px solid #c8d8f0;">금액(원)</th><th style="width:28px;border:1px solid #c8d8f0;"></th></tr></thead>
+        <tbody id="edit-ins-cost-tbody">
+          <tr><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="true">누수 탐지 검사비</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="true">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="true">${(j.inspectCost||0).toLocaleString()}</td><td style="border:1px solid #c8d8f0;text-align:center;"><button class="del-btn" onclick="delRow(this)">×</button></td></tr>
+          <tr style="background:#f8faff;"><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="true">누수 보수 공사비</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="true">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="true">${(j.baseCost||0).toLocaleString()}</td><td style="border:1px solid #c8d8f0;text-align:center;"><button class="del-btn" onclick="delRow(this)">×</button></td></tr>
+          ${(j.extraSpots||0)>0?`<tr><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="true">추가 구간 공사비(${j.extraSpots}개소)</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="true">${j.extraSpots}개소</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="true">${extraCost.toLocaleString()}</td><td style="border:1px solid #c8d8f0;text-align:center;"><button class="del-btn" onclick="delRow(this)">×</button></td></tr>`:''}
+          <tr ${(j.extraSpots||0)===0?'style="background:#f8faff;"':''}><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="true">자재비</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="true">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="true">${(j.materialCost||0).toLocaleString()}</td><td style="border:1px solid #c8d8f0;text-align:center;"><button class="del-btn" onclick="delRow(this)">×</button></td></tr>
+        </tbody>
+      </table>
+      <button style="width:100%;padding:7px;margin-bottom:10px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:5px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;" onclick="addEditInsRow()">+ 비용 항목 추가</button>
+      <div style="background:#1a3a6e;color:white;padding:9px 12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <span style="font-size:12px;font-weight:600;">청구 합계 (VAT 포함)</span>
+        <span style="font-size:15px;font-weight:700;" contenteditable="true">${insTotal.toLocaleString()}원</span>
+      </div>
+
+      <!-- ④ 현장사진 확인 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">④ 현장 사진</div>
+      <div style="border:1px solid #c8d8f0;padding:12px;margin-bottom:12px;">
+        ${hasPh?`
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#1a3a6e;margin-bottom:6px;">조치 전</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+            ${bPh.filter(Boolean).map(p=>`<img src="${p}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid #e0e8f0;">`).join('')}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#1a3a6e;margin-bottom:6px;">조치 후</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+            ${aPh.filter(Boolean).map(p=>`<img src="${p}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid #e0e8f0;">`).join('')}
+          </div>
+        </div>`:`<div style="text-align:center;padding:16px;color:#aaa;font-size:12px;">
+          현장관리에서 작업 사진을 등록하면 여기에 자동으로 불러옵니다
+        </div>`}
+      </div>
+
+      <!-- ⑤ 첨부서류 체크리스트 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">⑤ 첨부서류</div>
+      <div style="border:1px solid #c8d8f0;padding:12px;margin-bottom:12px;">
+        <div style="display:grid;gap:6px;">
+          ${['📋 견적서','📝 소견서','📸 현장사진 (조치 전)','📸 현장사진 (조치 후)','🧾 영수증 (카드전표 또는 이체확인서)','🏢 사업자등록증 사본','🪪 신분증 사본'].map((item,i)=>`
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e0e8f0;border-radius:6px;cursor:pointer;background:white;font-size:12px;">
+            <input type="checkbox" onchange="this.closest('label').style.background=this.checked?'#f0f9f0':'white';this.closest('label').style.borderColor=this.checked?'#4caf50':'#e0e8f0';" style="width:16px;height:16px;accent-color:#1a3a6e;cursor:pointer;">
+            <span>${item}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <!-- ⑥ 영수증 첨부 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">⑥ 영수증 첨부</div>
+      <div style="border:1px solid #c8d8f0;padding:12px;margin-bottom:12px;">
+        <div style="font-size:11px;color:#888;margin-bottom:10px;">카드전표 또는 계좌이체 확인서를 첨부하세요</div>
+        <div id="ins-receipt-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"></div>
+        <button onclick="document.getElementById('ins-receipt-input').click()" style="width:100%;padding:10px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:6px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📎 영수증 사진 추가</button>
+        <input type="file" id="ins-receipt-input" accept="image/*" multiple style="display:none" onchange="handleInsReceipt(event)">
+      </div>
+
+      <!-- ⑦ 입금 계좌 -->
+      <div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:6px 10px;border-radius:4px 4px 0 0;">⑦ 보험금 입금 계좌</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;"><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:26%;">은행명</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:22%;">예금주</td><td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true">${j.name}</td></tr>
+        <tr><td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">계좌번호</td><td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="true"></td></tr>
+      </table>
+
+      <!-- ⑧ 서명 -->
+      <div style="border:1px solid #c8d8f0;border-radius:6px;padding:12px;background:#fafcff;">
+        <div style="font-size:11px;color:#555;margin-bottom:10px;">위 내용이 사실임을 확인하며 보험금 청구를 신청합니다.</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+          <div style="flex:1;"><div style="font-size:11px;color:#888;margin-bottom:4px;">신청일</div><div style="border-bottom:1px solid #999;padding-bottom:4px;" contenteditable="true">${today}</div></div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">신청인 서명</div>
+            <div style="width:100px;height:50px;border:1px solid #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:white;">
+              ${biz.signatureImg?`<img src="${biz.signatureImg}" style="max-height:44px;max-width:95px;object-fit:contain;">`:'<span style="font-size:10px;color:#ccc;">서명</span>'}
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">업체 도장</div>
+            <div style="width:56px;height:56px;border:1px solid #ccc;border-radius:50%;display:flex;align-items:center;justify-content:center;background:white;margin:0 auto;">
+              ${biz.stampImg?`<img src="${biz.stampImg}" style="width:52px;height:52px;object-fit:contain;">`:'<span style="font-size:10px;color:#ccc;">도장</span>'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    // 영수증 목록 초기화
+    window.__insReceipts=[];
+  }
+}
+
+function handleInsReceipt(e){
+  const files=Array.from(e.target.files);
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      window.__insReceipts=(window.__insReceipts||[]);
+      window.__insReceipts.push(ev.target.result);
+      renderInsReceiptList();
+    };reader.readAsDataURL(file);
+  });
+  e.target.value='';
+}
+function renderInsReceiptList(){
+  const list=document.getElementById('ins-receipt-list');if(!list)return;
+  list.innerHTML=(window.__insReceipts||[]).map((src,i)=>`
+    <div style="position:relative;">
+      <img src="${src}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;border:1px solid #e0e8f0;">
+      <button onclick="window.__insReceipts.splice(${i},1);renderInsReceiptList();" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+    </div>`).join('');
+}
+function addEditInsRow(){
+  const t=document.getElementById('edit-ins-cost-tbody');if(!t)return;
+  const s='padding:6px 10px;border:1px solid #c8d8f0;';
+  const tr=document.createElement('tr');
+  tr.innerHTML='<td style="'+s+'" contenteditable="true">항목명</td>'
+    +'<td style="'+s+'text-align:center;" contenteditable="true">1식</td>'
+    +'<td style="'+s+'text-align:right;" contenteditable="true">0</td>'
+    +'<td style="border:1px solid #c8d8f0;text-align:center;width:28px;"><button class="del-btn" onclick="delRow(this)">×</button></td>';
+  t.appendChild(tr);
+}
+function updateInsCheck(i){}

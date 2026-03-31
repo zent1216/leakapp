@@ -513,8 +513,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       <button class="login-btn google" onclick="window.doGoogleLogin&&window.doGoogleLogin()">
         <span style="font-size:18px;">G</span> Google 계정으로 로그인
       </button>
-      <button class="login-btn" onclick="window.doSignup&&window.doSignup()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);">📝 새 계정 만들기 (회원가입)</button>
+      <button class="login-btn" onclick="showPage('page-signup')" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);">📝 새 계정 만들기</button>
       <div class="login-footer"><a onclick="window.doForgotPw&&window.doForgotPw()" style="color:var(--text2);">🔑 비밀번호를 잊으셨나요?</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ SIGNUP PAGE ════════════════ -->
+<div class="page" id="page-signup">
+  <div class="login-wrap">
+    <div class="login-logo">📝</div>
+    <div class="login-title">새 계정 <span>만들기</span></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px;text-align:center;line-height:1.6;">
+      이메일과 비밀번호를 입력해 주세요.<br>가입 후 이메일 인증이 필요합니다.
+    </div>
+    <div class="login-form" style="width:100%;">
+      <input class="login-input" type="email" id="signup-email" placeholder="이메일 주소">
+      <input class="login-input" type="password" id="signup-pw" placeholder="비밀번호 (6자리 이상)">
+      <input class="login-input" type="password" id="signup-pw2" placeholder="비밀번호 확인">
+      <button class="login-btn" onclick="window.doSignup&&window.doSignup()">✅ 가입하기</button>
+      <button class="login-btn" onclick="showPage('page-login')" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);">← 로그인으로 돌아가기</button>
     </div>
   </div>
 </div>
@@ -968,6 +986,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
     </div>
 
     <button class="btn btn-primary" onclick="saveBizInfo()">💾 전체 저장</button>
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:500;">⚠️ 위험 구역</div>
+      <button class="btn btn-danger" onclick="window.deleteAccount&&window.deleteAccount()">🗑️ 계정 삭제</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;text-align:center;">계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다.</div>
+    </div>
     <div style="height:20px;"></div>
   </div>
 </div>
@@ -1109,20 +1132,17 @@ window.doLogin=async function doLogin(){
 
 // ── 회원가입 (이메일 인증 포함) ──
 window.doSignup=async function doSignup(){
-  const email=document.getElementById('login-email').value.trim();
-  const pw=document.getElementById('login-pw').value;
+  const email=(document.getElementById('signup-email').value||'').trim();
+  const pw=document.getElementById('signup-pw').value||'';
+  const pw2=document.getElementById('signup-pw2').value||'';
   if(!email){showToast('이메일을 입력해주세요');return;}
   if(!pw){showToast('비밀번호를 입력해주세요');return;}
   if(pw.length<6){showToast('비밀번호는 6자리 이상이어야 합니다');return;}
+  if(pw!==pw2){showToast('비밀번호가 일치하지 않습니다 ❌');return;}
   try{
     showToast('계정 생성 중...');
     const cred=await auth.createUserWithEmailAndPassword(email,pw);
-    // 이메일 인증 메일 발송
-    await cred.user.sendEmailVerification({
-      url: window.location.href,
-      handleCodeInApp: false
-    });
-    // 인증 대기 페이지로 이동
+    await cred.user.sendEmailVerification({url:window.location.href,handleCodeInApp:false});
     document.getElementById('verify-email-addr').textContent=email;
     showPage('page-verify');
     showToast('인증 메일을 발송했습니다 📧');
@@ -1185,6 +1205,34 @@ window.doGoogleLogin=async function doGoogleLogin(){
     showToast('구글 로그인 중...');
     await auth.signInWithPopup(googleProvider);
   }catch(e){showToast('구글 로그인 실패: '+e.message);}
+}
+
+// ── 계정 삭제 ──
+window.deleteAccount=async function deleteAccount(){
+  const msg='정말 계정을 삭제하시겠습니까?\n\n⚠️ 모든 작업 데이터와 계정 정보가 영구적으로 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.';
+  if(!confirm(msg))return;
+  const user=auth.currentUser;
+  if(!user){showToast('로그인 상태가 아닙니다');return;}
+  try{
+    showToast('계정 삭제 중...');
+    // Firestore 데이터 삭제
+    const uid=user.uid;
+    await db.collection('users').doc(uid).delete();
+    // Firebase Auth 계정 삭제
+    await user.delete();
+    _cachedJobs=null;_cachedBiz={};_currentUid=null;
+    pageHistory=[];
+    showPage('page-login');
+    showToast('계정이 삭제되었습니다');
+  }catch(e){
+    if(e.code==='auth/requires-recent-login'){
+      showToast('보안을 위해 재로그인 후 시도해주세요');
+      await auth.signOut();
+      showPage('page-login');
+    } else {
+      showToast('삭제 실패: '+e.message);
+    }
+  }
 }
 
 // ── 로그아웃 ──

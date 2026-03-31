@@ -2231,61 +2231,218 @@ function renderDocEditArea(type){
     </div>`;
 
   } else {
-    // 보험서류
+    // 보험서류 - 완전한 보험청구 양식
+    const insTotal=jobTotal(j);
+    const extraCost=(j.extraSpots||0)*200000;
+    const workCost=(j.baseCost||0)+extraCost;
     el.innerHTML=`
     <div style="background:white;color:#111;border-radius:12px;padding:20px 16px;font-size:13px;">
-      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
-        <div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
-        <div style="font-size:11px;color:#555;" contenteditable="${ce}">${today}</div>
-      </div>
-      <div style="text-align:center;margin-bottom:14px;">
-        <div style="font-size:18px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">보험처리 신청서</div>
-      </div>
-      <div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:8px;padding:12px;margin-bottom:14px;">
-        <div style="display:flex;gap:8px;margin-bottom:4px;font-size:12px;">
-          <span style="color:#555;min-width:40px;">성명</span><span contenteditable="${ce}">${j.name}</span>
-          <span style="color:#555;min-width:40px;margin-left:8px;">연락처</span><span contenteditable="${ce}">${j.phone||'-'}</span>
+
+      <!-- 헤더 -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a6e;padding-bottom:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자번호: ${biz.reg||'-'}</div>
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'} | ${biz.addr||''}</div>
         </div>
-        <div style="display:flex;gap:8px;font-size:12px;">
-          <span style="color:#555;min-width:40px;">주소</span><span contenteditable="${ce}">${j.addr}</span>
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">작성일: ${today}</div>
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">문서번호: INS-${j.id}-${Date.now().toString().slice(-6)}</div>
         </div>
       </div>
-      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:3px solid #4f8ef7;padding-left:8px;margin-bottom:8px;">사고 내역</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;">
-        <thead><tr style="background:#1a3a6e;color:white;">
-          <th style="padding:7px 10px;text-align:left;width:35%">항목</th>
-          <th style="padding:7px 10px;text-align:left;">내용</th>
-          <th style="display:table-cell;width:28px;"></th>
-        </tr></thead>
-        <tbody id="edit-ins-tbody">
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고일자</td><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.date}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고유형</td><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.type}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고장소</td><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.location||j.addr}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고경위</td><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.before||'-'}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-        </tbody>
+
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:5px;">보 험 청 구 신 청 서</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">수분 및 누수 피해 보험 청구용</div>
+      </div>
+
+      <!-- 1. 신청인 정보 -->
+      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:4px solid #4f8ef7;padding-left:8px;margin-bottom:8px;background:#f0f5ff;padding:6px 8px;border-radius:0 4px 4px 0;">① 신청인 정보</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:32%;">성명</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.name}</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:28%;">생년월일</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">연락처</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.phone||'-'}</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">이메일</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+        </tr>
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 주소</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.addr}${j.location?' ('+j.location+')':''}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">보험사명</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">증권번호</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+        </tr>
       </table>
-      <button style="width:100%;padding:7px;margin-bottom:14px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:5px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;" onclick="addEditRow('edit-ins-tbody','항목','내용')">+ 행 추가</button>
-      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:3px solid #4f8ef7;padding-left:8px;margin-bottom:8px;">수리 비용 명세</div>
+
+      <!-- 2. 사고 내역 -->
+      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:4px solid #4f8ef7;padding-left:8px;margin-bottom:8px;background:#f0f5ff;padding:6px 8px;border-radius:0 4px 4px 0;">② 사고 내역</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:32%;">사고 발생일</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.date}</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:28%;">누수 유형</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.type}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 장소</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.location||j.addr}</td>
+        </tr>
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">사고 경위</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;min-height:50px;" contenteditable="${ce}">${j.before||'사고 경위를 입력하세요'}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">피해 범위</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.location||'-'} 일대 누수로 인한 수분 피해</td>
+        </tr>
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">조치 내용</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.action||'-'}</td>
+        </tr>
+      </table>
+      <button style="width:100%;padding:7px;margin-bottom:14px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:5px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;" onclick="addEditRow('edit-acc-tbody','항목','내용')">+ 사고 내역 행 추가</button>
+
+      <!-- 3. 수리 비용 명세 -->
+      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:4px solid #4f8ef7;padding-left:8px;margin-bottom:8px;background:#f0f5ff;padding:6px 8px;border-radius:0 4px 4px 0;">③ 수리 비용 명세</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;">
         <thead><tr style="background:#1a3a6e;color:white;">
           <th style="padding:7px 10px;text-align:left;">항목</th>
-          <th style="padding:7px 10px;text-align:right;width:35%">금액</th>
-          <th style="display:table-cell;width:28px;"></th>
+          <th style="padding:7px 10px;text-align:center;width:25%">수량/단위</th>
+          <th style="padding:7px 10px;text-align:right;width:28%">금액(원)</th>
+          <th style="display:table-cell;width:28px;background:#1a3a6e;"></th>
         </tr></thead>
         <tbody id="edit-ins-cost-tbody">
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">검사비</td><td style="padding:6px 10px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.inspectCost||0).toLocaleString()}원</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">공사비 (기본+추가)</td><td style="padding:6px 10px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${((j.baseCost||0)+((j.extraSpots||0)*200000)).toLocaleString()}원</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
-          <tr><td style="padding:6px 10px;border:1px solid #e0e8f0;" contenteditable="${ce}">자재비</td><td style="padding:6px 10px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.materialCost||0).toLocaleString()}원</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr style="background:#f8faff;"><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">누수 탐지 검사비</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="${ce}">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="${ce}">${(j.inspectCost||0).toLocaleString()}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;border:1px solid #c8d8f0;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">누수 보수 공사비 (기본)</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="${ce}">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="${ce}">${(j.baseCost||0).toLocaleString()}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;border:1px solid #c8d8f0;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          ${(j.extraSpots||0)>0?`<tr style="background:#f8faff;"><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">추가 구간 공사비 (${j.extraSpots}개소)</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="${ce}">${j.extraSpots}개소</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="${ce}">${extraCost.toLocaleString()}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;border:1px solid #c8d8f0;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>`:''}
+          <tr ${(j.extraSpots||0)===0?'style="background:#f8faff;"':''}><td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">자재비</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="${ce}">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="${ce}">${(j.materialCost||0).toLocaleString()}</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;border:1px solid #c8d8f0;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
         </tbody>
       </table>
-      <button style="width:100%;padding:7px;margin-bottom:14px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:5px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;" onclick="addEditRow('edit-ins-cost-tbody','항목','0원')">+ 비용 행 추가</button>
-      <div style="background:#1a3a6e;color:white;padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span style="font-size:13px;font-weight:600;">합계</span>
-        <span style="font-size:16px;font-weight:700;" contenteditable="${ce}">${jobTotal(j).toLocaleString()}원</span>
+      <button style="width:100%;padding:7px;margin-bottom:8px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.35);border-radius:5px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;" onclick="addEditInsRow()">+ 비용 항목 추가</button>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
+        <tr style="background:#e8f0fe;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;font-weight:700;">소계</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;text-align:center;"></td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;text-align:right;font-weight:700;" contenteditable="${ce}">${insTotal.toLocaleString()}</td>
+          <td style="width:28px;border:1px solid #c8d8f0;"></td>
+        </tr>
+        <tr style="background:#1a3a6e;color:white;">
+          <td style="padding:8px 10px;font-weight:700;font-size:13px;" colspan="2">청구 합계 (VAT 포함)</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;font-size:15px;" contenteditable="${ce}">${insTotal.toLocaleString()}원</td>
+          <td style="width:28px;"></td>
+        </tr>
+      </table>
+
+      <!-- 4. 첨부서류 체크리스트 -->
+      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:4px solid #4f8ef7;padding-left:8px;margin-bottom:8px;background:#f0f5ff;padding:6px 8px;border-radius:0 4px 4px 0;">④ 첨부서류</div>
+      <div style="border:1px solid #c8d8f0;border-radius:6px;padding:12px;margin-bottom:14px;background:#fafcff;">
+        <div style="font-size:11px;color:#888;margin-bottom:8px;">아래 서류를 함께 제출해 주세요</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">📋</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">견적서</div>
+              <div style="font-size:10px;color:#888;">업체 발행 견적서</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">📝</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">소견서</div>
+              <div style="font-size:10px;color:#888;">전문가 기술 소견서</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">📸</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">현장사진</div>
+              <div style="font-size:10px;color:#888;">조치 전·후 현장 사진</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">🧾</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">영수증</div>
+              <div style="font-size:10px;color:#888;">카드전표 또는 입금확인서</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">🏢</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">사업자등록증</div>
+              <div style="font-size:10px;color:#888;">업체 사업자등록증 사본</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e0e8f0;border-radius:4px;background:white;">
+            <span style="font-size:16px;">🪪</span>
+            <div>
+              <div style="font-weight:600;color:#1a3a6e;">신분증 사본</div>
+              <div style="font-size:10px;color:#888;">신청인 신분증 사본</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:4px;font-size:11px;color:#664d03;" contenteditable="${ce}">
+          ※ 영수증은 카드전표(카드사명/승인번호 포함) 또는 계좌이체 확인증으로 대체 가능합니다.<br>
+          ※ 현장사진은 누수 부위, 피해 범위, 조치 전·후를 모두 포함해야 합니다.
+        </div>
       </div>
-      <div style="font-size:12px;color:#555;padding:10px 0;border-top:1px solid #eee;" contenteditable="${ce}">첨부서류: □ 현장사진(전/후) &nbsp;□ 견적서 &nbsp;□ 소견서 &nbsp;□ 사업자등록증</div>
+
+      <!-- 5. 입금 계좌 -->
+      <div style="font-size:13px;font-weight:700;color:#1a3a6e;border-left:4px solid #4f8ef7;padding-left:8px;margin-bottom:8px;background:#f0f5ff;padding:6px 8px;border-radius:0 4px 4px 0;">⑤ 보험금 입금 계좌</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;border:1px solid #c8d8f0;">
+        <tr style="background:#f8faff;">
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:32%;">은행명</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;width:28%;">예금주</td>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">${j.name}</td>
+        </tr>
+        <tr>
+          <td style="padding:7px 10px;border:1px solid #c8d8f0;color:#555;font-weight:600;">계좌번호</td>
+          <td colspan="3" style="padding:7px 10px;border:1px solid #c8d8f0;" contenteditable="${ce}">-</td>
+        </tr>
+      </table>
+
+      <!-- 6. 서명란 -->
+      <div style="border:1px solid #c8d8f0;border-radius:6px;padding:12px;margin-bottom:8px;background:#fafcff;">
+        <div style="font-size:11px;color:#555;margin-bottom:8px;">위 내용이 사실임을 확인하며 보험금 청구를 신청합니다.</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">신청일</div>
+            <div style="border-bottom:1px solid #999;padding-bottom:4px;" contenteditable="${ce}">${today}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">신청인 서명</div>
+            <div style="width:100px;height:50px;border:1px solid #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:white;">
+              ${biz.signatureImg?`<img src="${biz.signatureImg}" style="max-height:44px;max-width:95px;object-fit:contain;">`:'<span style="font-size:10px;color:#ccc;">서명</span>'}
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;color:#888;margin-bottom:4px;">업체 확인</div>
+            <div style="width:60px;height:60px;border:1px solid #ccc;border-radius:50%;display:flex;align-items:center;justify-content:center;background:white;margin:0 auto;">
+              ${biz.stampImg?`<img src="${biz.stampImg}" style="width:56px;height:56px;object-fit:contain;">`:'<span style="font-size:10px;color:#ccc;">도장</span>'}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#aaa;text-align:center;" contenteditable="${ce}">※ 이 서류는 ${co}이 보험청구를 위해 작성한 공식 서류입니다.</div>
     </div>`;
   }
+}
+
+function addEditInsRow(){
+  const t=document.getElementById('edit-ins-cost-tbody');if(!t)return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td style="padding:6px 10px;border:1px solid #c8d8f0;" contenteditable="true">항목명</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:center;" contenteditable="true">1식</td><td style="padding:6px 10px;border:1px solid #c8d8f0;text-align:right;" contenteditable="true">0</td><td style="display:table-cell;width:28px;padding:0 2px;text-align:center;border:1px solid #c8d8f0;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  t.appendChild(tr);
 }
 
 function addEditRow(tbodyId,col1,col2){

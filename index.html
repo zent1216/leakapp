@@ -506,8 +506,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       <div class="login-feat"><div class="login-feat-icon">📊</div><div class="login-feat-text">월별 실적 · 매출 통계</div></div>
     </div>
     <div class="login-form">
-      <input class="login-input" type="email" id="login-email" placeholder="이메일" value="demo@leakapp.kr">
-      <input class="login-input" type="password" id="login-pw" placeholder="비밀번호" value="1234">
+      <input class="login-input" type="email" id="login-email" placeholder="이메일" placeholder="이메일 주소" value="">
+      <input class="login-input" type="password" id="login-pw" placeholder="비밀번호 (6자리 이상)" value="">
       <button class="login-btn" onclick="window.doLogin&&window.doLogin()">로그인</button>
       <div class="login-divider"><span>또는</span></div>
       <button class="login-btn google" onclick="window.doGoogleLogin&&window.doGoogleLogin()">
@@ -697,43 +697,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
     <div class="topbar-title" id="docs-page-title">문서 <span>생성</span></div>
     <div class="topbar-right">
       <button id="docs-mode-btn" onclick="toggleDocsMode()"
-        style="background:var(--accent);color:white;border:none;border-radius:var(--r-sm);padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation;">
+        style="background:var(--accent);color:white;border:none;border-radius:var(--r-sm);padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;touch-action:manipulation;">
         👁️ 미리보기
       </button>
     </div>
   </div>
-
-  <!-- ── 편집 모드 (기본 화면) ── -->
-  <div id="docs-edit-panel" class="page-body">
+  <div class="page-body">
+    <!-- 작업 선택 + 탭 (항상 표시) -->
     <div class="form-group" style="margin-bottom:10px;">
       <label class="form-label">작업 선택</label>
       <select class="form-select" id="doc-job-sel" onchange="onDocJobChange()"></select>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
+    <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;">
       <button class="btn btn-secondary btn-sm" id="tab-estimate" onclick="setDocType('estimate')">📋 견적서</button>
       <button class="btn btn-secondary btn-sm" id="tab-opinion" onclick="setDocType('opinion')">📝 소견서</button>
       <button class="btn btn-secondary btn-sm" id="tab-insurance" onclick="setDocType('insurance')">🏛️ 보험서류</button>
     </div>
-    <!-- 선택된 작업 요약 정보 -->
-    <div id="docs-edit-form"></div>
-    <div style="height:20px;"></div>
-  </div>
 
-  <!-- ── 미리보기 모드 (👁️ 버튼 클릭 후) ── -->
-  <div id="docs-preview-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
-    <div class="page-body">
-      <!-- 직접 수정 토글 바 -->
-      <div class="edit-mode-bar" style="margin-bottom:10px;">
-        <div class="edit-mode-label">
-          <span id="edit-mode-icon">👁️</span>
-          <span id="edit-mode-text">A4 미리보기</span>
-        </div>
-        <button class="edit-toggle-btn off" id="edit-toggle-btn" onclick="toggleEditMode()">✏️ 직접수정</button>
+    <!-- ── 편집 모드: 기존처럼 contenteditable 문서 (모바일 너비) ── -->
+    <div id="docs-edit-panel">
+      <!-- 직접수정 안내 -->
+      <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:var(--r-sm);padding:8px 12px;font-size:12px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <span>✏️</span>
+        <span>텍스트를 직접 터치해서 수정할 수 있어요</span>
       </div>
-      <div class="edit-hint" id="edit-hint" style="display:none;">💡 텍스트를 직접 터치해서 수정하세요</div>
-      <!-- A4 문서 미리보기 -->
+      <div id="doc-edit-area"></div>
+    </div>
+
+    <!-- ── 미리보기 모드: A4 규격 + 공유버튼 ── -->
+    <div id="docs-preview-panel" style="display:none;">
       <div id="doc-preview-area"></div>
-      <!-- 공유/내보내기 -->
       <div class="share-bar" style="margin-top:10px;">
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500;">공유 및 내보내기</div>
         <div class="share-btns">
@@ -744,8 +737,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
           <button class="share-btn" onclick="printDoc()" style="grid-column:1/-1;background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄 (A4)</button>
         </div>
       </div>
-      <div style="height:20px;"></div>
     </div>
+
+    <div style="height:20px;"></div>
   </div>
 </div>
 
@@ -1065,16 +1059,25 @@ window.doLogin=async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
   if(!email||!pw){showToast('이메일과 비밀번호를 입력해주세요');return;}
+  if(pw.length<6){showToast('비밀번호는 6자리 이상이어야 합니다');return;}
   try{
     showToast('로그인 중...');
     await auth.signInWithEmailAndPassword(email,pw);
   }catch(e){
-    if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'){
-      // 계정 없으면 자동 회원가입
+    if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'){
       try{
+        showToast('계정 생성 중...');
         await auth.createUserWithEmailAndPassword(email,pw);
         showToast('새 계정이 생성됐습니다 ✓');
-      }catch(e2){showToast('오류: '+e2.message);}
+      }catch(e2){
+        if(e2.code==='auth/email-already-in-use'){
+          showToast('비밀번호가 틀렸습니다');
+        } else {
+          showToast('오류: '+e2.message);
+        }
+      }
+    } else if(e.code==='auth/invalid-email'){
+      showToast('이메일 형식이 올바르지 않습니다');
     } else {
       showToast('로그인 실패: '+e.message);
     }
@@ -1911,15 +1914,17 @@ function setDocsEditMode(){
   document.getElementById('docs-preview-panel').style.display='none';
   const btn=document.getElementById('docs-mode-btn');
   if(btn){btn.textContent='👁️ 미리보기';btn.style.background='var(--accent)';btn.style.color='white';}
-  if(isEditMode)toggleEditMode();
+  // 편집 영역 렌더링
+  renderDocEditArea(currentDocType);
 }
 
 function setDocsPreviewMode(){
   isPreviewMode=true;
   document.getElementById('docs-edit-panel').style.display='none';
-  document.getElementById('docs-preview-panel').style.display='flex';
+  document.getElementById('docs-preview-panel').style.display='block';
   const btn=document.getElementById('docs-mode-btn');
   if(btn){btn.textContent='← 편집으로';btn.style.background='var(--bg3)';btn.style.color='var(--text2)';}
+  // A4 미리보기 렌더링
   renderDocPreviewCurrent();
   setTimeout(scaleA4,150);
 }
@@ -1932,17 +1937,6 @@ function toggleDocsMode(){
 function initDocsPage(type){
   isEditMode=false;
   isPreviewMode=false;
-  setDocsEditMode();
-  // 편집모드 버튼 초기화
-  const etBtn=document.getElementById('edit-toggle-btn');
-  const icon=document.getElementById('edit-mode-icon');
-  const txt=document.getElementById('edit-mode-text');
-  const hint=document.getElementById('edit-hint');
-  if(etBtn){etBtn.textContent='✏️ 직접수정';etBtn.className='edit-toggle-btn off';}
-  if(icon)icon.textContent='👁️';
-  if(txt)txt.textContent='A4 미리보기';
-  if(hint)hint.style.display='none';
-  // 작업 목록 로드
   const jobs=loadJobs();
   const sel=document.getElementById('doc-job-sel');
   sel.innerHTML=jobs.length
@@ -1951,44 +1945,178 @@ function initDocsPage(type){
   setDocType(type);
 }
 
-function renderDocsEditForm(type){
+// 편집 영역 렌더링 - contenteditable, 모바일 너비 기준
+function renderDocEditArea(type){
   const j=getSelJob();
-  const el=document.getElementById('docs-edit-form');
+  const el=document.getElementById('doc-edit-area');
   if(!el)return;
   if(!j){
-    el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>위에서 작업을 선택하세요</div></div>';
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>작업을 선택하세요</div></div>';
     return;
   }
-  const labels={estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  const biz=loadBiz();
+  const today=new Date().toLocaleDateString('ko-KR');
   const total=jobTotal(j);
-  el.innerHTML=`
-    <div class="detail-info-card">
-      <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);">
-        📄 ${labels[type]||'문서'} — ${j.name} (${j.date})
+  const co=biz.name||'누수설비 전문업체';
+  const ce='true'; // contenteditable 항상 켜져있음
+
+  if(type==='estimate'){
+    el.innerHTML=`<div style="background:white;color:#111;border-radius:var(--r);padding:20px 16px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자: ${biz.reg||'-'}</div>
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'}</div>
+        </div>
+        <div style="font-size:10px;color:#555;text-align:right;" contenteditable="${ce}">발행일: ${today}</div>
       </div>
-      <div class="info-row"><div class="info-key">고객명</div><div class="info-val">${j.name}</div></div>
-      <div class="info-row"><div class="info-key">연락처</div><div class="info-val">${j.phone||'-'}</div></div>
-      <div class="info-row"><div class="info-key">주소</div><div class="info-val">${j.addr}${j.location?' · '+j.location:''}</div></div>
-      <div class="info-row"><div class="info-key">작업일</div><div class="info-val">${j.date}</div></div>
-      <div class="info-row"><div class="info-key">유형</div><div class="info-val">${j.type}</div></div>
-      ${type==='estimate'?`<div class="info-row"><div class="info-key">합계금액</div><div class="info-val" style="color:var(--accent);font-weight:700;">${fmtMoney(total)}</div></div>`:''}
-      ${j.before?`<div class="info-row"><div class="info-key">조치 전</div><div class="info-val" style="font-size:12px;color:var(--text2);">${j.before}</div></div>`:''}
-      ${j.action?`<div class="info-row"><div class="info-key">조치 내용</div><div class="info-val" style="font-size:12px;color:var(--text2);">${j.action}</div></div>`:''}
-      ${j.afterDesc?`<div class="info-row"><div class="info-key">조치 후</div><div class="info-val" style="font-size:12px;color:var(--text2);">${j.afterDesc}</div></div>`:''}
-      ${j.expertOpinion?`<div class="info-row"><div class="info-key">전문가소견</div><div class="info-val" style="font-size:12px;color:var(--text2);">${j.expertOpinion}</div></div>`:''}
-    </div>
-    <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:var(--text2);margin-bottom:12px;">
-      💡 내용 수정은 <strong style="color:var(--text)">현장관리 → 작업 수정</strong>에서 하세요.<br>
-      문서에서 직접 수정은 <strong style="color:var(--accent)">미리보기 → 직접수정</strong> 버튼을 사용하세요.
-    </div>
-    <button class="btn btn-primary" onclick="setDocsPreviewMode()">
-      👁️ A4 미리보기로 보기
-    </button>`;
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;" contenteditable="${ce}">견  적  서</div>
+      </div>
+      <div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
+        <div style="display:flex;gap:8px;font-size:12px;margin-bottom:3px;">
+          <span style="color:#555;min-width:52px;">고객명</span><span contenteditable="${ce}">${j.name}</span>
+          <span style="color:#555;min-width:40px;margin-left:8px;">연락처</span><span contenteditable="${ce}">${j.phone||'-'}</span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;">
+          <span style="color:#555;min-width:52px;">현장주소</span><span contenteditable="${ce}">${j.addr}${j.location?' ('+j.location+')':''}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;" contenteditable="${ce}">작업 내역</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;">
+        <thead><tr style="background:#1a3a6e;color:white;"><th style="padding:6px 8px;text-align:left;width:30%">항목</th><th style="padding:6px 8px;text-align:left;">내용</th><th class="th-del"></th></tr></thead>
+        <tbody id="edit-work-tbody">
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">작업일</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.date}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">누수 유형</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.type}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">조치 내용</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.action||'-'}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEditRow('edit-work-tbody','작업 항목','내용')">+ 작업 항목 추가</button>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;" contenteditable="${ce}">비용 명세</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;">
+        <thead><tr style="background:#1a3a6e;color:white;"><th style="padding:6px 8px;text-align:left;">항목</th><th style="padding:6px 8px;text-align:center;width:22%">단가</th><th style="padding:6px 8px;text-align:right;width:22%">금액</th><th class="th-del"></th></tr></thead>
+        <tbody id="edit-cost-tbody">
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">누수 검사비</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:center;" contenteditable="${ce}">-</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.inspectCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">기본 공사비</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:center;" contenteditable="${ce}">-</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.baseCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          ${(j.extraSpots||0)>0?`<tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">추가 구간</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:center;" contenteditable="${ce}">200,000원</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${((j.extraSpots||0)*200000).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>`:''}
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">자재비</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:center;" contenteditable="${ce}">-</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.materialCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEditCostRow('edit-cost-tbody')">+ 비용 항목 추가</button>
+      <div style="background:#1a3a6e;color:white;padding:8px 12px;border-radius:6px;display:flex;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:600;" contenteditable="${ce}">합계 금액 (VAT 포함)</span>
+        <span style="font-size:14px;font-weight:700;" contenteditable="${ce}">${total.toLocaleString()}원</span>
+      </div>
+      <div style="background:#fffbf0;border:1px solid #f0d060;border-radius:6px;padding:8px 12px;font-size:10px;color:#665500;line-height:1.8;" contenteditable="${ce}">※ 본 견적서는 현장 확인 후 변동될 수 있습니다.<br>※ 견적 유효기간: 발행일로부터 30일<br>※ AS 보증기간: 시공 완료일로부터 1년<br>${biz.bank?'※ 입금계좌: '+biz.bank:''}</div>
+    </div>`;
+
+  } else if(type==='opinion'){
+    el.innerHTML=`<div style="background:white;color:#111;border-radius:var(--r);padding:20px 16px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
+          <div style="font-size:10px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'}</div>
+        </div>
+        <div style="font-size:10px;color:#555;" contenteditable="${ce}">작성일: ${today}</div>
+      </div>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;" contenteditable="${ce}">소  견  서</div>
+      </div>
+      <div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
+        <div style="display:flex;gap:8px;font-size:12px;margin-bottom:3px;">
+          <span style="color:#555;min-width:52px;">고객명</span><span contenteditable="${ce}">${j.name}</span>
+          <span style="color:#555;min-width:40px;margin-left:8px;">점검일</span><span contenteditable="${ce}">${j.date}</span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;margin-bottom:3px;">
+          <span style="color:#555;min-width:52px;">현장주소</span><span contenteditable="${ce}">${j.addr}</span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;">
+          <span style="color:#555;min-width:52px;">누수 유형</span><span contenteditable="${ce}">${j.type}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;">누수 원인 및 발생 경위</div>
+      <div style="background:#f8faff;border:1px solid #e0e8f0;border-radius:6px;padding:10px;font-size:12px;line-height:1.8;margin-bottom:10px;min-height:60px;" contenteditable="${ce}">${j.before||'내용을 입력하세요'}</div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;">조치 내역</div>
+      <div style="background:#f8faff;border:1px solid #e0e8f0;border-radius:6px;padding:10px;font-size:12px;line-height:1.8;margin-bottom:10px;min-height:60px;" contenteditable="${ce}">${j.action||'내용을 입력하세요'}</div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;">조치 후 상태</div>
+      <div style="background:#f8faff;border:1px solid #e0e8f0;border-radius:6px;padding:10px;font-size:12px;line-height:1.8;margin-bottom:10px;min-height:50px;" contenteditable="${ce}">${j.afterDesc||'내용을 입력하세요'}</div>
+      <div style="font-size:12px;font-weight:700;color:#c0392b;padding-left:6px;border-left:3px solid #e74c3c;margin-bottom:6px;">전문가 소견</div>
+      <div style="background:#fff8f8;border:1px solid #f5c6cb;border-radius:6px;padding:10px;font-size:12px;line-height:1.8;margin-bottom:12px;min-height:70px;" contenteditable="${ce}">${j.expertOpinion||'전문가 소견을 입력하세요'}</div>
+    </div>`;
+
+  } else {
+    // 보험서류 - 간단 요약 편집
+    el.innerHTML=`<div style="background:white;color:#111;border-radius:var(--r);padding:20px 16px;font-size:12px;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:16px;font-weight:700;color:#1a3a6e;letter-spacing:4px;" contenteditable="${ce}">보험처리 신청서류</div>
+        <div style="font-size:10px;color:#888;margin-top:4px;" contenteditable="${ce}">${co} | ${today}</div>
+      </div>
+      <div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
+        <div style="display:flex;gap:8px;font-size:12px;margin-bottom:3px;">
+          <span style="color:#555;min-width:40px;">성명</span><span contenteditable="${ce}">${j.name}</span>
+          <span style="color:#555;min-width:40px;margin-left:8px;">연락처</span><span contenteditable="${ce}">${j.phone||'-'}</span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;">
+          <span style="color:#555;min-width:40px;">주소</span><span contenteditable="${ce}">${j.addr}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;">사고 내역</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;">
+        <thead><tr style="background:#1a3a6e;color:white;"><th style="padding:6px 8px;text-align:left;width:30%">항목</th><th style="padding:6px 8px;text-align:left;">내용</th><th class="th-del"></th></tr></thead>
+        <tbody id="edit-ins-tbody">
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고일자</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.date}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고유형</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.type}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고장소</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.location||j.addr}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">사고경위</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">${j.before||'-'}</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEditRow('edit-ins-tbody','항목명','내용')">+ 항목 추가</button>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;padding-left:6px;border-left:3px solid #4f8ef7;margin-bottom:6px;">수리 비용 명세</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;">
+        <thead><tr style="background:#1a3a6e;color:white;"><th style="padding:6px 8px;text-align:left;">항목</th><th style="padding:6px 8px;text-align:right;width:30%">금액</th><th class="th-del"></th></tr></thead>
+        <tbody id="edit-ins-cost-tbody">
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">검사비</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.inspectCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">공사비 (기본+추가)</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${((j.baseCost||0)+((j.extraSpots||0)*200000)).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+          <tr><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="${ce}">자재비</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="${ce}">${(j.materialCost||0).toLocaleString()}원</td><td class="td-del"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEditCostRow2('edit-ins-cost-tbody')">+ 비용 항목 추가</button>
+      <div style="background:#1a3a6e;color:white;padding:8px 12px;border-radius:6px;display:flex;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:600;">합계</span>
+        <span style="font-size:14px;font-weight:700;" contenteditable="${ce}">${jobTotal(j).toLocaleString()}원</span>
+      </div>
+      <div style="font-size:11px;color:#555;padding:8px 0;" contenteditable="${ce}">□ 현장 사진 (조치 전/후) &nbsp; □ 견적서 &nbsp; □ 소견서 &nbsp; □ 사업자등록증</div>
+    </div>`;
+  }
+  // 삭제/추가 버튼은 항상 보이게 (doc-editable 없이)
+  el.querySelectorAll('.td-del').forEach(td=>td.style.display='table-cell');
+  el.querySelectorAll('.th-del').forEach(th=>th.style.display='table-cell');
+  el.querySelectorAll('.add-row-btn').forEach(btn=>btn.style.display='flex');
+}
+
+// 편집 영역 행 추가 헬퍼
+function addEditRow(tbodyId,col1,col2){
+  const t=document.getElementById(tbodyId);if(!t)return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="true">${col1}</td><td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="true">${col2}</td><td class="td-del" style="display:table-cell;width:28px;padding:0 2px;text-align:center;vertical-align:middle;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  t.appendChild(tr);
+}
+function addEditCostRow(tbodyId){
+  const t=document.getElementById(tbodyId);if(!t)return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="true">항목명</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:center;" contenteditable="true">-</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="true">0원</td><td class="td-del" style="display:table-cell;width:28px;padding:0 2px;text-align:center;vertical-align:middle;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  t.appendChild(tr);
+}
+function addEditCostRow2(tbodyId){
+  const t=document.getElementById(tbodyId);if(!t)return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="true">항목명</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="true">0원</td><td class="td-del" style="display:table-cell;width:28px;padding:0 2px;text-align:center;vertical-align:middle;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  t.appendChild(tr);
 }
 
 function onDocJobChange(){
-  renderDocsEditForm(currentDocType);
   if(isPreviewMode) renderDocPreviewCurrent();
+  else renderDocEditArea(currentDocType);
 }
 function renderDocPreviewCurrent(){renderDocPreview(currentDocType);setTimeout(scaleA4,100);}
 function getSelJob(){

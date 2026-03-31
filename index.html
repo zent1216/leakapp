@@ -513,7 +513,42 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       <button class="login-btn google" onclick="window.doGoogleLogin&&window.doGoogleLogin()">
         <span style="font-size:18px;">G</span> Google 계정으로 로그인
       </button>
-      <div class="login-footer">계정이 없으신가요? <a onclick="window.doLogin&&window.doLogin()">회원가입</a></div>
+      <button class="login-btn" onclick="window.doSignup&&window.doSignup()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);">📝 새 계정 만들기 (회원가입)</button>
+      <div class="login-footer"><a onclick="window.doForgotPw&&window.doForgotPw()" style="color:var(--text2);">🔑 비밀번호를 잊으셨나요?</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ EMAIL VERIFY PAGE ════════════════ -->
+<div class="page" id="page-verify">
+  <div class="login-wrap" style="gap:16px;">
+    <div style="font-size:48px;">📧</div>
+    <div class="login-title" style="text-align:center;">이메일 <span>인증</span></div>
+    <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.7;" id="verify-email-msg">
+      가입하신 이메일로 인증 메일을 발송했습니다.<br>메일함을 확인하고 인증 링크를 클릭해주세요.
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;width:100%;text-align:center;">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">인증 메일 발송 주소</div>
+      <div style="font-size:14px;font-weight:700;" id="verify-email-addr">-</div>
+    </div>
+    <button class="login-btn" onclick="window.checkEmailVerified&&window.checkEmailVerified()">✅ 인증 완료 확인</button>
+    <button class="login-btn" onclick="window.resendVerifyEmail&&window.resendVerifyEmail()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);">📨 인증 메일 다시 보내기</button>
+    <button class="login-btn" onclick="window.doLogout&&window.doLogout()" style="background:transparent;color:var(--text3);border:none;font-size:13px;">로그아웃</button>
+  </div>
+</div>
+
+<!-- ════════════════ FORGOT PASSWORD PAGE ════════════════ -->
+<div class="page" id="page-forgot">
+  <div class="login-wrap">
+    <div class="login-logo">🔑</div>
+    <div class="login-title">비밀번호 <span>찾기</span></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px;text-align:center;line-height:1.6;">
+      가입한 이메일 주소를 입력하시면<br>비밀번호 재설정 링크를 보내드립니다.
+    </div>
+    <div class="login-form">
+      <input class="login-input" type="email" id="forgot-email" placeholder="가입한 이메일 주소">
+      <button class="login-btn" onclick="window.sendResetEmail&&window.sendResetEmail()">📨 재설정 메일 보내기</button>
+      <button class="login-btn" onclick="showPage('page-login')" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);margin-top:4px;">← 로그인으로 돌아가기</button>
     </div>
   </div>
 </div>
@@ -1055,6 +1090,7 @@ function goBack(){
 }
 
 // ══ AUTH ══
+// ── 로그인 ──
 window.doLogin=async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
@@ -1064,31 +1100,94 @@ window.doLogin=async function doLogin(){
     showToast('로그인 중...');
     await auth.signInWithEmailAndPassword(email,pw);
   }catch(e){
-    if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'){
-      try{
-        showToast('계정 생성 중...');
-        await auth.createUserWithEmailAndPassword(email,pw);
-        showToast('새 계정이 생성됐습니다 ✓');
-      }catch(e2){
-        if(e2.code==='auth/email-already-in-use'){
-          showToast('비밀번호가 틀렸습니다');
-        } else {
-          showToast('오류: '+e2.message);
-        }
-      }
-    } else if(e.code==='auth/invalid-email'){
-      showToast('이메일 형식이 올바르지 않습니다');
-    } else {
-      showToast('로그인 실패: '+e.message);
-    }
+    if(e.code==='auth/invalid-email'){showToast('이메일 형식이 올바르지 않습니다');}
+    else if(e.code==='auth/user-not-found'){showToast('가입되지 않은 이메일입니다. 회원가입을 해주세요.');}
+    else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){showToast('비밀번호가 틀렸습니다');}
+    else{showToast('로그인 실패: '+e.message);}
   }
 }
+
+// ── 회원가입 (이메일 인증 포함) ──
+window.doSignup=async function doSignup(){
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  if(!email){showToast('이메일을 입력해주세요');return;}
+  if(!pw){showToast('비밀번호를 입력해주세요');return;}
+  if(pw.length<6){showToast('비밀번호는 6자리 이상이어야 합니다');return;}
+  try{
+    showToast('계정 생성 중...');
+    const cred=await auth.createUserWithEmailAndPassword(email,pw);
+    // 이메일 인증 메일 발송
+    await cred.user.sendEmailVerification({
+      url: window.location.href,
+      handleCodeInApp: false
+    });
+    // 인증 대기 페이지로 이동
+    document.getElementById('verify-email-addr').textContent=email;
+    showPage('page-verify');
+    showToast('인증 메일을 발송했습니다 📧');
+  }catch(e){
+    if(e.code==='auth/email-already-in-use'){showToast('이미 가입된 이메일입니다. 로그인해 주세요.');}
+    else if(e.code==='auth/invalid-email'){showToast('이메일 형식이 올바르지 않습니다');}
+    else{showToast('회원가입 실패: '+e.message);}
+  }
+}
+
+// ── 이메일 인증 확인 ──
+window.checkEmailVerified=async function checkEmailVerified(){
+  const user=auth.currentUser;
+  if(!user){showPage('page-login');return;}
+  await user.reload();
+  if(user.emailVerified){
+    showToast('이메일 인증 완료! ✓');
+    await loadUserData(user.uid);
+    document.getElementById('main-user-name').textContent=user.displayName||user.email.split('@')[0];
+    showPage('page-main');
+    updateMainStats();
+  }else{
+    showToast('아직 인증이 완료되지 않았습니다. 메일함을 확인해주세요.');
+  }
+}
+
+// ── 인증 메일 재발송 ──
+window.resendVerifyEmail=async function resendVerifyEmail(){
+  const user=auth.currentUser;
+  if(!user)return;
+  try{
+    await user.sendEmailVerification({url:window.location.href,handleCodeInApp:false});
+    showToast('인증 메일을 다시 보냈습니다 📧');
+  }catch(e){showToast('발송 실패: '+e.message);}
+}
+
+// ── 비밀번호 찾기 ──
+window.doForgotPw=function doForgotPw(){
+  const email=document.getElementById('login-email').value.trim();
+  if(email) document.getElementById('forgot-email').value=email;
+  showPage('page-forgot');
+}
+window.sendResetEmail=async function sendResetEmail(){
+  const email=document.getElementById('forgot-email').value.trim();
+  if(!email){showToast('이메일을 입력해주세요');return;}
+  try{
+    showToast('메일 발송 중...');
+    await auth.sendPasswordResetEmail(email,{url:window.location.href});
+    showToast('비밀번호 재설정 메일을 보냈습니다 ✓');
+    setTimeout(()=>showPage('page-login'),2000);
+  }catch(e){
+    if(e.code==='auth/user-not-found'){showToast('가입되지 않은 이메일입니다');}
+    else{showToast('발송 실패: '+e.message);}
+  }
+}
+
+// ── 구글 로그인 ──
 window.doGoogleLogin=async function doGoogleLogin(){
   try{
     showToast('구글 로그인 중...');
     await auth.signInWithPopup(googleProvider);
   }catch(e){showToast('구글 로그인 실패: '+e.message);}
 }
+
+// ── 로그아웃 ──
 window.doLogout=async function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?'))return;
   await auth.signOut();
@@ -1097,9 +1196,15 @@ window.doLogout=async function doLogout(){
   showPage('page-login');
 }
 
-// Firebase Auth 상태 감지 - 앱 시작점
+// ── Firebase Auth 상태 감지 ──
 auth.onAuthStateChanged(async(user)=>{
   if(user){
+    // 이메일 로그인인데 인증 안 된 경우
+    if(!user.emailVerified && user.providerData[0]?.providerId==='password'){
+      document.getElementById('verify-email-addr').textContent=user.email;
+      showPage('page-verify');
+      return;
+    }
     showToast('데이터 불러오는 중...');
     await loadUserData(user.uid);
     document.getElementById('main-user-name').textContent=user.displayName||user.email.split('@')[0];

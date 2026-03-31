@@ -2177,8 +2177,8 @@ function renderDocEditArea(type){
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
         <div>
           <div style="font-size:16px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
-          <div style="font-size:11px;color:#555;margin-top:2px;" contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자: ${biz.reg||'-'}</div>
-          <div style="font-size:11px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'} | ${biz.addr||''}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px;" contenteditable="${ce}">대표: ${ceo} | 사업자: ${breg}</div>
+          <div style="font-size:11px;color:#555;" contenteditable="${ce}">TEL: ${btel} | ${baddr}</div>
         </div>
         <div style="font-size:11px;color:#555;text-align:right;" contenteditable="${ce}">발행일: ${today}</div>
       </div>
@@ -2240,7 +2240,7 @@ function renderDocEditArea(type){
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
         <div>
           <div style="font-size:16px;font-weight:700;color:#1a3a6e;" contenteditable="${ce}">${co}</div>
-          <div style="font-size:11px;color:#555;" contenteditable="${ce}">TEL: ${biz.tel||'-'}</div>
+          <div style="font-size:11px;color:#555;" contenteditable="${ce}">TEL: ${btel}</div>
         </div>
         <div style="font-size:11px;color:#555;" contenteditable="${ce}">작성일: ${today}</div>
       </div>
@@ -2286,8 +2286,8 @@ function renderDocEditArea(type){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a6e;padding-bottom:12px;margin-bottom:16px;">
         <div>
           <div style="font-size:16px;font-weight:700;color:#1a3a6e;" contenteditable="true">${co}</div>
-          <div style="font-size:11px;color:#555;margin-top:2px;" contenteditable="true">대표: ${biz.ceo||'-'} | 사업자번호: ${biz.reg||'-'}</div>
-          <div style="font-size:11px;color:#555;" contenteditable="true">TEL: ${biz.tel||'-'}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px;" contenteditable="true">대표: ${ceo} | 사업자번호: ${breg}</div>
+          <div style="font-size:11px;color:#555;" contenteditable="true">TEL: ${btel}</div>
         </div>
         <div style="text-align:right;font-size:11px;color:#555;" contenteditable="true">작성일: ${today}</div>
       </div>
@@ -2454,14 +2454,21 @@ function renderDocPreview(type){
   const total=jobTotal(j);
   const co=biz.name||'누수설비 전문업체';
   const ce='false';
+  const dash='-';
+  const ceo=biz.ceo||dash;
+  const breg=biz.reg||dash;
+  const btel=biz.tel||dash;
+  const baddr=baddr;
+  const bemail=biz.email||'';
+  const bbank=biz.bank||'';
 
   if(type==='estimate'){
     el.innerHTML=`<div class="a4-preview"><div id="doc-render">
       <div class="doc-co-header">
         <div>
           <div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px;" data-ed contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자번호: ${biz.reg||'-'}</div>
-          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${biz.tel||'-'} | ${biz.addr||''}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px;" data-ed contenteditable="${ce}">대표: ${ceo} | 사업자번호: ${breg}</div>
+          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${btel} | ${baddr}</div>
         </div>
         <div class="doc-co-info" data-ed contenteditable="${ce}">발행일: ${today}<br>${biz.email?biz.email+'<br>':''}${biz.bank?'계좌: '+biz.bank:''}</div>
       </div>
@@ -2515,7 +2522,7 @@ function renderDocPreview(type){
       <div class="doc-co-header">
         <div>
           <div class="doc-co-name" data-ed contenteditable="${ce}">${co}</div>
-          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${biz.tel||'-'}</div>
+          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${btel}</div>
         </div>
         <div class="doc-co-info" data-ed contenteditable="${ce}">작성일: ${today}</div>
       </div>
@@ -2558,8 +2565,8 @@ function renderDocPreview(type){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a6e;padding-bottom:12px;margin-bottom:16px;">
         <div>
           <div style="font-size:16px;font-weight:700;color:#1a3a6e;" data-ed contenteditable="${ce}">${co}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px;" data-ed contenteditable="${ce}">대표: ${biz.ceo||'-'} | 사업자번호: ${biz.reg||'-'}</div>
-          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${biz.tel||'-'} | ${biz.addr||''}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px;" data-ed contenteditable="${ce}">대표: ${ceo} | 사업자번호: ${breg}</div>
+          <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${btel} | ${baddr}</div>
         </div>
         <div style="text-align:right;">
           <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">작성일: ${today}</div>
@@ -2672,7 +2679,7 @@ function renderDocPreview(type){
     <div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>
     <div class="a4-preview" id="ins-page-opinion"><div id="doc-render-opinion" style="background:white;">
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;">
-        <div><div style="font-size:16px;font-weight:700;color:#1a3a6e;" data-ed contenteditable="${ce}">${co}</div><div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${biz.tel||'-'}</div></div>
+        <div><div style="font-size:16px;font-weight:700;color:#1a3a6e;" data-ed contenteditable="${ce}">${co}</div><div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">TEL: ${btel}</div></div>
         <div style="font-size:10px;color:#555;" data-ed contenteditable="${ce}">작성일: ${today}</div>
       </div>
       <div style="text-align:center;margin-bottom:14px;"><div style="font-size:22px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소  견  서</div></div>

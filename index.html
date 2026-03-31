@@ -2133,6 +2133,13 @@ function toggleDocsMode(){
 function initDocsPage(type){
   isEditMode=false;
   isPreviewMode=false;
+  // 편집 패널 보이게, 미리보기 숨기게
+  const ep=document.getElementById('docs-edit-panel');
+  const pp=document.getElementById('docs-preview-panel');
+  if(ep)ep.style.display='block';
+  if(pp)pp.style.display='none';
+  const btn=document.getElementById('docs-mode-btn');
+  if(btn){btn.textContent='👁️ 미리보기';btn.style.background='var(--accent)';btn.style.color='white';}
   const jobs=loadJobs();
   const sel=document.getElementById('doc-job-sel');
   sel.innerHTML=jobs.length
@@ -2308,6 +2315,25 @@ function addEditCostRow2(tbodyId){
   const tr=document.createElement('tr');
   tr.innerHTML=`<td style="padding:5px 8px;border:1px solid #e0e8f0;" contenteditable="true">항목명</td><td style="padding:5px 8px;border:1px solid #e0e8f0;text-align:right;" contenteditable="true">0원</td><td class="td-del" style="display:table-cell;width:28px;padding:0 2px;text-align:center;vertical-align:middle;"><button class="del-btn" onclick="this.closest('tr').remove()">×</button></td>`;
   t.appendChild(tr);
+}
+
+function setDocType(type){
+  currentDocType=type;
+  const titles={estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  const el=document.getElementById('docs-page-title');
+  if(el)el.innerHTML=titles[type]+' <span>생성</span>';
+  ['estimate','opinion','insurance'].forEach(t=>{
+    const b=document.getElementById('tab-'+t);
+    if(!b)return;
+    b.style.background=t===type?'var(--accent)':'var(--bg3)';
+    b.style.color=t===type?'white':'var(--text)';
+    b.style.border=t===type?'none':'1px solid var(--border)';
+  });
+  if(!isPreviewMode){
+    renderDocEditArea(type);
+  } else {
+    renderDocPreviewCurrent();
+  }
 }
 
 function onDocJobChange(){

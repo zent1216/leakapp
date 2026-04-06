@@ -2215,12 +2215,43 @@ function toggleDocsMode(){
 function initDocsPage(type){
   isEditMode=false;
   isPreviewMode=false;
+  // 편집 패널 보이게, 미리보기 숨기게
+  var ep=document.getElementById('docs-edit-panel');
+  var pp=document.getElementById('docs-preview-panel');
+  if(ep)ep.style.display='block';
+  if(pp)pp.style.display='none';
+  var sn=document.getElementById('share-btns-normal');
+  var si=document.getElementById('share-btns-insurance');
+  if(sn)sn.style.display='none';
+  if(si)si.style.display='none';
+  var modeBtn=document.getElementById('docs-mode-btn');
+  if(modeBtn){modeBtn.textContent='👁️ 미리보기';modeBtn.style.background='var(--accent)';modeBtn.style.color='white';}
   const jobs=loadJobs();
   const sel=document.getElementById('doc-job-sel');
   sel.innerHTML=jobs.length
     ?jobs.sort((a,b)=>b.date>a.date?1:-1).map(j=>`<option value="${j.id}">${j.date} · ${j.name} · ${j.type}</option>`).join('')
     :'<option>저장된 작업 없음</option>';
   setDocType(type);
+}
+function setDocType(type){
+  currentDocType=type;
+  var titles={estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  var titleEl=document.getElementById('docs-page-title');
+  if(titleEl)titleEl.innerHTML=(titles[type]||type)+' <span>생성</span>';
+  ['estimate','opinion','insurance'].forEach(function(t){
+    var b=document.getElementById('tab-'+t);
+    if(!b)return;
+    if(t===type){
+      b.style.background='var(--accent)';b.style.color='white';b.style.border='none';
+    }else{
+      b.style.background='var(--bg3)';b.style.color='var(--text)';b.style.border='1px solid var(--border)';
+    }
+  });
+  if(!isPreviewMode){
+    renderDocEditArea(type);
+  }else{
+    renderDocPreviewCurrent();
+  }
 }
 
 // 편집 영역 렌더링 - contenteditable, 모바일 너비 기준

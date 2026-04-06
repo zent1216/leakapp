@@ -778,17 +778,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
     <!-- ── 미리보기 모드: A4 규격 + 공유버튼 ── -->
     <div id="docs-preview-panel" style="display:none;">
       <div id="doc-preview-area"></div>
-      <div class="share-bar" style="margin-top:10px;">
+      <!-- 견적서/소견서용 공유버튼 -->
+      <div class="share-bar" id="share-btns-normal" style="margin-top:10px;display:none;">
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500;">공유 및 내보내기</div>
         <div class="share-btns">
-          <button class="share-btn kakao" onclick="shareDoc()">카카오톡</button>
-          <button class="share-btn" onclick="shareDoc()">📱 문자</button>
           <button class="share-btn pdf-btn" onclick="downloadPDF()">📄 PDF 저장</button>
-          <button class="share-btn" onclick="shareImage()">🖼️ 이미지</button>
+          <button class="share-btn" onclick="shareImage()">🖼️ 이미지 저장</button>
+          <button class="share-btn kakao" onclick="shareDoc()">카카오톡 공유</button>
           <button class="share-btn" onclick="printDoc()" style="grid-column:1/-1;background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄 (A4)</button>
         </div>
       </div>
-    </div>
+      <!-- 보험서류용 공유버튼 -->
+      <div class="share-bar" id="share-btns-insurance" style="margin-top:10px;display:none;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500;">보험서류 내보내기</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">📋 신청서 + 현장사진 + 소견서 + 사업자등록증 포함</div>
+        <div class="share-btns">
+          <button class="share-btn pdf-btn" onclick="downloadInsurancePDF()" style="grid-column:1/-1;">📄 보험서류 PDF (전체 합본)</button>
+          <button class="share-btn" onclick="downloadInsuranceImages()">🖼️ 페이지별 이미지</button>
+          <button class="share-btn" onclick="printDoc()">🖨️ 인쇄 (A4)</button>
+        </div>
+      </div>
+iv>
 
     <div style="height:20px;"></div>
   </div>
@@ -2141,9 +2151,13 @@ function setDocsEditMode(){
   isPreviewMode=false;
   document.getElementById('docs-edit-panel').style.display='block';
   document.getElementById('docs-preview-panel').style.display='none';
+  // 공유 버튼 모두 숨기기 (편집모드에서는 내보내기 없음)
+  var n=document.getElementById('share-btns-normal');
+  var ins=document.getElementById('share-btns-insurance');
+  if(n)n.style.display='none';
+  if(ins)ins.style.display='none';
   const btn=document.getElementById('docs-mode-btn');
   if(btn){btn.textContent='👁️ 미리보기';btn.style.background='var(--accent)';btn.style.color='white';}
-  // 편집 영역 렌더링
   renderDocEditArea(currentDocType);
 }
 
@@ -2591,18 +2605,15 @@ function renderDocPreview(type){
     if((j.extraSpots||0)>0){ extraRow='<tr><td style="padding:5px 8px;border:1px solid #c8d8f0;">추가 구간('+j.extraSpots+'개소)</td><td style="padding:5px 8px;border:1px solid #c8d8f0;text-align:center;">'+j.extraSpots+'개소</td><td style="padding:5px 8px;border:1px solid #c8d8f0;text-align:right;">'+extraCost.toLocaleString()+'</td></tr>'; }
 
     // 4페이지 HTML 생성
+    // 5페이지: 영수증 (있을 경우만)
     var p4Html='';
-    if(bizRegImg||receipts.length>0){
-      p4Html='<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 사업자등록증·영수증</span><div class="ins-page-divider-line"></div></div>';
-      p4Html+='<div class="a4-preview"><div style="background:white;padding:40px 36px;">';
-      p4Html+='<div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">첨부 서류</div>';
-      if(bizRegImg){ p4Html+='<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:8px;padding-left:6px;border-left:3px solid #4f8ef7;">사업자등록증 사본</div><img src="'+bizRegImg+'" style="max-width:100%;border:1px solid #e0e8f0;border-radius:4px;"></div>'; }
-      if(receipts.length>0){
-        p4Html+='<div><div style="font-size:12px;font-weight:700;color:#1a3a6e;margin-bottom:8px;padding-left:6px;border-left:3px solid #4f8ef7;">영수증</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-        receipts.forEach(function(src,i){ p4Html+='<div><img src="'+src+'" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;"><div style="font-size:9px;color:#888;text-align:center;margin-top:3px;">영수증 '+(i+1)+'</div></div>'; });
-        p4Html+='</div></div>';
-      }
-      p4Html+='</div></div>';
+    if(receipts.length>0){
+      p4Html='<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">5페이지 — 영수증</span><div class="ins-page-divider-line"></div></div>';
+      p4Html+='<div class="a4-preview" id="ins-page-receipt"><div style="background:white;padding:40px 36px;">';
+      p4Html+='<div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">영수증 (카드전표 / 이체확인서)</div>';
+      p4Html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';
+      receipts.forEach(function(src,i){ p4Html+='<div><img src="'+src+'" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.06);"><div style="font-size:10px;color:#888;text-align:center;margin-top:4px;">영수증 '+(i+1)+'</div></div>'; });
+      p4Html+='</div></div></div>';
     }
 
     // 전체 HTML 조립
@@ -2709,7 +2720,23 @@ function renderDocPreview(type){
     +'</div>'
     +'</div></div>'
 
-    // 4페이지 (사업자등록증+영수증, 있을 경우만)
+    // 4페이지: 사업자등록증 (항상 표시, 없으면 빈 양식)
+    +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 사업자등록증 사본</span><div class="ins-page-divider-line"></div></div>'
+    +'<div class="a4-preview" id="ins-page-bizreg"><div style="background:white;padding:40px 36px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:20px;">'
+    +'<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;">'+co+'</div>'
+    +'<div style="font-size:10px;color:#555;">대표: '+(biz.ceo||'-')+' | 사업자번호: '+(biz.reg||'-')+'</div></div>'
+    +'<div style="font-size:10px;color:#555;">작성일: '+today+'</div></div>'
+    +'<div style="font-size:16px;font-weight:700;color:#1a3a6e;margin-bottom:16px;padding-left:8px;border-left:4px solid #4f8ef7;">사업자등록증 사본</div>'
+    +(bizRegImg
+      ? '<div style="display:flex;justify-content:center;"><img src="'+bizRegImg+'" style="max-width:90%;max-height:500px;object-fit:contain;border:1px solid #e0e8f0;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.08);"></div>'
+      : '<div style="border:2px dashed #c8d8f0;border-radius:8px;padding:60px 20px;text-align:center;color:#aaa;">'
+        +'<div style="font-size:32px;margin-bottom:12px;">📄</div>'
+        +'<div style="font-size:14px;margin-bottom:6px;">사업자등록증이 등록되지 않았습니다</div>'
+        +'<div style="font-size:12px;">사업자정보 메뉴에서 업로드해 주세요</div></div>')
+    +'</div></div>'
+
+    // 5페이지: 영수증 (있을 경우만)
     +p4Html;
 
     setTimeout(function(){scaleA4();},150);
@@ -2820,6 +2847,57 @@ function printDoc(){
 }
 
 // ══ PDF / SHARE ══
+// 보험서류 PDF 합본 다운로드
+async function downloadInsurancePDF(){
+  if(typeof html2canvas==='undefined'||typeof jsPDF==='undefined'){
+    showToast('PDF 라이브러리 로딩 중... 잠시 후 다시 시도해주세요'); return;
+  }
+  const j=getSelJob();if(!j){showToast('작업을 선택해주세요');return;}
+  showToast('PDF 생성 중... 잠시 기다려주세요 ⏳');
+  try{
+    const pages=document.querySelectorAll('#docs-preview-panel .a4-preview');
+    if(!pages.length){showToast('미리보기 페이지가 없습니다');return;}
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210, H=297;
+    for(let i=0;i<pages.length;i++){
+      const canvas=await html2canvas(pages[i],{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+      const imgData=canvas.toDataURL('image/jpeg',0.95);
+      if(i>0)pdf.addPage();
+      pdf.addImage(imgData,'JPEG',0,0,W,H);
+    }
+    const name=(j.date||'보험서류')+'_'+j.name+'_보험청구서류.pdf';
+    pdf.save(name);
+    showToast('PDF가 저장됐습니다 ✓');
+  }catch(e){showToast('PDF 생성 실패: '+e.message);}
+}
+
+// 보험서류 페이지별 이미지 저장
+async function downloadInsuranceImages(){
+  if(typeof html2canvas==='undefined'){
+    showToast('이미지 라이브러리 로딩 중... 잠시 후 다시 시도해주세요'); return;
+  }
+  const j=getSelJob();if(!j){showToast('작업을 선택해주세요');return;}
+  showToast('이미지 생성 중... 잠시 기다려주세요 ⏳');
+  try{
+    const pages=document.querySelectorAll('#docs-preview-panel .a4-preview');
+    if(!pages.length){showToast('미리보기 페이지가 없습니다');return;}
+    const labels=['1_신청서','2_현장사진','3_소견서','4_사업자등록증','5_영수증'];
+    let saved=0;
+    for(let i=0;i<pages.length;i++){
+      const canvas=await html2canvas(pages[i],{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+      const imgData=canvas.toDataURL('image/png');
+      const a=document.createElement('a');
+      a.href=imgData;
+      const label=labels[i]||('페이지'+(i+1));
+      a.download=(j.date||'보험서류')+'_'+j.name+'_'+label+'.png';
+      a.click();
+      saved++;
+      await new Promise(r=>setTimeout(r,400));
+    }
+    showToast(saved+'개 이미지가 저장됐습니다 ✓');
+  }catch(e){showToast('이미지 생성 실패: '+e.message);}
+}
+
 async function downloadPDF(){
   showToast('PDF 생성 중...');
   try{

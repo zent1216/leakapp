@@ -2,10 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>누수설비 관리</title>
+<title>누수설비 관리 v22</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1111,8 +1114,15 @@ function handleOverlayClick(e,id){if(e.target===e.currentTarget)closeModal(id);}
 
 // ══ PAGE NAV ══
 function showPage(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>{
+    p.classList.remove('active');
+    p.style.display='';  // inline style 초기화
+  });
+  const el=document.getElementById(id);
+  if(el){
+    el.classList.add('active');
+    el.style.display='flex';  // 강제 표시
+  }
 }
 function goPage(id,docType){
   pageHistory.push(document.querySelector('.page.active')?.id||'page-main');

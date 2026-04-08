@@ -143,7 +143,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   width:30px;height:30px;border-radius:50%;background:var(--bg3);
   border:none;color:var(--text2);font-size:16px;cursor:pointer;
 }
-.modal-body{padding:16px 20px;}
+.modal-body{padding:16px 20px;overflow-y:auto;}
 
 /* ── 로그인 ── */
 .login-page{
@@ -283,7 +283,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   margin-bottom:16px;box-shadow:var(--shadow);
   overflow:hidden;
 }
-.a4-preview>div{padding:40px 48px;font-size:13px;line-height:1.7;box-sizing:border-box;}
+.a4-preview>div{padding:40px 48px;font-size:13px;line-height:1.7;min-height:1123px;box-sizing:border-box;}
 
 /* 미리보기 모드: A4 스케일 컨테이너 */
 .a4-scale-wrap{
@@ -296,6 +296,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .a4-scale-page{
   background:white;color:#111;
   width:794px;
+  min-height:1123px;
   padding:40px 48px;
   font-size:13px;line-height:1.7;
   transform-origin:top left;
@@ -1122,25 +1123,87 @@ function renderCalendar() {
   const body = document.getElementById('calendar-body');
   if (!title || !body) return;
   title.textContent = _curYear + '년 ' + (_curMonth + 1) + '월';
-  const prefix = _curYear + '-' + String(_curMonth + 1).padStart(2,'0');
-  const monthJobs = _jobs.filter(j => (j.date||'').startsWith(prefix))
-                          .sort((a,b) => b.date > a.date ? 1 : -1);
-  if (!monthJobs.length) {
-    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">이번 달 작업이 없습니다</div></div>';
-    return;
+
+  // 달력 그리드 생성
+  const y = _curYear, m = _curMonth;
+  const firstDay = new Date(y, m, 1).getDay(); // 0=일
+  const lastDate = new Date(y, m + 1, 0).getDate();
+
+  // 이달 작업 날짜 맵
+  const prefix = y + '-' + String(m + 1).padStart(2,'0');
+  const dayJobMap = {};
+  _jobs.forEach(function(j) {
+    if ((j.date||'').startsWith(prefix)) {
+      const d = parseInt((j.date||'').slice(8,10));
+      if (!dayJobMap[d]) dayJobMap[d] = [];
+      dayJobMap[d].push(j);
+    }
+  });
+
+  // 달력 HTML
+  const today = new Date();
+  const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:8px;background:var(--card);border-radius:var(--r);margin-bottom:12px;">';
+  // 요일 헤더
+  ['일','월','화','수','목','금','토'].forEach(function(d, i) {
+    const color = i===0?'var(--red)':i===6?'var(--accent)':'var(--text2)';
+    html += '<div style="text-align:center;font-size:11px;font-weight:600;color:'+color+';padding:6px 0;">'+d+'</div>';
+  });
+  // 빈 칸
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div></div>';
   }
-  body.innerHTML = monthJobs.map(j => {
-    const total = jobTotal(j);
-    const asCount = (j.asHistory||[]).length;
-    return '<div class="job-card' + (asCount > 0 ? (j.asHistory.slice(-1)[0]?.status === 'as-done' ? ' as-done' : ' has-as') : '') + '" onclick="showDetail(' + j.id + ')">'
-      + '<div class="job-card-top"><span class="job-name">' + j.name + '</span><span class="badge ' + j.status + '">' + (j.status==='done'?'완료':'진행중') + '</span></div>'
-      + '<div class="job-meta">📅 ' + j.date + ' · 📍 ' + j.addr + '</div>'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-      + '<span class="job-amount">' + fmtMoney(total) + '</span>'
-      + (asCount > 0 ? '<span style="font-size:11px;color:var(--purple);">🔧 AS ' + asCount + '건</span>' : '')
-      + '</div></div>';
-  }).join('');
+  // 날짜
+  for (let d = 1; d <= lastDate; d++) {
+    const jobs = dayJobMap[d] || [];
+    const isToday = (y===todayY && m===todayM && d===todayD);
+    const hasJob = jobs.length > 0;
+    const dotColor = jobs.some(j=>j.status==='done') ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
+    const col = (firstDay + d - 1) % 7;
+    const textColor = col===0?'var(--red)':col===6?'var(--accent)':'var(--text)';
+    html += '<div onclick="'+(hasJob?'filterCalByDay('+d+')':'')+'" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:'+(hasJob?'pointer':'default')+';background:'+(isToday?'var(--accent)':hasJob?'var(--bg3)':'transparent')+';position:relative;">'
+      + '<span style="font-size:13px;font-weight:'+(isToday||hasJob?'700':'400')+';color:'+(isToday?'white':textColor)+';">'+d+'</span>'
+      + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:'+dotColor+';"></div>' : '')
+      + '</div>';
+  }
+  html += '</div>';
+
+  // 이달 작업 리스트
+  const monthJobs = _jobs.filter(function(j){ return (j.date||'').startsWith(prefix); })
+                          .sort(function(a,b){ return b.date > a.date ? 1 : -1; });
+  if (monthJobs.length) {
+    html += '<div id="cal-job-list">';
+    html += monthJobs.map(function(j) {
+      const total = jobTotal(j);
+      const asCount = (j.asHistory||[]).length;
+      return '<div class="job-card'+(asCount>0?(j.asHistory.slice(-1)[0]?.status==='as-done'?' as-done':' has-as'):'')
+        +'" onclick="showDetail('+j.id+')">'
+        +'<div class="job-card-top"><span class="job-name">'+j.name+'</span>'
+        +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':'진행중')+'</span></div>'
+        +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        +'<span class="job-amount">'+fmtMoney(total)+'</span>'
+        +(asCount>0?'<span style="font-size:11px;color:var(--purple);">🔧 AS '+asCount+'건</span>':'')
+        +'</div></div>';
+    }).join('');
+    html += '</div>';
+  } else {
+    html += '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">이번 달 작업이 없습니다</div></div>';
+  }
+  body.innerHTML = html;
 }
+
+function filterCalByDay(d) {
+  const prefix = _curYear + '-' + String(_curMonth + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  const dayJobs = _jobs.filter(function(j){ return (j.date||'').startsWith(prefix); });
+  const list = document.getElementById('cal-job-list');
+  if (!list || !dayJobs.length) return;
+  // 해당 날짜로 스크롤
+  const cards = list.querySelectorAll('.job-card');
+  if (cards.length) cards[0].scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
 
 function changeMonth(dir) {
   _curMonth += dir;

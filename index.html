@@ -340,10 +340,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .ins-page-num{font-size:11px;color:var(--text3);white-space:nowrap;background:var(--bg3);padding:3px 10px;border-radius:20px;}
 .share-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-top:10px;}
 /* A4 문서 편집/미리보기 */
-.doc-a4-wrap{width:100%;overflow-x:auto;padding:0 0 16px;}
+.doc-a4-wrap{
+  width:100%;
+  padding:0 0 16px;
+  overflow:hidden;
+}
 .doc-a4-page{
   background:white;color:#111;
-  width:794px;min-height:1123px;
+  width:794px;min-height:600px;
   margin:0 auto;
   padding:40px 48px;
   font-size:12px;line-height:1.6;
@@ -1409,6 +1413,7 @@ function initDocs(type) {
       : '<option value="">저장된 작업 없음</option>';
   }
   setDocType(type);
+  setTimeout(scaleDocPage, 100);
 }
 
 function setDocType(type) {
@@ -1434,6 +1439,25 @@ function setDocType(type) {
 function onDocJobChange() {
   if (_isPreview) renderDocPreview();
   else renderDocEdit();
+}
+
+function scaleDocPage() {
+  // 편집/미리보기 모두에서 .doc-a4-page를 화면 너비에 맞게 스케일
+  try {
+    const wraps = document.querySelectorAll('.doc-a4-wrap');
+    if (!wraps || !wraps.forEach) return;
+    wraps.forEach(function(wrap) {
+      if (!wrap || typeof wrap.querySelector !== 'function') return;
+      const page = wrap.querySelector('.doc-a4-page');
+      if (!page) return;
+      const wrapW = (wrap.offsetWidth || window.innerWidth || 390) - 32;
+      const scale = Math.min(wrapW / 794, 1);
+      page.style.transform = 'scale(' + scale + ')';
+      page.style.transformOrigin = 'top left';
+      const h = page.offsetHeight || 600;
+      wrap.style.height = Math.ceil(h * scale) + 'px';
+    });
+  } catch(e) {}
 }
 
 function scaleA4() {
@@ -1488,6 +1512,9 @@ function toggleDocsMode() {
     document.getElementById('share-insurance').style.display = 'none';
     if (window._scaleHandler) window.removeEventListener('resize', window._scaleHandler);
     renderDocEdit();
+    setTimeout(scaleDocPage, 50);
+    window._scaleDocHandler = scaleDocPage;
+    window.addEventListener('resize', window._scaleDocHandler);
   }
 }
 
@@ -1981,6 +2008,10 @@ document.addEventListener('DOMContentLoaded', function() {
   ['f-inspect','f-base','f-material-cost'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', calcTotal);
+  });
+  window.addEventListener('resize', function() {
+    scaleDocPage();
+    scaleA4();
   });
 });
 </script>

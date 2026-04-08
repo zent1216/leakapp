@@ -877,6 +877,9 @@ function showPage(id) {
   if (el) {
     el.classList.add('active');
     el.style.display = 'flex';
+    // 페이지 진입 시 스크롤 맨 위로
+    const body = el.querySelector('.page-body');
+    if (body) body.scrollTop = 0;
   }
 }
 
@@ -891,11 +894,15 @@ function goPage(id, extra) {
   else if (id === 'page-as') renderAs();
   else if (id === 'page-docs') initDocs(extra || 'estimate');
   else if (id === 'page-field') {
-    // editJob()에서 직접 goPage 호출한 경우 resetForm 하지 않음
     if (!_editingJobId) {
       resetForm();
       document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
     }
+    // 항상 폼 상단으로 스크롤
+    setTimeout(function() {
+      const fb = document.querySelector('#page-field .page-body');
+      if (fb) fb.scrollTop = 0;
+    }, 50);
   }
 }
 
@@ -1247,7 +1254,7 @@ function showDetail(id) {
     + '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">자재비</span><span>' + fmtMoney(j.materialCost) + '</span></div>'
     + '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:\'IBM Plex Mono\',monospace;">' + fmtMoney(total) + '</span></div>'
     + '</div>'
-    + '<div class="btn-group"><button class="btn btn-secondary" onclick="editJob('+j.id+');closeModal(\'detail-modal\')">✏️ 수정</button><button class="btn btn-primary" onclick="closeModal(\'detail-modal\');goPage(\'page-docs\',\'estimate\')">📋 문서</button></div>'
+    + '<div class="btn-group"><button class="btn btn-secondary" onclick="closeModal(\'detail-modal\');editJob('+j.id+');goPage(\'page-field\')">✏️ 수정</button><button class="btn btn-primary" onclick="closeModal(\'detail-modal\');goPage(\'page-docs\',\'estimate\')">📋 문서</button></div>'
     + ((j.asHistory||[]).length > 0 ? '<div style="background:var(--purple-bg);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">'
     + '<div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:8px;">🔧 AS 내역 ('+j.asHistory.length+'건)</div>'
     + j.asHistory.map((a,idx) => '<div style="border-bottom:1px solid rgba(168,85,247,0.15);padding-bottom:8px;margin-bottom:8px;cursor:pointer;" onclick="openAsForm('+j.id+','+idx+');closeModal(\'detail-modal\')">'
@@ -1332,7 +1339,7 @@ function editJob(id) {
   while (_tempPhotos.after.length < 3) _tempPhotos.after.push(null);
   renderPhotoSlots();
   calcTotal();
-  goPage('page-field');
+  // goPage는 호출부에서 처리 (순서 보장)
 }
 
 function calcTotal() {

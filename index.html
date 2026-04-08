@@ -1226,45 +1226,114 @@ function changeMonth(dir) {
 // ════════════════════════════════════════
 //  작업 상세 모달
 // ════════════════════════════════════════
+
+// 상세 모달 버튼 래퍼 함수들 (onclick 이스케이프 문제 해결)
+function doEditJob(id) {
+  closeModal('detail-modal');
+  editJob(id);
+}
+function doGoDoc() {
+  closeModal('detail-modal');
+  goPage('page-docs', 'estimate');
+}
+function doOpenAs(jobId) {
+  closeModal('detail-modal');
+  openAsForm(jobId, null);
+}
+function doEditAs(jobId, asIdx) {
+  closeModal('detail-modal');
+  openAsForm(jobId, asIdx);
+}
+function doDeleteJob(id) {
+  if (!confirm('이 작업을 삭제하시겠습니까?')) return;
+  _jobs = _jobs.filter(function(j){ return j.id !== id; });
+  saveJobs();
+  closeModal('detail-modal');
+  renderCalendar();
+  updateMainStats();
+  showToast('삭제됐습니다');
+}
 function showDetail(id) {
-  const j = _jobs.find(x => x.id === id);
+  const j = _jobs.find(function(x){ return x.id === id; });
   if (!j) return;
   const total = jobTotal(j);
   document.getElementById('detail-title').textContent = j.name + ' 작업';
   const body = document.getElementById('detail-body');
-  document.getElementById('detail-modal').scrollTop = 0;
   const bPh = (j.photosBefore||[]).filter(Boolean);
   const aPh = (j.photosAfter||[]).filter(Boolean);
-  body.innerHTML = ''
-    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-    + '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span> <span style="font-size:12px;color:var(--text2);">' + (j.phone||'') + '</span></div>'
-    + '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':'진행중') + '</span></div>'
-    + '<div class="detail-info-card">'
-    + '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + j.date + '</div></div>'
-    + '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + j.addr + (j.location?' ('+j.location+')':'') + '</div></div>'
-    + '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + j.type + '</div></div>'
-    + '</div>'
-    + (bPh.length||aPh.length ? '<div class="ba-grid"><div class="ba-box"><div class="ba-label-top">조치 전</div><div class="ba-img-area">' + (bPh[0]?'<img src="'+bPh[0]+'">'  :'<span style="font-size:24px;opacity:.3;">📷</span>') + '</div></div>'
-    + '<div class="ba-box"><div class="ba-label-top">조치 후</div><div class="ba-img-area">' + (aPh[0]?'<img src="'+aPh[0]+'">'  :'<span style="font-size:24px;opacity:.3;">📷</span>') + '</div></div></div>' : '')
-    + '<div class="detail-info-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">비용 내역</div>'
-    + '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">검사비</span><span>' + fmtMoney(j.inspectCost) + '</span></div>'
-    + '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">공사비</span><span>' + fmtMoney(j.baseCost) + '</span></div>'
-    + ((j.extraSpots||0)>0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">추가구간('+j.extraSpots+'개소)</span><span>'+fmtMoney((j.extraSpots||0)*200000)+'</span></div>' : '')
-    + '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">자재비</span><span>' + fmtMoney(j.materialCost) + '</span></div>'
-    + '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:\'IBM Plex Mono\',monospace;">' + fmtMoney(total) + '</span></div>'
-    + '</div>'
-    + '<div class="btn-group"><button class="btn btn-secondary" onclick="closeModal(\'detail-modal\');editJob('+j.id+')">✏️ 수정</button><button class="btn btn-primary" onclick="closeModal(\'detail-modal\');goPage(\'page-docs\',\'estimate\')">📋 문서</button></div>'
-    + ((j.asHistory||[]).length > 0 ? '<div style="background:var(--purple-bg);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">'
-    + '<div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:8px;">🔧 AS 내역 ('+j.asHistory.length+'건)</div>'
-    + j.asHistory.map((a,idx) => '<div style="border-bottom:1px solid rgba(168,85,247,0.15);padding-bottom:8px;margin-bottom:8px;cursor:pointer;" onclick="openAsForm('+j.id+','+idx+');closeModal(\'detail-modal\')">'
-      + '<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--purple);">'+(a.date||'')+'</span><span class="badge '+a.status+'">'+(a.status==='as-done'?'AS완료':'AS접수')+'</span></div>'
-      + (a.symptom?'<div style="font-size:12px;color:var(--text2);">증상: '+a.symptom+'</div>':'') + '</div>').join('')
-    + '</div>' : '')
-    + '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;color:var(--purple);border-color:rgba(168,85,247,0.3);" onclick="closeModal(\'detail-modal\');openAsForm('+j.id+',null)">🔧 AS 접수</button>'
-    + '<button class="btn btn-danger" onclick="deleteJob('+j.id+')">🗑️ 삭제</button>';
+
+  let html = '';
+  // 고객명 + 상태
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
+  html += '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span>';
+  if (j.phone) html += ' <span style="font-size:12px;color:var(--text2);">' + j.phone + '</span>';
+  html += '</div>';
+  html += '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':'진행중') + '</span></div>';
+
+  // 기본 정보
+  html += '<div class="detail-info-card">';
+  html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + j.date + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + j.addr + (j.location?' ('+j.location+')':'') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + j.type + '</div></div>';
+  html += '</div>';
+
+  // 사진
+  if (bPh.length || aPh.length) {
+    html += '<div class="ba-grid">';
+    html += '<div class="ba-box"><div class="ba-label-top">조치 전</div><div class="ba-img-area">';
+    html += bPh[0] ? '<img src="' + bPh[0] + '">' : '<span style="font-size:24px;opacity:.3;">📷</span>';
+    html += '</div></div>';
+    html += '<div class="ba-box"><div class="ba-label-top">조치 후</div><div class="ba-img-area">';
+    html += aPh[0] ? '<img src="' + aPh[0] + '">' : '<span style="font-size:24px;opacity:.3;">📷</span>';
+    html += '</div></div>';
+    html += '</div>';
+  }
+
+  // 비용
+  html += '<div class="detail-info-card">';
+  html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">비용 내역</div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">검사비</span><span>' + fmtMoney(j.inspectCost) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">공사비</span><span>' + fmtMoney(j.baseCost) + '</span></div>';
+  if ((j.extraSpots||0) > 0) {
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">추가구간(' + j.extraSpots + '개소)</span><span>' + fmtMoney((j.extraSpots||0)*200000) + '</span></div>';
+  }
+  html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">자재비</span><span>' + fmtMoney(j.materialCost) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">' + fmtMoney(total) + '</span></div>';
+  html += '</div>';
+
+  // 수정/문서 버튼 - data-id 방식으로
+  html += '<div class="btn-group">';
+  html += '<button class="btn btn-secondary" onclick="doEditJob(' + j.id + ')">✏️ 수정</button>';
+  html += '<button class="btn btn-primary" onclick="doGoDoc()">📋 문서</button>';
+  html += '</div>';
+
+  // AS 내역
+  const asHistory = j.asHistory || [];
+  if (asHistory.length > 0) {
+    html += '<div style="background:var(--purple-bg);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:8px;">🔧 AS 내역 (' + asHistory.length + '건)</div>';
+    asHistory.forEach(function(a, idx) {
+      html += '<div style="border-bottom:1px solid rgba(168,85,247,0.15);padding-bottom:8px;margin-bottom:8px;cursor:pointer;" onclick="doEditAs(' + j.id + ',' + idx + ')">';
+      html += '<div style="display:flex;justify-content:space-between;margin-bottom:3px;">';
+      html += '<span style="font-size:12px;color:var(--purple);">' + (a.date||'') + '</span>';
+      html += '<span class="badge ' + (a.status||'as') + '">' + (a.status==='as-done'?'AS완료':'AS접수') + '</span>';
+      html += '</div>';
+      if (a.symptom) html += '<div style="font-size:12px;color:var(--text2);">증상: ' + a.symptom + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // AS 접수 버튼
+  html += '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;color:var(--purple);border-color:rgba(168,85,247,0.3);" onclick="doOpenAs(' + j.id + ')">🔧 AS 접수</button>';
+
+  // 삭제 버튼
+  html += '<button class="btn btn-danger" onclick="doDeleteJob(' + j.id + ')">🗑️ 삭제</button>';
+
+  body.innerHTML = html;
   document.getElementById('detail-modal').classList.add('open');
 }
+
 
 function deleteJob(id) {
   if (!confirm('이 작업을 삭제하시겠습니까?')) return;

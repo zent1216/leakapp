@@ -770,6 +770,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="biz-addr" placeholder="서울시 강남구"></div>
     </div>
     <div class="form-card">
+      <div class="form-card-title">🏦 계좌 정보</div>
+      <div class="form-row2">
+        <div class="form-group"><label class="form-label">은행</label><input class="form-input" id="biz-bank" placeholder="국민은행"></div>
+        <div class="form-group"><label class="form-label">예금주</label><input class="form-input" id="biz-holder" placeholder="홍길동"></div>
+      </div>
+      <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="biz-account" placeholder="000-0000-0000-00"></div>
+    </div>
+    <div class="form-card">
       <div class="form-card-title">🖊️ 서명 / 도장</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
@@ -1263,6 +1271,7 @@ function showDetail(id) {
   const aPh = (j.photosAfter||[]).filter(Boolean);
 
   let html = '';
+
   // 고객명 + 상태
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
   html += '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span>';
@@ -1272,9 +1281,9 @@ function showDetail(id) {
 
   // 기본 정보
   html += '<div class="detail-info-card">';
-  html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + j.date + '</div></div>';
-  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + j.addr + (j.location?' ('+j.location+')':'') + '</div></div>';
-  html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + j.type + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + (j.date||'-') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + (j.addr||'-') + (j.location?' ('+j.location+')':'') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + (j.type||'-') + '</div></div>';
   html += '</div>';
 
   // 사진
@@ -1286,6 +1295,29 @@ function showDetail(id) {
     html += '<div class="ba-box"><div class="ba-label-top">조치 후</div><div class="ba-img-area">';
     html += aPh[0] ? '<img src="' + aPh[0] + '">' : '<span style="font-size:24px;opacity:.3;">📷</span>';
     html += '</div></div>';
+    html += '</div>';
+  }
+
+  // 작업 내용 (before/action/afterDesc/expertOpinion)
+  if (j.before || j.action || j.afterDesc || j.expertOpinion) {
+    html += '<div class="detail-info-card">';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">작업 내용</div>';
+    if (j.before) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 전 상황</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.before + '</div></div>';
+    }
+    if (j.action) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 내용</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.action + '</div></div>';
+    }
+    if (j.afterDesc) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 후 상태</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.afterDesc + '</div></div>';
+    }
+    if (j.expertOpinion) {
+      html += '<div style="margin-bottom:4px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">전문가 소견</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.expertOpinion + '</div></div>';
+    }
     html += '</div>';
   }
 
@@ -1301,45 +1333,14 @@ function showDetail(id) {
   html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">' + fmtMoney(total) + '</span></div>';
   html += '</div>';
 
-  // 작업 상세 내용 (before/action/afterDesc/expertOpinion/memo)
-  var hasDetail = j.before || j.action || j.afterDesc || j.expertOpinion || j.memo;
-  if (hasDetail) {
-    html += '<div class="detail-info-card" style="margin-bottom:10px;">';
-    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;font-weight:600;">📋 작업 상세 내용</div>';
-    if (j.before) {
-      html += '<div style="margin-bottom:10px;">';
-      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 전 상황</div>';
-      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.before + '</div>';
-      html += '</div>';
-    }
-    if (j.action) {
-      html += '<div style="margin-bottom:10px;">';
-      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 내용</div>';
-      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.action + '</div>';
-      html += '</div>';
-    }
-    if (j.afterDesc) {
-      html += '<div style="margin-bottom:10px;">';
-      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 후 상태</div>';
-      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.afterDesc + '</div>';
-      html += '</div>';
-    }
-    if (j.expertOpinion) {
-      html += '<div style="margin-bottom:10px;background:rgba(239,68,68,0.05);border-left:3px solid var(--red);padding:8px 10px;border-radius:0 6px 6px 0;">';
-      html += '<div style="font-size:11px;color:var(--red);font-weight:600;margin-bottom:4px;">전문가 소견</div>';
-      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.expertOpinion + '</div>';
-      html += '</div>';
-    }
-    if (j.memo) {
-      html += '<div style="margin-bottom:4px;">';
-      html += '<div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;">📝 내부 메모</div>';
-      html += '<div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;">' + j.memo + '</div>';
-      html += '</div>';
-    }
-    html += '</div>';
+  // 메모
+  if (j.memo) {
+    html += '<div style="background:var(--bg3);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:12px;">';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📝 메모</div>';
+    html += '<div style="font-size:13px;">' + j.memo + '</div></div>';
   }
 
-  // 수정/문서 버튼 - data-id 방식으로
+  // 수정/문서 버튼
   html += '<div class="btn-group">';
   html += '<button class="btn btn-secondary" onclick="doEditJob(' + j.id + ')">✏️ 수정</button>';
   html += '<button class="btn btn-primary" onclick="doGoDoc()">📋 문서</button>';
@@ -1362,10 +1363,7 @@ function showDetail(id) {
     html += '</div>';
   }
 
-  // AS 접수 버튼
   html += '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;color:var(--purple);border-color:rgba(168,85,247,0.3);" onclick="doOpenAs(' + j.id + ')">🔧 AS 접수</button>';
-
-  // 삭제 버튼
   html += '<button class="btn btn-danger" onclick="doDeleteJob(' + j.id + ')">🗑️ 삭제</button>';
 
   body.innerHTML = html;
@@ -1677,6 +1675,22 @@ function toggleDocsMode() {
       document.getElementById('share-normal').style.display = 'block';
       document.getElementById('share-insurance').style.display = 'none';
     }
+    // 보험서류 편집 필드 값 저장
+    if (_curDocType === 'insurance') {
+      var j2 = getSelJob();
+      if (j2) {
+        var ic = document.getElementById('ins-company');
+        var ip = document.getElementById('ins-policy');
+        var ib = document.getElementById('ins-bank');
+        var ia = document.getElementById('ins-account');
+        var ih = document.getElementById('ins-holder');
+        if (ic) j2._insCompany = ic.value;
+        if (ip) j2._insPolicy = ip.value;
+        if (ib) _biz.bank = ib.value;
+        if (ia) _biz.account = ia.value;
+        if (ih) _biz.holder = ih.value;
+      }
+    }
     renderDocPreview();
     setTimeout(scaleA4, 150);
     window._scaleHandler = function(){ scaleA4(); };
@@ -1737,91 +1751,48 @@ function renderInsuranceEdit(j, el) {
       return '<div><img src="'+p+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;"><div style="font-size:9px;color:#888;text-align:center;margin-top:2px;">'+label+(i+1)+'</div></div>';
     }).join('');
   };
-  var html = '<div class="form-card">'
-    + '<div class="form-card-title">📸 현장 사진 (현장관리에서 자동 연동)</div>'
-    + '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 전</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'+mkPh(bPh,'전')+'</div>'
-    + '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 후</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+mkPh(aPh,'후')+'</div>'
-    + '</div>'
-    + '<div class="form-card">'
-    + '<div class="form-card-title">🧾 영수증 첨부</div>'
-    + '<div id="ins-receipt-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;"></div>'
-    + '<button onclick="openReceiptInput()" class="btn btn-secondary btn-sm" style="width:100%;">📎 영수증 사진 추가</button>'
-    + '<input type="file" id="ins-receipt-input" accept="image/*" multiple style="display:none" onchange="handleInsReceipt(event)">'
-    + '</div>'
-    + '<div class="form-card">'
-    + '<div class="form-card-title">✅ 첨부서류 확인</div>'
-    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📋 견적서</label>'
-    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📝 소견서</label>'
-    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📸 현장사진</label>'
-    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🧾 영수증</label>'
-    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🏢 사업자등록증</label>'
-    + '</div>';
+
+  var html = '';
+
+  // 보험 정보 입력
+  html += '<div class="form-card">';
+  html += '<div class="form-card-title">🏛️ 보험 정보</div>';
+  html += '<div class="form-group"><label class="form-label">보험사</label><input class="form-input" id="ins-company" placeholder="삼성화재, DB손보 등" value="'+(j._insCompany||'')+'"></div>';
+  html += '<div class="form-group"><label class="form-label">증권번호</label><input class="form-input" id="ins-policy" placeholder="보험 증권번호" value="'+(j._insPolicy||'')+'"></div>';
+  html += '<div class="form-group"><label class="form-label">입금 은행</label><input class="form-input" id="ins-bank" placeholder="국민은행" value="'+((_biz.bank)||'')+'"></div>';
+  html += '<div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="ins-account" placeholder="000-0000-0000-00" value="'+((_biz.account)||'')+'"></div>';
+  html += '<div class="form-group"><label class="form-label">예금주</label><input class="form-input" id="ins-holder" placeholder="예금주명" value="'+(_biz.ceo||j.name||'')+'"></div>';
+  html += '</div>';
+
+  // 현장 사진
+  html += '<div class="form-card">';
+  html += '<div class="form-card-title">📸 현장 사진 (현장관리에서 자동 연동)</div>';
+  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 전</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'+mkPh(bPh,'전')+'</div>';
+  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 후</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+mkPh(aPh,'후')+'</div>';
+  html += '</div>';
+
+  // 영수증
+  html += '<div class="form-card">';
+  html += '<div class="form-card-title">🧾 영수증 첨부</div>';
+  html += '<div id="ins-receipt-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;"></div>';
+  html += '<button onclick="openReceiptInput()" class="btn btn-secondary btn-sm" style="width:100%;">📎 영수증 사진 추가</button>';
+  html += '<input type="file" id="ins-receipt-input" accept="image/*" multiple style="display:none" onchange="handleInsReceipt(event)">';
+  html += '</div>';
+
+  // 체크리스트
+  html += '<div class="form-card">';
+  html += '<div class="form-card-title">✅ 첨부서류 확인</div>';
+  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📋 견적서</label>';
+  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📝 소견서</label>';
+  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📸 현장사진</label>';
+  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🧾 영수증</label>';
+  html += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🏢 사업자등록증</label>';
+  html += '</div>';
+
   el.innerHTML = html;
   renderInsReceiptList();
-}
-
-
-function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
-  var extraRow = (j.extraSpots||0)>0
-    ? '<tr><td contenteditable="'+ce+'">추가 구간('+j.extraSpots+'개소)</td><td style="text-align:right;" contenteditable="'+ce+'">'+((j.extraSpots||0)*200000).toLocaleString()+'</td></tr>' : '';
-  return '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
-    + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
-    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
-    + '<div style="font-size:10px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
-    + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">견&nbsp;&nbsp;적&nbsp;&nbsp;서</div></div>'
-    + '<table class="doc-table" style="margin-bottom:10px;">'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;width:26%;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">연락처</td><td contenteditable="'+ce+'">'+(j.phone||'-')+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">주소</td><td contenteditable="'+ce+'">'+j.addr+(j.location?' ('+j.location+')':'')+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">유형</td><td contenteditable="'+ce+'">'+j.type+'</td></tr>'
-    + '</table>'
-    + '<table class="doc-table" style="margin-bottom:8px;">'
-    + '<thead><tr><th style="width:60%">항목</th><th style="text-align:right;">금액(원)</th></tr></thead>'
-    + '<tbody>'
-    + '<tr><td contenteditable="'+ce+'">누수 탐지 검사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.inspectCost||0).toLocaleString()+'</td></tr>'
-    + '<tr><td contenteditable="'+ce+'">누수 보수 공사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.baseCost||0).toLocaleString()+'</td></tr>'
-    + extraRow
-    + '<tr><td contenteditable="'+ce+'">자재비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.materialCost||0).toLocaleString()+'</td></tr>'
-    + '</tbody></table>'
-    + '<div class="doc-total-section"><span class="doc-total-label">견적 합계 (VAT 포함)</span><span class="doc-total-val">'+insTotal.toLocaleString()+'원</span></div>'
-    + '<div style="font-size:10px;color:#555;text-align:center;margin-top:8px;" contenteditable="'+ce+'">본 견적서는 발행일로부터 30일간 유효합니다</div>'
-    + '<div class="doc-sign-row">'
-    + (biz.signatureImg ? '<div class="doc-sign-box"><div>담당자</div><img class="doc-sign-img" src="'+biz.signatureImg+'"><div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>' : '')
-    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
-    + '</div>';
-}
-
-
-function makeOpinionHTML(j, biz, today, co, ce) {
-  return '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
-    + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
-    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">TEL: '+(biz.tel||'-')+'</div></div>'
-    + '<div style="font-size:10px;color:#555;" contenteditable="'+ce+'">'+today+'</div></div>'
-    + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
-    + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
-    + '<table class="doc-table" style="border:none;margin:0;">'
-    + '<tr><td style="border:none;width:26%;color:#555;font-weight:600;padding:2px 4px;">고객명</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.name+'</td></tr>'
-    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">점검일</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.date+'</td></tr>'
-    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">현장주소</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.addr+'</td></tr>'
-    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">누수유형</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.type+'</td></tr>'
-    + '</table></div>'
-    + '<div class="doc-section-h">누수 원인 및 발생 경위</div>'
-    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.before||' ')+'</div>'
-    + '<div class="doc-section-h">조치 내역</div>'
-    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.action||' ')+'</div>'
-    + '<div class="doc-section-h">조치 후 상태</div>'
-    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.afterDesc||' ')+'</div>'
-    + '<div class="doc-section-h" style="color:#c0392b;border-left-color:#e74c3c;">전문가 소견</div>'
-    + '<div class="doc-text-editable" style="background:#fff8f8;border-color:#f5c6cb;" contenteditable="'+ce+'">'+(j.expertOpinion||'본 기술자는 현장 점검 결과, 상기 내용과 같이 누수가 발생하였음을 확인합니다.')+'</div>'
-    + '<div class="doc-sign-row">'
-    + '<div class="doc-sign-box"><div>작성자 (기술자)</div>'
-    + (biz.signatureImg ? '<img class="doc-sign-img" src="'+biz.signatureImg+'">' : '<div class="doc-sign-line"></div>')
-    + '<div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>'
-    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
-    + '</div>';
 }
 
 
@@ -2108,7 +2079,7 @@ function renderContacts() {
 // ════════════════════════════════════════
 function loadBizForm() {
   const b = _biz;
-  ['name','ceo','reg','tel','addr'].forEach(k => {
+  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
     const el = document.getElementById('biz-' + k);
     if (el) el.value = b[k] || '';
   });
@@ -2143,7 +2114,7 @@ function loadBizForm() {
 }
 
 function saveBizInfo() {
-  ['name','ceo','reg','tel','addr'].forEach(k => {
+  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
     const el = document.getElementById('biz-' + k);
     if (el) _biz[k] = el.value.trim();
   });

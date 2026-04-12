@@ -1742,6 +1742,82 @@ function renderDocEdit() {
   }
 }
 
+function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
+  var extraRow = '';
+  if ((j.extraSpots||0) > 0) {
+    extraRow = '<tr><td contenteditable="'+ce+'">추가 구간('+j.extraSpots+'개소)</td>'
+      + '<td style="text-align:right;" contenteditable="'+ce+'">'+((j.extraSpots||0)*200000).toLocaleString()+'</td>'
+      + '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>';
+  }
+  return ''
+    + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
+    + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
+    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:10px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">견&nbsp;&nbsp;적&nbsp;&nbsp;서</div></div>'
+    + '<table class="doc-table" style="margin-bottom:10px;">'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:26%;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">연락처</td><td contenteditable="'+ce+'">'+(j.phone||'-')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">주소</td><td contenteditable="'+ce+'">'+j.addr+(j.location?' ('+j.location+')':'')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">유형</td><td contenteditable="'+ce+'">'+j.type+'</td></tr>'
+    + '</table>'
+    + '<table class="doc-table" style="margin-bottom:4px;">'
+    + '<thead><tr><th style="width:60%">항목</th><th style="text-align:right;">금액(원)</th><th style="width:32px;background:#1a3a6e;"></th></tr></thead>'
+    + '<tbody id="est-items-body">'
+    + '<tr><td contenteditable="'+ce+'">누수 탐지 검사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.inspectCost||0).toLocaleString()+'</td><td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
+    + '<tr><td contenteditable="'+ce+'">누수 보수 공사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.baseCost||0).toLocaleString()+'</td><td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
+    + extraRow
+    + '<tr><td contenteditable="'+ce+'">자재비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.materialCost||0).toLocaleString()+'</td><td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
+    + '</tbody></table>'
+    + '<button onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>'
+    + '<div class="doc-total-section"><span class="doc-total-label">견적 합계 (VAT 포함)</span><span class="doc-total-val">'+insTotal.toLocaleString()+'원</span></div>'
+    + '<div style="font-size:10px;color:#555;text-align:center;margin-top:8px;" contenteditable="'+ce+'">본 견적서는 발행일로부터 30일간 유효합니다</div>'
+    + '<div class="doc-sign-row">'
+    + (biz.signatureImg ? '<div class="doc-sign-box"><div>담당자</div><img class="doc-sign-img" src="'+biz.signatureImg+'"><div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>' : '')
+    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
+    + '</div>';
+}
+
+function addEstItem() {
+  var tbody = document.getElementById('est-items-body');
+  if (!tbody) return;
+  var tr = document.createElement('tr');
+  tr.innerHTML = '<td contenteditable="true">항목명</td><td style="text-align:right;" contenteditable="true">0</td><td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
+  tbody.appendChild(tr);
+}
+
+function makeOpinionHTML(j, biz, today, co, ce) {
+  return ''
+    + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
+    + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
+    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:10px;color:#555;" contenteditable="'+ce+'">'+today+'</div></div>'
+    + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
+    + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
+    + '<table class="doc-table" style="border:none;margin:0;">'
+    + '<tr><td style="border:none;width:26%;color:#555;font-weight:600;padding:2px 4px;">고객명</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.name+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">점검일</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.date+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">현장주소</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.addr+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">누수유형</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.type+'</td></tr>'
+    + '</table></div>'
+    + '<div class="doc-section-h">누수 원인 및 발생 경위</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.before||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h">조치 내역</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.action||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h">조치 후 상태</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.afterDesc||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h" style="color:#c0392b;border-left-color:#e74c3c;">전문가 소견</div>'
+    + '<div class="doc-text-editable" style="background:#fff8f8;border-color:#f5c6cb;" contenteditable="'+ce+'">'+(j.expertOpinion||'본 기술자는 현장 점검 결과, 상기 내용과 같이 누수가 발생하였음을 확인합니다.')+'</div>'
+    + '<div class="doc-sign-row">'
+    + '<div class="doc-sign-box"><div>작성자 (기술자)</div>'
+    + (biz.signatureImg ? '<img class="doc-sign-img" src="'+biz.signatureImg+'">' : '<div class="doc-sign-line"></div>')
+    + '<div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>'
+    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
+    + '</div>';
+}
+
+
 function renderInsuranceEdit(j, el) {
   var bPh = (j.photosBefore||[]).filter(Boolean);
   var aPh = (j.photosAfter||[]).filter(Boolean);

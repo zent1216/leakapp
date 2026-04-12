@@ -1301,6 +1301,44 @@ function showDetail(id) {
   html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">' + fmtMoney(total) + '</span></div>';
   html += '</div>';
 
+  // 작업 상세 내용 (before/action/afterDesc/expertOpinion/memo)
+  var hasDetail = j.before || j.action || j.afterDesc || j.expertOpinion || j.memo;
+  if (hasDetail) {
+    html += '<div class="detail-info-card" style="margin-bottom:10px;">';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;font-weight:600;">📋 작업 상세 내용</div>';
+    if (j.before) {
+      html += '<div style="margin-bottom:10px;">';
+      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 전 상황</div>';
+      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.before + '</div>';
+      html += '</div>';
+    }
+    if (j.action) {
+      html += '<div style="margin-bottom:10px;">';
+      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 내용</div>';
+      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.action + '</div>';
+      html += '</div>';
+    }
+    if (j.afterDesc) {
+      html += '<div style="margin-bottom:10px;">';
+      html += '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;">조치 후 상태</div>';
+      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.afterDesc + '</div>';
+      html += '</div>';
+    }
+    if (j.expertOpinion) {
+      html += '<div style="margin-bottom:10px;background:rgba(239,68,68,0.05);border-left:3px solid var(--red);padding:8px 10px;border-radius:0 6px 6px 0;">';
+      html += '<div style="font-size:11px;color:var(--red);font-weight:600;margin-bottom:4px;">전문가 소견</div>';
+      html += '<div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">' + j.expertOpinion + '</div>';
+      html += '</div>';
+    }
+    if (j.memo) {
+      html += '<div style="margin-bottom:4px;">';
+      html += '<div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;">📝 내부 메모</div>';
+      html += '<div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;">' + j.memo + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
   // 수정/문서 버튼 - data-id 방식으로
   html += '<div class="btn-group">';
   html += '<button class="btn btn-secondary" onclick="doEditJob(' + j.id + ')">✏️ 수정</button>';

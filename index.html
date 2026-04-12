@@ -730,6 +730,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group"><label class="form-label">AS 접수일</label><input class="form-input" id="as-date" type="date"></div>
       <div class="form-group"><label class="form-label">증상</label><textarea class="form-textarea" id="as-symptom" placeholder="재발 증상 설명"></textarea></div>
       <div class="form-group"><label class="form-label">처리 내용</label><textarea class="form-textarea" id="as-action" placeholder="처리 내용"></textarea></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="as-memo" placeholder="내부 메모"></textarea></div>
       <div class="form-group">
         <label class="form-label">상태</label>
         <select class="form-select" id="as-status">
@@ -738,6 +739,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         </select>
       </div>
       <button class="btn btn-primary" onclick="saveAs()">💾 저장</button>
+    </div>
+    <div class="form-card">
+      <div class="form-card-title">📷 AS 현장 사진</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">조치 전</div>
+      <div class="photo-grid" id="as-photos-before"></div>
+      <div style="font-size:12px;color:var(--text2);margin:10px 0 8px;">조치 후</div>
+      <div class="photo-grid" id="as-photos-after"></div>
+      <input type="file" id="as-photo-input" accept="image/*" style="display:none" onchange="handleAsPhotoUpload(event)">
     </div>
   </div>
 </div>
@@ -871,6 +880,8 @@ let _tempPhotos = {before:[null,null,null], after:[null,null,null]};
 let _asFilter = 'all';
 let _asEditJobId = null;
 let _asEditIdx = null;
+let _asPhotoTarget = null;
+let _tempAsPhotos = {before:[null,null,null], after:[null,null,null]};
 let _insReceipts = [];
 
 // ════════════════════════════════════════
@@ -1137,6 +1148,59 @@ function updateMainStats() {
 // ════════════════════════════════════════
 //  현장관리 (캘린더)
 // ════════════════════════════════════════
+function renderAsPhotoSlots() {
+  ['before','after'].forEach(function(type) {
+    const grid = document.getElementById('as-photos-' + type);
+    if (!grid) return;
+    grid.innerHTML = '';
+    [0,1,2].forEach(function(i) {
+      const p = _tempAsPhotos[type][i];
+      const div = document.createElement('div');
+      if (p) {
+        div.className = 'photo-slot filled';
+        const img = document.createElement('img');
+        img.src = p;
+        const btn = document.createElement('button');
+        btn.className = 'remove-btn';
+        btn.textContent = '×';
+        btn.onclick = function(e) { removeAsPhoto(type, i, e); };
+        div.appendChild(img);
+        div.appendChild(btn);
+      } else {
+        div.className = 'photo-slot';
+        div.innerHTML = '<div class="add-icon">+</div><div class="add-label">사진</div>';
+        div.onclick = function() { addAsPhoto(type, i); };
+      }
+      grid.appendChild(div);
+    });
+  });
+}
+
+function addAsPhoto(type, idx) {
+  _asPhotoTarget = {type, idx};
+  document.getElementById('as-photo-input').click();
+}
+
+function handleAsPhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file || !_asPhotoTarget) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    _tempAsPhotos[_asPhotoTarget.type][_asPhotoTarget.idx] = ev.target.result;
+    renderAsPhotoSlots();
+    _asPhotoTarget = null;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function removeAsPhoto(type, idx, e) {
+  e.stopPropagation();
+  _tempAsPhotos[type][idx] = null;
+  renderAsPhotoSlots();
+}
+
+
 function renderCalendar() {
   const title = document.getElementById('cal-title');
   const body = document.getElementById('calendar-body');
@@ -1911,7 +1975,7 @@ function renderDocPreview() {
     if(aPh.length>0){aPhHtml='';aPh.forEach(function(p,i){aPhHtml+='<div><img src="'+p+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:3px;"><p style="font-size:9px;color:#888;text-align:center;margin:2px 0;">후'+(i+1)+'</p></div>';});}
     var p5Html='';
     if(receipts.length>0){p5Html='<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">5페이지 — 영수증</span><div class="ins-page-divider-line"></div></div><div class="a4-scale-wrap"><div class="a4-scale-page"><div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">영수증</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';receipts.forEach(function(src,i){p5Html+='<div><img src="'+src+'" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:9px;color:#888;text-align:center;margin:3px 0;">영수증'+(i+1)+'</p></div>';});p5Html+='</div></div></div>';}
-    var bizRegHtml=bizReg?('<div style="display:flex;justify-content:center;"><img src="'+bizReg+'" style="max-width:100%;max-height:600px;object-fit:contain;border:1px solid #e0e8f0;border-radius:6px;"></div>'):'<div style="border:2px dashed #c8d8f0;border-radius:8px;padding:60px 20px;text-align:center;color:#aaa;"><div style="font-size:32px;margin-bottom:12px;">📄</div><p>사업자정보에서 사업자등록증을 업로드해주세요</p></div>';
+    var bizRegHtml=bizReg?('<div style="display:flex;justify-content:center;"><img src="'+bizReg+'" style="width:100%;max-height:900px;object-fit:contain;border:1px solid #e0e8f0;border-radius:6px;"></div>'):'<div style="border:2px dashed #c8d8f0;border-radius:8px;padding:60px 20px;text-align:center;color:#aaa;"><div style="font-size:32px;margin-bottom:12px;">📄</div><p>사업자정보에서 사업자등록증을 업로드해주세요</p></div>';
 
     el.innerHTML=''
       +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">1페이지 — 보험청구 신청서</span><div class="ins-page-divider-line"></div></div>'
@@ -2106,12 +2170,21 @@ function openAsForm(jobId, asIdx) {
   const infoEl = document.getElementById('as-job-info');
   if (infoEl) infoEl.innerHTML = '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">' + (j?.name||'') + '</div>'
     + '<div style="font-size:12px;color:var(--text2);">' + (j?.addr||'') + ' · ' + (j?.date||'') + '</div>';
-  const as = asIdx !== null && j ? (j.asHistory||[])[asIdx] : null;
+  const as = (asIdx !== null && asIdx !== undefined && j) ? (j.asHistory||[])[asIdx] : null;
   document.getElementById('as-date').value = as?.date || new Date().toISOString().slice(0,10);
   document.getElementById('as-symptom').value = as?.symptom || '';
   document.getElementById('as-action').value = as?.action || '';
+  document.getElementById('as-memo').value = as?.memo || '';
   document.getElementById('as-status').value = as?.status || 'as';
+  // 사진 불러오기
+  _tempAsPhotos = {
+    before: [...(as?.photosBefore||[null,null,null])].slice(0,3),
+    after:  [...(as?.photosAfter||[null,null,null])].slice(0,3)
+  };
+  while (_tempAsPhotos.before.length < 3) _tempAsPhotos.before.push(null);
+  while (_tempAsPhotos.after.length < 3) _tempAsPhotos.after.push(null);
   goPage('page-as-form');
+  renderAsPhotoSlots();
 }
 
 function saveAs() {
@@ -2122,9 +2195,12 @@ function saveAs() {
     date: document.getElementById('as-date').value,
     symptom: document.getElementById('as-symptom').value.trim(),
     action: document.getElementById('as-action').value.trim(),
+    memo: document.getElementById('as-memo').value.trim(),
     status: document.getElementById('as-status').value,
+    photosBefore: _tempAsPhotos.before.filter(Boolean),
+    photosAfter:  _tempAsPhotos.after.filter(Boolean),
   };
-  if (_asEditIdx !== null && _asEditIdx < j.asHistory.length) {
+  if (_asEditIdx !== null && _asEditIdx !== undefined && _asEditIdx < j.asHistory.length) {
     j.asHistory[_asEditIdx] = rec;
   } else {
     j.asHistory.push(rec);

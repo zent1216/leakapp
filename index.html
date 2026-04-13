@@ -1889,6 +1889,13 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<button onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>'
     + '<div class="doc-total-section"><span class="doc-total-label">견적 합계 (VAT 포함)</span><span class="doc-total-val">'+insTotal.toLocaleString()+'원</span></div>'
     + '<div style="font-size:10px;color:#555;text-align:center;margin-top:8px;" contenteditable="'+ce+'">본 견적서는 발행일로부터 30일간 유효합니다</div>'
+    + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
+    + '<thead><tr><th colspan="2" style="background:#2c5f9e;">입금 계좌</th></tr></thead>'
+    + '<tbody>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:26%;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;">예금주</td><td contenteditable="'+ce+'">'+(biz.holder||biz.ceo||'&nbsp;')+'</td></tr>'
+    + '</tbody></table>'
     + '<div class="doc-sign-row">'
     + (biz.signatureImg ? '<div class="doc-sign-box"><div>담당자</div><img class="doc-sign-img" src="'+biz.signatureImg+'"><div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>' : '')
     + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
@@ -2026,12 +2033,12 @@ function renderDocPreview() {
     var aPhHtml='<p style="grid-column:1/-1;color:#aaa;font-size:11px;text-align:center;padding:10px;">현장사진 없음</p>';
     if(aPh.length>0){aPhHtml='';aPh.forEach(function(p,i){aPhHtml+='<div><img src="'+p+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:3px;"><p style="font-size:9px;color:#888;text-align:center;margin:2px 0;">후'+(i+1)+'</p></div>';});}
     var p5Html='';
-    if(receipts.length>0){p5Html='<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">5페이지 — 영수증</span><div class="ins-page-divider-line"></div></div><div class="a4-scale-wrap"><div class="a4-scale-page"><div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">영수증</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';receipts.forEach(function(src,i){p5Html+='<div><img src="'+src+'" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:9px;color:#888;text-align:center;margin:3px 0;">영수증'+(i+1)+'</p></div>';});p5Html+='</div></div></div>';}
+    if(receipts.length>0){p5Html='<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">5페이지 — 영수증</span><div class="ins-page-divider-line"></div></div><div class="a4-preview"><div class="a4-preview-page"><div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:20px;">영수증</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';receipts.forEach(function(src,i){p5Html+='<div><img src="'+src+'" style="width:100%;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:9px;color:#888;text-align:center;margin:3px 0;">영수증'+(i+1)+'</p></div>';});p5Html+='</div></div></div>';}
     var bizRegHtml=bizReg?('<div style="display:flex;justify-content:center;"><img src="'+bizReg+'" style="width:100%;max-height:900px;object-fit:contain;border:1px solid #e0e8f0;border-radius:6px;"></div>'):'<div style="border:2px dashed #c8d8f0;border-radius:8px;padding:60px 20px;text-align:center;color:#aaa;"><div style="font-size:32px;margin-bottom:12px;">📄</div><p>사업자정보에서 사업자등록증을 업로드해주세요</p></div>';
 
     el.innerHTML=''
       +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">1페이지 — 보험청구 신청서</span><div class="ins-page-divider-line"></div></div>'
-      +'<div class="a4-scale-wrap"><div class="a4-scale-page" id="ins-p1">'
+      +'<div class="a4-preview"><div class="a4-preview-page" id="ins-p1">'
       +'<div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a3a6e;padding-bottom:12px;margin-bottom:16px;"><div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div><div style="font-size:11px;color:#555;margin-top:3px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+'</div></div><div style="font-size:11px;color:#555;" contenteditable="'+ce+'">작성일: '+today+'</div></div>'
       +'<div style="text-align:center;margin-bottom:20px;"><div style="font-size:22px;font-weight:700;color:#1a3a6e;letter-spacing:4px;">보 험 청 구 신 청 서</div></div>'
       +'<div style="font-size:12px;font-weight:700;color:white;background:#1a3a6e;padding:5px 10px;margin-bottom:0;">① 신청인 정보</div>'
@@ -2046,13 +2053,13 @@ function renderDocPreview() {
       +'<div style="border:1px solid #c8d8f0;border-radius:4px;padding:12px;"><div style="font-size:11px;color:#555;margin-bottom:10px;">위 내용이 사실임을 확인하며 보험금 청구를 신청합니다.</div><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;"><div style="flex:1;"><div style="font-size:11px;color:#888;margin-bottom:4px;">신청일</div><div style="border-bottom:1px solid #999;padding-bottom:4px;" contenteditable="'+ce+'">'+today+'</div></div><div style="text-align:center;"><div style="font-size:11px;color:#888;margin-bottom:4px;">서명</div><div style="width:100px;height:48px;border:1px solid #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:white;">'+signH+'</div></div><div style="text-align:center;"><div style="font-size:11px;color:#888;margin-bottom:4px;">도장</div><div style="width:52px;height:52px;border:1px solid #ccc;border-radius:50%;display:flex;align-items:center;justify-content:center;background:white;margin:0 auto;">'+stampH+'</div></div></div></div>'
       +'</div></div>'
       +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">2페이지 — 현장 사진</span><div class="ins-page-divider-line"></div></div>'
-      +'<div class="a4-scale-wrap"><div class="a4-scale-page" id="ins-p2"><div style="font-size:18px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:16px;">현 장 사 진</div><div style="font-size:12px;color:#555;margin-bottom:14px;">고객: <b>'+j.name+'</b> | 작업일: <b>'+j.date+'</b> | 주소: '+j.addr+'</div><div style="font-size:13px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:8px;border-left:3px solid #4f8ef7;">조치 전</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">'+bPhHtml+'</div><div style="font-size:13px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:8px;border-left:3px solid #4f8ef7;">조치 후</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+aPhHtml+'</div></div></div>'
+      +'<div class="a4-preview"><div class="a4-preview-page" id="ins-p2"><div style="font-size:18px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:16px;">현 장 사 진</div><div style="font-size:12px;color:#555;margin-bottom:14px;">고객: <b>'+j.name+'</b> | 작업일: <b>'+j.date+'</b> | 주소: '+j.addr+'</div><div style="font-size:13px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:8px;border-left:3px solid #4f8ef7;">조치 전</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">'+bPhHtml+'</div><div style="font-size:13px;font-weight:700;color:#1a3a6e;margin-bottom:10px;padding-left:8px;border-left:3px solid #4f8ef7;">조치 후</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+aPhHtml+'</div></div></div>'
       +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>'
-      +'<div class="a4-scale-wrap"><div class="a4-scale-page" id="ins-p3">'
+      +'<div class="a4-preview"><div class="a4-preview-page" id="ins-p3">'
       +makeOpinionHTML(j, biz, today, co, ce)
       +'</div></div>'
       +'<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 사업자등록증</span><div class="ins-page-divider-line"></div></div>'
-      +'<div class="a4-scale-wrap"><div class="a4-scale-page" id="ins-p4"><div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:20px;"><div><div style="font-size:18px;font-weight:700;color:#1a3a6e;">'+co+'</div><div style="font-size:11px;color:#555;">사업자번호: '+(biz.reg||'-')+'</div></div><div style="font-size:11px;color:#555;">'+today+'</div></div><div style="font-size:16px;font-weight:700;color:#1a3a6e;margin-bottom:16px;">사업자등록증 사본</div>'+bizRegHtml+'</div></div>'
+      +'<div class="a4-preview"><div class="a4-preview-page" id="ins-p4"><div style="display:flex;justify-content:space-between;border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:20px;"><div><div style="font-size:18px;font-weight:700;color:#1a3a6e;">'+co+'</div><div style="font-size:11px;color:#555;">사업자번호: '+(biz.reg||'-')+'</div></div><div style="font-size:11px;color:#555;">'+today+'</div></div><div style="font-size:16px;font-weight:700;color:#1a3a6e;margin-bottom:16px;">사업자등록증 사본</div>'+bizRegHtml+'</div></div>'
       +p5Html;
   }
   setTimeout(scaleA4, 100);
@@ -2120,7 +2127,9 @@ function getDocPage() {
   // 견적서/소견서: a4-scale-page
   const scalePage = area.querySelector('.a4-scale-page');
   if (scalePage) return scalePage;
-  // 보험서류: 전체 preview area 반환 (여러 페이지)
+  // 보험서류: a4-preview > div (첫 번째)
+  const previewDiv = area.querySelector('.a4-preview > div');
+  if (previewDiv) return previewDiv;
   return area;
 }
 async function downloadInsurancePDF() {

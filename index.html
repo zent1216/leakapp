@@ -363,19 +363,51 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 /* 인쇄용 */
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  body{margin:0!important;padding:0!important;}
   body>*:not(#page-docs){display:none!important;}
-  #page-docs{display:block!important;position:static!important;width:100%!important;max-width:none!important;}
-  .topbar,.doc-tabs,.doc-job-select,.doc-edit-hint,.share-bar,#share-normal,#share-insurance,#docs-mode-btn,#docs-edit-area{display:none!important;}
-  #docs-preview-area{display:block!important;}
-  /* 편집 모드 미리보기 없을 때 편집 영역 출력 */
-  .doc-a4-wrap{overflow:visible!important;page-break-after:always;}
-  .doc-a4-page{width:210mm!important;min-height:297mm!important;padding:15mm 18mm!important;margin:0!important;box-shadow:none!important;transform:none!important;}
-  /* 미리보기 모드 */
-  .a4-scale-wrap{overflow:visible!important;height:auto!important;page-break-after:always;}
-  .a4-scale-page{width:210mm!important;min-height:297mm!important;padding:15mm 18mm!important;margin:0!important;box-shadow:none!important;transform:none!important;}
-  .a4-preview{page-break-after:always;margin:0!important;}
-  .a4-preview>div{width:210mm!important;min-height:297mm!important;padding:15mm 18mm!important;transform:none!important;box-shadow:none!important;}
+  #page-docs{
+    display:block!important;position:static!important;
+    width:100%!important;max-width:none!important;
+    overflow:visible!important;height:auto!important;
+  }
+  .topbar,.doc-tabs,.doc-job-select,.doc-edit-hint,.share-bar,
+  #share-normal,#share-insurance,#docs-mode-btn,#docs-edit-area,
   .ins-page-divider{display:none!important;}
+  #docs-body,#docs-preview-area{
+    display:block!important;overflow:visible!important;
+    height:auto!important;padding:0!important;
+  }
+  /* 견적서/소견서 미리보기 */
+  .a4-scale-wrap{
+    overflow:visible!important;height:auto!important;
+    box-shadow:none!important;margin:0!important;
+    page-break-after:always;break-after:page;
+  }
+  .a4-scale-page{
+    width:210mm!important;min-height:297mm!important;
+    padding:15mm 18mm!important;margin:0!important;
+    box-shadow:none!important;transform:none!important;
+    border-radius:0!important;
+  }
+  /* 보험서류 미리보기 (5페이지) */
+  .a4-preview{
+    overflow:visible!important;height:auto!important;
+    box-shadow:none!important;margin:0!important;border-radius:0!important;
+    page-break-after:always;break-after:page;
+  }
+  .a4-preview>div{
+    width:210mm!important;min-height:297mm!important;
+    padding:15mm 18mm!important;
+    transform:none!important;box-shadow:none!important;
+    overflow:visible!important;height:auto!important;
+  }
+  /* 편집 모드에서 인쇄 */
+  .doc-a4-wrap{overflow:visible!important;page-break-after:always;break-after:page;}
+  .doc-a4-page{
+    width:210mm!important;min-height:297mm!important;
+    padding:15mm 18mm!important;margin:0!important;
+    box-shadow:none!important;transform:none!important;
+  }
 }
 .share-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .share-btn{
@@ -1687,11 +1719,21 @@ function setDocType(type) {
   const titles = {estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
   const titleEl = document.getElementById('docs-title');
   if (titleEl) titleEl.innerHTML = (titles[type]||type) + ' <span>생성</span>';
-  // 공유버튼 숨기기 (편집모드)
-  document.getElementById('share-normal').style.display = 'none';
-  document.getElementById('share-insurance').style.display = 'none';
-  if (_isPreview) renderDocPreview();
-  else renderDocEdit();
+  // 공유버튼: 편집모드면 숨기기, 미리보기면 타입에 맞게 표시
+  if (!_isPreview) {
+    document.getElementById('share-normal').style.display = 'none';
+    document.getElementById('share-insurance').style.display = 'none';
+    renderDocEdit();
+  } else {
+    if (type === 'insurance') {
+      document.getElementById('share-normal').style.display = 'none';
+      document.getElementById('share-insurance').style.display = 'block';
+    } else {
+      document.getElementById('share-normal').style.display = 'block';
+      document.getElementById('share-insurance').style.display = 'none';
+    }
+    renderDocPreview();
+  }
 }
 
 function onDocJobChange() {
@@ -2045,27 +2087,27 @@ function renderInsReceiptList() {
 async function downloadPDF() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
-  if (typeof jsPDF === 'undefined') { showToast('PDF 라이브러리 로딩 중...'); return; }
+  if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
   showToast('PDF 생성 중... ⏳');
   try {
-    // transform 임시 제거 후 캡처
-    const page = getDocPage();
-    if (!page) { showToast('미리보기를 먼저 열어주세요'); return; }
-    const origTransform = page.style.transform;
-    const origWidth = page.style.width;
+    const page = document.getElementById('docs-preview-area').querySelector('.a4-scale-page');
+    if (!page) { showToast('먼저 미리보기 버튼을 눌러주세요'); return; }
+    // transform 임시 해제
+    const wrap = page.parentElement;
+    const origT = page.style.transform;
+    const origH = wrap ? wrap.style.height : '';
+    const origO = wrap ? wrap.style.overflow : '';
     page.style.transform = 'none';
-    page.style.width = '794px';
-    if (page.parentElement) page.parentElement.style.height = 'auto';
-    await new Promise(r => setTimeout(r, 80));
+    if (wrap) { wrap.style.height = 'auto'; wrap.style.overflow = 'visible'; }
+    await new Promise(r => setTimeout(r, 100));
     const canvas = await html2canvas(page, {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false});
-    page.style.transform = origTransform;
-    page.style.width = origWidth;
-    if (page.parentElement) page.parentElement.style.height = '';
+    page.style.transform = origT;
+    if (wrap) { wrap.style.height = origH; wrap.style.overflow = origO; }
     const { jsPDF: JSPDF } = jspdf;
     const pdf = new JSPDF({orientation:'portrait', unit:'mm', format:'a4'});
-    const ratio = canvas.height / canvas.width;
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 210 * ratio);
-    const label = _curDocType === 'estimate' ? '견적서' : '소견서';
+    const imgH = 210 * canvas.height / canvas.width;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, imgH);
+    const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'opinion' ? '소견서' : '문서';
     pdf.save(j.date + '_' + j.name + '_' + label + '.pdf');
     showToast('PDF 저장됐습니다 ✓');
   } catch(e) { showToast('PDF 실패: ' + e.message); }
@@ -2078,15 +2120,13 @@ function getDocPage() {
   // 견적서/소견서: a4-scale-page
   const scalePage = area.querySelector('.a4-scale-page');
   if (scalePage) return scalePage;
-  // 보험서류: a4-preview > div
-  const previewDiv = area.querySelector('.a4-preview > div');
-  if (previewDiv) return previewDiv;
+  // 보험서류: 전체 preview area 반환 (여러 페이지)
   return area;
 }
 async function downloadInsurancePDF() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
-  if (typeof jsPDF === 'undefined') { showToast('PDF 라이브러리 로딩 중...'); return; }
+  if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
   showToast('PDF 생성 중... ⏳');
   try {
     const area = document.getElementById('docs-preview-area');

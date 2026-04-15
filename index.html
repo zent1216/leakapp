@@ -2091,25 +2091,73 @@ function renderInsReceiptList() {
 }
 
 // PDF/이미지 다운로드
+// 페이지 원본 크기로 캡처 (transform 제거 후)
+async function captureA4Page(el) {
+  if (!el) return null;
+  const inner = el.querySelector('div') || el;
+  const isWrap = el.classList.contains('a4-preview') || el.classList.contains('a4-scale-wrap');
+  const target = isWrap ? inner : el;
+
+  // 원래 스타일 저장
+  const origTransform = target.style.transform;
+  const origWidth = target.style.width;
+  const origHeight = target.style.height;
+  const wrapOrigH = isWrap ? el.style.height : '';
+  const wrapOrigO = isWrap ? el.style.overflow : '';
+
+  // transform 제거, 원본 크기 복원
+  target.style.transform = 'none';
+  target.style.width = '794px';
+  target.style.height = 'auto';
+  if (isWrap) {
+    el.style.height = 'auto';
+    el.style.overflow = 'visible';
+  }
+
+  await new Promise(r => setTimeout(r, 80));
+
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    width: 794,
+    windowWidth: 794
+  });
+
+  // 스타일 복원
+  target.style.transform = origTransform;
+  target.style.width = origWidth;
+  target.style.height = origHeight;
+  if (isWrap) {
+    el.style.height = wrapOrigH;
+    el.style.overflow = wrapOrigO;
+  }
+
+  return canvas;
+}
+
+
 async function downloadPDF() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
   if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
+  // 미리보기 모드 강제 전환
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 200));
+  }
   showToast('PDF 생성 중... ⏳');
   try {
-    const page = document.getElementById('docs-preview-area').querySelector('.a4-scale-page');
-    if (!page) { showToast('먼저 미리보기 버튼을 눌러주세요'); return; }
-    // transform 임시 해제
-    const wrap = page.parentElement;
-    const origT = page.style.transform;
-    const origH = wrap ? wrap.style.height : '';
-    const origO = wrap ? wrap.style.overflow : '';
-    page.style.transform = 'none';
-    if (wrap) { wrap.style.height = 'auto'; wrap.style.overflow = 'visible'; }
-    await new Promise(r => setTimeout(r, 100));
-    const canvas = await html2canvas(page, {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false});
-    page.style.transform = origT;
-    if (wrap) { wrap.style.height = origH; wrap.style.overflow = origO; }
+    const area = document.getElementById('docs-preview-area');
+    const page = area.querySelector('.a4-scale-page');
+    if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
+    const canvas = await captureA4Page(page.parentElement);
+    if (!canvas) { showToast('캡처 실패'); return; }
     const { jsPDF: JSPDF } = jspdf;
     const pdf = new JSPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const imgH = 210 * canvas.height / canvas.width;
@@ -2136,31 +2184,29 @@ async function downloadInsurancePDF() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
   if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
+  // 미리보기 모드 강제 전환
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
   showToast('PDF 생성 중... ⏳');
   try {
     const area = document.getElementById('docs-preview-area');
     const pages = area.querySelectorAll('.a4-preview');
-    if (!pages.length) { showToast('먼저 미리보기를 열어주세요'); return; }
+    if (!pages.length) { showToast('미리보기 페이지를 찾을 수 없습니다'); return; }
     const { jsPDF: JSPDF } = jspdf;
     const pdf = new JSPDF({orientation:'portrait', unit:'mm', format:'a4'});
     for (let i = 0; i < pages.length; i++) {
-      // transform 임시 제거
-      const inner = pages[i].querySelector('div') || pages[i];
-      const origT = inner.style.transform;
-      const origW = inner.style.width;
-      inner.style.transform = 'none';
-      inner.style.width = '794px';
-      pages[i].style.height = 'auto';
-      pages[i].style.overflow = 'visible';
-      await new Promise(r => setTimeout(r, 60));
-      const canvas = await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false});
-      inner.style.transform = origT;
-      inner.style.width = origW;
-      pages[i].style.height = '';
-      pages[i].style.overflow = '';
+      showToast('PDF 생성 중... ' + (i+1) + '/' + pages.length + ' ⏳');
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
       if (i > 0) pdf.addPage();
-      const ratio = canvas.height / canvas.width;
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 210 * ratio);
+      const imgH = 210 * canvas.height / canvas.width;
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, imgH);
     }
     pdf.save(j.date + '_' + j.name + '_보험청구서류.pdf');
     showToast('PDF ' + pages.length + '페이지 저장됐습니다 ✓');
@@ -2171,26 +2217,23 @@ async function downloadInsurancePDF() {
 async function downloadInsuranceImages() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
   showToast('이미지 생성 중... ⏳');
   try {
     const area = document.getElementById('docs-preview-area');
     const pages = area.querySelectorAll('.a4-preview');
-    if (!pages.length) { showToast('먼저 미리보기를 열어주세요'); return; }
+    if (!pages.length) { showToast('페이지를 찾을 수 없습니다'); return; }
     const labels = ['1_신청서','2_현장사진','3_소견서','4_사업자등록증','5_영수증'];
     for (let i = 0; i < pages.length; i++) {
-      const inner = pages[i].querySelector('div') || pages[i];
-      const origT = inner.style.transform;
-      const origW = inner.style.width;
-      inner.style.transform = 'none';
-      inner.style.width = '794px';
-      pages[i].style.height = 'auto';
-      pages[i].style.overflow = 'visible';
-      await new Promise(r => setTimeout(r, 60));
-      const canvas = await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false});
-      inner.style.transform = origT;
-      inner.style.width = origW;
-      pages[i].style.height = '';
-      pages[i].style.overflow = '';
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
       a.download = j.date + '_' + j.name + '_' + (labels[i] || '페이지' + (i+1)) + '.png';
@@ -2205,20 +2248,20 @@ async function downloadInsuranceImages() {
 async function shareImage() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 200));
+  }
   showToast('이미지 생성 중... ⏳');
   try {
-    const page = getDocPage();
-    if (!page) { showToast('먼저 미리보기를 열어주세요'); return; }
-    const origT = page.style.transform;
-    const origW = page.style.width;
-    page.style.transform = 'none';
-    page.style.width = '794px';
-    if (page.parentElement) { page.parentElement.style.height = 'auto'; page.parentElement.style.overflow = 'visible'; }
-    await new Promise(r => setTimeout(r, 80));
-    const canvas = await html2canvas(page, {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false});
-    page.style.transform = origT;
-    page.style.width = origW;
-    if (page.parentElement) { page.parentElement.style.height = ''; page.parentElement.style.overflow = ''; }
+    const area = document.getElementById('docs-preview-area');
+    const page = area.querySelector('.a4-scale-page');
+    if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
+    const canvas = await captureA4Page(page.parentElement);
+    if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
     const label = _curDocType === 'estimate' ? '견적서' : '소견서';
     const fname = j.date + '_' + j.name + '_' + label + '.png';
@@ -2269,14 +2312,24 @@ async function shareKakao() {
 async function shareInsuranceImage() {
   const j = getSelJob();
   if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
   showToast('이미지 생성 중... ⏳');
   try {
-    const pages = document.querySelectorAll('#docs-preview-area .a4-preview');
-    if (!pages.length) { showToast('먼저 미리보기를 열어주세요'); return; }
+    const area = document.getElementById('docs-preview-area');
+    const pages = area.querySelectorAll('.a4-preview');
+    if (!pages.length) { showToast('페이지를 찾을 수 없습니다'); return; }
     const labels = ['신청서','현장사진','소견서','사업자등록증','영수증'];
     const files = [];
     for (let i = 0; i < pages.length; i++) {
-      const canvas = await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
       const blob = await (await fetch(canvas.toDataURL('image/png'))).blob();
       files.push(new File([blob], j.date+'_'+j.name+'_'+(labels[i]||'p'+(i+1))+'.png', {type:'image/png'}));
     }
@@ -2284,7 +2337,6 @@ async function shareInsuranceImage() {
       await navigator.share({files, title:'보험서류_'+j.name});
       return;
     }
-    // 폴백: 각각 다운로드
     for (const f of files) {
       const url = URL.createObjectURL(f);
       const a = document.createElement('a'); a.href=url; a.download=f.name; a.click();
@@ -2292,8 +2344,9 @@ async function shareInsuranceImage() {
       await new Promise(r => setTimeout(r, 300));
     }
     showToast(files.length+'개 이미지 저장됐습니다 ✓');
-  } catch(e) { showToast('실패: '+e.message); }
+  } catch(e) { showToast('실패: ' + e.message); }
 }
+
 
 function printDoc() { window.print(); }
 

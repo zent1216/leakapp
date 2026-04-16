@@ -686,9 +686,24 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="photo-grid" id="photos-after"></div>
       <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
     </div>
-    <div class="form-group">
-      <label class="form-label">메모</label>
-      <textarea class="form-textarea" id="f-memo" placeholder="내부 메모 (고객에게 표시 안됨)"></textarea>
+    <div class="form-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="form-card-title" style="color:var(--purple);">🔒 내부 관리 (고객 비공개)</div>
+      <div class="form-group">
+        <label class="form-label">메모</label>
+        <textarea class="form-textarea" id="f-memo" placeholder="내부 메모 (고객에게 표시 안됨)"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">수수료 지급처</label>
+        <input class="form-input" id="f-commission-name" placeholder="예: 광고업체명, 협업업체명">
+      </div>
+      <div class="form-group">
+        <label class="form-label">수수료 금액</label>
+        <input class="form-input" id="f-commission" type="number" placeholder="0" oninput="calcNetProfit()">
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--r-sm);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:var(--text2);">순수익 (수수료 차감 후)</span>
+        <span id="net-profit-display" style="font-size:16px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">0원</span>
+      </div>
     </div>
     <div style="height:10px;"></div>
   </div>
@@ -1183,15 +1198,22 @@ function updateMainStats() {
   const y = now.getFullYear(), m = now.getMonth() + 1;
   const prefix = y + '-' + String(m).padStart(2,'0');
   const thisMonth = _jobs.filter(j => (j.date||'').startsWith(prefix));
-  const done = thisMonth.filter(j => j.status === 'done').length;
+  const doneJobs = thisMonth.filter(j => j.status === 'done');
+  const done = doneJobs.length;
   const pending = thisMonth.filter(j => j.status !== 'done').length;
-  const revenue = thisMonth.filter(j => j.status === 'done').reduce((s,j) => s + jobTotal(j), 0);
+  const revenue = doneJobs.reduce((s,j) => s + jobTotal(j), 0);
+  const commission = doneJobs.reduce((s,j) => s + (j.commission||0), 0);
+  const netRevenue = revenue - commission;
   const el1 = document.getElementById('ms-done');
   const el2 = document.getElementById('ms-pending');
   const el3 = document.getElementById('ms-revenue');
   if (el1) el1.textContent = done;
   if (el2) el2.textContent = pending;
-  if (el3) el3.textContent = fmtShort(revenue);
+  // 수수료 있으면 순수익 표시, 없으면 전체매출
+  if (el3) el3.textContent = commission > 0 ? fmtShort(netRevenue) : fmtShort(revenue);
+  // 라벨 업데이트
+  const label3 = el3 ? el3.nextElementSibling : null;
+  if (label3) label3.textContent = commission > 0 ? '이달 순수익' : '이달 수입';
 }
 
 // ════════════════════════════════════════
@@ -1501,11 +1523,11 @@ function resetForm() {
   _extraSpotCount = 0;
   _tempPhotos = {before:[null,null,null], after:[null,null,null]};
   document.getElementById('field-title').innerHTML = '새 <span>작업</span>';
-  ['f-name','f-phone','f-addr','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo'].forEach(id => {
+  ['f-name','f-phone','f-addr','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo','f-commission-name'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['f-inspect','f-base','f-material-cost'].forEach(id => {
+  ['f-inspect','f-base','f-material-cost','f-commission'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1542,6 +1564,8 @@ function editJob(id) {
   document.getElementById('f-base').value = j.baseCost || '';
   document.getElementById('f-material-cost').value = j.materialCost || '';
   document.getElementById('f-memo').value = j.memo || '';
+  document.getElementById('f-commission-name').value = j.commissionName || '';
+  document.getElementById('f-commission').value = j.commission || '';
   // 자재
   document.getElementById('material-list').innerHTML = '';
   const mats = j.materials || [];
@@ -1568,6 +1592,16 @@ function calcTotal() {
   const total = v('f-inspect') + v('f-base') + v('f-material-cost') + _extraSpotCount * 200000;
   const el = document.getElementById('total-display');
   if (el) el.textContent = fmtMoney(total);
+  calcNetProfit();
+}
+
+function calcNetProfit() {
+  const v = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const total = v('f-inspect') + v('f-base') + v('f-material-cost') + _extraSpotCount * 200000;
+  const commission = v('f-commission');
+  const net = total - commission;
+  const el = document.getElementById('net-profit-display');
+  if (el) el.textContent = fmtMoney(net);
 }
 
 function addMaterialRow(name='', qty='') {
@@ -1671,6 +1705,8 @@ function saveJob() {
     photosBefore: _tempPhotos.before.filter(Boolean),
     photosAfter: _tempPhotos.after.filter(Boolean),
     memo: document.getElementById('f-memo').value.trim(),
+    commissionName: document.getElementById('f-commission-name').value.trim(),
+    commission: parseFloat(document.getElementById('f-commission').value) || 0,
   };
   if (_editingJobId) {
     const existing = _jobs.find(j => j.id === _editingJobId);
@@ -1798,7 +1834,7 @@ function toggleDocsMode() {
       document.getElementById('share-normal').style.display = 'block';
       document.getElementById('share-insurance').style.display = 'none';
     }
-    // 보험서류 편집 필드 값 저장
+    // 편집 내용 미리보기에 반영
     if (_curDocType === 'insurance') {
       var j2 = getSelJob();
       if (j2) {
@@ -1813,6 +1849,9 @@ function toggleDocsMode() {
         if (ia) _biz.account = ia.value;
         if (ih) _biz.holder = ih.value;
       }
+    } else if (_curDocType === 'estimate') {
+      // 편집 영역의 현재 항목들을 읽어서 미리보기에 반영
+      syncEstimateEditToPreview();
     }
     renderDocPreview();
     setTimeout(scaleA4, 150);
@@ -1865,15 +1904,80 @@ function renderDocEdit() {
   }
 }
 
+// 견적서 편집 영역 → _jobs 동기화 (미리보기 전환 시 호출)
+function syncEstimateEditToPreview() {
+  var j = getSelJob();
+  if (!j) return;
+  // 현재 편집 영역의 항목 tbody 읽기
+  var tbody = document.getElementById('est-items-body');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  var items = [];
+  rows.forEach(function(tr) {
+    var cells = tr.querySelectorAll('td');
+    if (cells.length >= 2) {
+      var name = cells[0].textContent.trim();
+      var amount = cells[1].textContent.trim().replace(/,/g, '');
+      var val = parseFloat(amount) || 0;
+      if (name) items.push({name: name, amount: val});
+    }
+  });
+  // 합계 재계산
+  var total = 0;
+  items.forEach(function(i){ total += i.amount; });
+  // 항목 정보를 j에 임시 저장
+  j._editItems = items;
+  j._editTotal = total;
+}
+
+
 function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
+  // 편집에서 동기화된 항목이 있으면 사용, 아니면 기본값
+  var items = j._editItems || null;
+  var displayTotal = (j._editTotal !== undefined) ? j._editTotal : insTotal;
+
   var extraRow = '';
-  if ((j.extraSpots||0) > 0) {
+  if (!items && (j.extraSpots||0) > 0) {
     extraRow = '<tr>'
       + '<td contenteditable="'+ce+'">추가 구간('+j.extraSpots+'개소)</td>'
       + '<td style="text-align:right;" contenteditable="'+ce+'">'+((j.extraSpots||0)*200000).toLocaleString()+'</td>'
       + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
       + '</tr>';
   }
+
+  // 항목 행 생성
+  var itemRows = '';
+  if (items) {
+    // 편집에서 동기화된 항목 사용
+    items.forEach(function(item) {
+      // 미리보기에서 0원 항목 표시 여부: ce='true'(편집)면 표시, 아니면 금액>0만 표시
+      if (ce === 'true' || item.amount > 0) {
+        itemRows += '<tr>'
+          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '</tr>';
+      }
+    });
+  } else {
+    // 기본 항목 (DB에서)
+    var defaultItems = [
+      {name:'누수 탐지 검사비', amount: j.inspectCost||0},
+      {name:'누수 보수 공사비', amount: j.baseCost||0},
+      {name:'자재비', amount: j.materialCost||0}
+    ];
+    defaultItems.forEach(function(item) {
+      if (ce === 'true' || item.amount > 0) {
+        itemRows += '<tr>'
+          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '</tr>';
+      }
+    });
+    itemRows += extraRow;
+  }
+
   return ''
     + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
     + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
@@ -1890,15 +1994,12 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<table class="doc-table" style="margin-bottom:4px;">'
     + '<thead><tr><th style="width:60%">항목</th><th style="text-align:right;">금액(원)</th><th class="est-del-btn" style="width:32px;background:#1a3a6e;"></th></tr></thead>'
     + '<tbody id="est-items-body">'
-    + '<tr><td contenteditable="'+ce+'">누수 탐지 검사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.inspectCost||0).toLocaleString()+'</td><td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
-    + '<tr><td contenteditable="'+ce+'">누수 보수 공사비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.baseCost||0).toLocaleString()+'</td><td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
-    + extraRow
-    + '<tr><td contenteditable="'+ce+'">자재비</td><td style="text-align:right;" contenteditable="'+ce+'">'+(j.materialCost||0).toLocaleString()+'</td><td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td></tr>'
+    + itemRows
     + '</tbody></table>'
     + '<button class="est-del-btn" onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>'
     + '<div class="doc-total-section">'
     + '<span class="doc-total-label">합계 금액 (VAT 별도)</span>'
-    + '<span class="doc-total-val">'+insTotal.toLocaleString()+'원</span>'
+    + '<span class="doc-total-val">'+displayTotal.toLocaleString()+'원</span>'
     + '</div>'
     + '<div style="font-size:10px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>'
     + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
@@ -2387,24 +2488,68 @@ function renderStats() {
   }
   const selYear = yearSel.value || years[0];
   const yearJobs = _jobs.filter(j=>(j.date||'').startsWith(selYear));
-  const totalRev = yearJobs.filter(j=>j.status==='done').reduce((s,j)=>s+jobTotal(j),0);
-  const byType = {};
-  yearJobs.forEach(j=>{byType[j.type]=(byType[j.type]||0)+1;});
-  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">'
-    + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체</div></div>'
-    + '<div class="stat-card"><div class="stat-num green">'+yearJobs.filter(j=>j.status==='done').length+'</div><div class="stat-label">완료</div></div>'
-    + '<div class="stat-card"><div class="stat-num orange">'+fmtShort(totalRev)+'</div><div class="stat-label">수입</div></div>'
+  const doneJobs = yearJobs.filter(j=>j.status==='done');
+  const totalRev = doneJobs.reduce((s,j)=>s+jobTotal(j), 0);
+  const totalComm = doneJobs.reduce((s,j)=>s+(j.commission||0), 0);
+  const netRev = totalRev - totalComm;
+
+  // 연간 요약 카드
+  el.innerHTML = ''
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
+    + '<div class="stat-card" style="grid-column:1/-1;">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출</div>'
+    + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
     + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">수수료 합계</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-'+fmtMoney(totalComm)+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">순수익</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(netRev)+'</div>'
+    + '</div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
+    + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체 건수</div></div>'
+    + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'
+    + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done').length+'</div><div class="stat-label">진행중</div></div>'
+    + '</div>'
+    // 월별
     + Array.from({length:12},(_,i)=>{
       const m = String(i+1).padStart(2,'0');
       const mJobs = yearJobs.filter(j=>(j.date||'').startsWith(selYear+'-'+m));
       if (!mJobs.length) return '';
-      const mRev = mJobs.filter(j=>j.status==='done').reduce((s,j)=>s+jobTotal(j),0);
-      return '<div class="month-row"><div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mJobs.length+'건)</span><span class="month-total">'+fmtMoney(mRev)+'</span></div>'
-        + '<div class="month-jobs">'+mJobs.map(j=>'<div class="month-job-row"><span>'+j.name+' · '+j.type+'</span><span style="color:var(--accent);font-family:\'IBM Plex Mono\',monospace;">'+fmtMoney(jobTotal(j))+'</span></div>').join('')+'</div></div>';
+      const mDone = mJobs.filter(j=>j.status==='done');
+      const mRev = mDone.reduce((s,j)=>s+jobTotal(j),0);
+      const mComm = mDone.reduce((s,j)=>s+(j.commission||0),0);
+      const mNet = mRev - mComm;
+      return '<div class="month-row">'
+        + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mJobs.length+'건)</span>'
+        + '<span class="month-total">'+fmtMoney(mRev)+'</span></div>'
+        + '<div class="month-jobs">'
+        // 수수료/순수익 요약
+        + (mComm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
+          + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>'
+          + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
+          + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
+        + mJobs.map(j=>{
+          const hasComm = (j.commission||0) > 0;
+          return '<div class="month-job-row">'
+            + '<div style="flex:1;">'
+            + '<span>'+j.name+' · '+j.type+'</span>'
+            + (hasComm ? '<span style="font-size:10px;color:var(--purple);margin-left:6px;">['+( j.commissionName||'수수료')+']</span>' : '')
+            + '</div>'
+            + '<div style="text-align:right;">'
+            + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobTotal(j))+'</div>'
+            + (hasComm ? '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0))+'</div>' : '')
+            + '</div>'
+            + '</div>';
+        }).join('')
+        + '</div></div>';
     }).join('')
     + '<div style="height:20px;"></div>';
 }
+
 
 // ════════════════════════════════════════
 //  AS 관리
@@ -2705,7 +2850,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('as-date').value = new Date().toISOString().slice(0,10);
   addMaterialRow();
   renderPhotoSlots();
-  ['f-inspect','f-base','f-material-cost'].forEach(id => {
+  ['f-inspect','f-base','f-material-cost','f-commission'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', calcTotal);
   });

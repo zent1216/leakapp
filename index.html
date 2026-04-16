@@ -1058,11 +1058,10 @@ async function loadUserData(uid) {
   }
 }
 
-async function saveJobs() {
+async function saveJobs(force) {
   if (!_uid) return;
-  // 안전장치: 빈 배열로 덮어쓰지 않음 (데이터 유실 방지)
-  // _jobs가 비어있어도 DB에 데이터가 있으면 유지
-  if (!_jobs || _jobs.length === 0) {
+  // 안전장치: force=true 이면 무조건 저장 (백업 복원 등)
+  if (!force && (!_jobs || _jobs.length === 0)) {
     try {
       const doc = await db.collection('users').doc(_uid).get();
       if (doc.exists) {
@@ -3014,8 +3013,8 @@ function importBackup(e) {
           regImg: backup.biz.regImg || keepImg.regImg
         });
       }
-      // Firebase에 저장
-      await saveJobs();
+      // Firebase에 강제 저장 (백업 복원이므로 force=true)
+      await saveJobs(true);
       await saveBizData();
       updateMainStats();
       loadBizForm();

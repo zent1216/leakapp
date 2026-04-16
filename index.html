@@ -891,6 +891,16 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       </div>
       <input type="file" id="bizreg-input" accept="image/*" style="display:none" onchange="handleBizRegUpload(event)">
     </div>
+    <div class="form-card">
+      <div class="form-card-title">💾 데이터 백업 / 복원</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">작업 데이터와 사업자정보를 파일로 저장하거나 불러올 수 있어요</div>
+      <div class="btn-group" style="margin-bottom:8px;">
+        <button class="btn btn-secondary" onclick="exportBackup()">📥 백업 저장 (.json)</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('backup-input').click()">📤 백업 불러오기</button>
+      </div>
+      <input type="file" id="backup-input" accept=".json" style="display:none" onchange="importBackup(event)">
+      <div id="backup-status" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;text-align:center;"></div>
+    </div>
     <div class="form-card" style="border-color:rgba(239,68,68,0.2);">
       <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">⚠️ 위험 구역</div>
       <button class="btn btn-danger" onclick="deleteAccount()">🗑️ 계정 삭제 (데이터 전체 삭제)</button>
@@ -1032,19 +1042,41 @@ async function loadUserData(uid) {
     const doc = await db.collection('users').doc(uid).get();
     if (doc.exists) {
       const d = doc.data();
-      try { _jobs = d.jobs ? JSON.parse(d.jobs) : []; } catch { _jobs = []; }
-      try { _biz = d.biz ? JSON.parse(d.biz) : {}; } catch { _biz = {}; }
+      try {
+        const parsed = d.jobs ? JSON.parse(d.jobs) : [];
+        _jobs = Array.isArray(parsed) ? parsed : [];
+      } catch { _jobs = []; }
+      try {
+        const parsedBiz = d.biz ? (typeof d.biz === 'string' ? JSON.parse(d.biz) : d.biz) : {};
+        _biz = parsedBiz || {};
+      } catch { _biz = {}; }
     } else {
       _jobs = []; _biz = {};
     }
   } catch(e) {
     console.error('loadUserData:', e);
-    _jobs = []; _biz = {};
+    // 오류 시 기존 데이터 유지 (초기화하지 않음)
+    if (!_jobs) _jobs = [];
+    if (!_biz) _biz = {};
   }
 }
 
 async function saveJobs() {
   if (!_uid) return;
+  // 안전장치: 빈 배열로 덮어쓰지 않음 (데이터 유실 방지)
+  // _jobs가 비어있어도 DB에 데이터가 있으면 유지
+  if (!_jobs || _jobs.length === 0) {
+    try {
+      const doc = await db.collection('users').doc(_uid).get();
+      if (doc.exists) {
+        const existing = doc.data().jobs;
+        if (existing && existing.length > 2) {
+          console.warn('saveJobs: _jobs가 비어있지만 DB에 데이터 있음 - 저장 건너뜀');
+          return;
+        }
+      }
+    } catch(e) {}
+  }
   try { await db.collection('users').doc(_uid).set({jobs: JSON.stringify(_jobs)}, {merge:true}); }
   catch(e) { console.error('saveJobs:', e); }
 }
@@ -2648,6 +2680,9 @@ function renderContacts() {
 // ════════════════════════════════════════
 function loadBizForm() {
   const b = _biz;
+  // 백업 상태 초기화
+  const st = document.getElementById('backup-status');
+  if (st) st.style.display = 'none';
   ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
     const el = document.getElementById('biz-' + k);
     if (el) el.value = b[k] || '';
@@ -2842,6 +2877,102 @@ function saveSigPad() {
   document.getElementById('sig-empty').style.display = 'none';
   closeModal('sig-pad-modal');
   showToast('서명이 저장됐습니다 ✓');
+}
+
+
+// ════════════════════════════════════════
+//  데이터 백업 / 복원
+// ════════════════════════════════════════
+function exportBackup() {
+  if (!_uid) { showToast('로그인이 필요합니다'); return; }
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    uid: _uid,
+    jobs: _jobs,
+    biz: Object.assign({}, _biz, {
+      // 이미지는 base64로 저장되므로 그대로 포함
+    })
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = '누수설비_백업_' + date + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('백업 파일이 저장됐습니다 ✓');
+  const st = document.getElementById('backup-status');
+  if (st) {
+    st.style.display = 'block';
+    st.style.background = 'var(--green-bg)';
+    st.style.color = 'var(--green)';
+    st.style.border = '1px solid rgba(62,207,142,0.3)';
+    st.textContent = '✅ 백업 완료: 작업 ' + _jobs.length + '건 저장됨 (' + date + ')';
+  }
+}
+
+function importBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const backup = JSON.parse(ev.target.result);
+      // 유효성 검사
+      if (!backup.version || !Array.isArray(backup.jobs)) {
+        throw new Error('유효하지 않은 백업 파일입니다');
+      }
+      const jobCount = backup.jobs.length;
+      if (!confirm('백업 파일에서 작업 ' + jobCount + '건을 불러올게요.\n현재 데이터(' + _jobs.length + '건)는 이 데이터로 교체됩니다.\n계속하시겠습니까?')) {
+        e.target.value = '';
+        return;
+      }
+      // 데이터 복원
+      _jobs = backup.jobs;
+      if (backup.biz) {
+        // biz 이미지 필드는 유지하고 나머지만 덮어씌움
+        const keepImg = {
+          signatureImg: _biz.signatureImg,
+          stampImg: _biz.stampImg,
+          regImg: _biz.regImg
+        };
+        _biz = Object.assign({}, backup.biz, {
+          signatureImg: backup.biz.signatureImg || keepImg.signatureImg,
+          stampImg: backup.biz.stampImg || keepImg.stampImg,
+          regImg: backup.biz.regImg || keepImg.regImg
+        });
+      }
+      // Firebase에 저장
+      await saveJobs();
+      await saveBizData();
+      updateMainStats();
+      loadBizForm();
+      showToast('✅ 백업 복원 완료! 작업 ' + jobCount + '건');
+      const st = document.getElementById('backup-status');
+      if (st) {
+        st.style.display = 'block';
+        st.style.background = 'var(--green-bg)';
+        st.style.color = 'var(--green)';
+        st.style.border = '1px solid rgba(62,207,142,0.3)';
+        st.textContent = '✅ 복원 완료: 작업 ' + jobCount + '건 불러옴';
+      }
+    } catch(err) {
+      showToast('복원 실패: ' + err.message);
+      const st = document.getElementById('backup-status');
+      if (st) {
+        st.style.display = 'block';
+        st.style.background = 'var(--red-bg)';
+        st.style.color = 'var(--red)';
+        st.style.border = '1px solid rgba(239,68,68,0.3)';
+        st.textContent = '❌ 복원 실패: ' + err.message;
+      }
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 

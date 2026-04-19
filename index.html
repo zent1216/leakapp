@@ -1047,15 +1047,93 @@ async function loadUserData(uid) {
         const parsedBiz = d.biz ? (typeof d.biz === 'string' ? JSON.parse(d.biz) : d.biz) : {};
         _biz = parsedBiz || {};
       } catch { _biz = {}; }
+      // 폴백: 클라우드에 사진 없으면 localStorage에서 복원
+      _jobs.forEach(function(j) {
+        if ((!j.photosBefore || !j.photosBefore.length) && (!j.photosAfter || !j.photosAfter.length)) {
+          try {
+            const photos = localStorage.getItem('photos_' + j.id);
+            if (photos) {
+              const p = JSON.parse(photos);
+              j.photosBefore = p.before || [];
+              j.photosAfter = p.after || [];
+            }
+          } catch(e) {}
+        }
+      });
     } else {
       _jobs = []; _biz = {};
     }
   } catch(e) {
     console.error('loadUserData:', e);
-    // 오류 시 기존 데이터 유지 (초기화하지 않음)
     if (!_jobs) _jobs = [];
     if (!_biz) _biz = {};
   }
+}
+
+// 사진 데이터를 localStorage에 저장
+function savePhotosLocal() {
+  try {
+    _jobs.forEach(function(j) {
+      if ((j.photosBefore && j.photosBefore.length) || (j.photosAfter && j.photosAfter.length)) {
+        localStorage.setItem('photos_' + j.id, JSON.stringify({
+          before: j.photosBefore || [],
+          after: j.photosAfter || []
+        }));
+      }
+      if (j.asHistory) {
+        j.asHistory.forEach(function(a, idx) {
+          if ((a.photosBefore && a.photosBefore.length) || (a.photosAfter && a.photosAfter.length)) {
+            localStorage.setItem('as_photos_' + j.id + '_' + idx, JSON.stringify({
+              before: a.photosBefore || [],
+              after: a.photosAfter || []
+            }));
+          }
+        });
+      }
+    });
+  } catch(e) { console.warn('사진 로컬 저장 실패:', e.message); }
+}
+
+// localStorage에서 사진 복원
+function loadPhotosLocal() {
+  try {
+    _jobs.forEach(function(j) {
+      const photos = localStorage.getItem('photos_' + j.id);
+      if (photos) {
+        const p = JSON.parse(photos);
+        j.photosBefore = p.before || [];
+        j.photosAfter = p.after || [];
+      }
+      if (j.asHistory) {
+        j.asHistory.forEach(function(a, idx) {
+          const ap = localStorage.getItem('as_photos_' + j.id + '_' + idx);
+          if (ap) {
+            const p = JSON.parse(ap);
+            a.photosBefore = p.before || [];
+            a.photosAfter = p.after || [];
+          }
+        });
+      }
+    });
+  } catch(e) { console.warn('사진 로컬 로드 실패:', e.message); }
+}
+
+// Firestore 저장용: 사진 제외한 job 데이터
+function jobsWithoutPhotos() {
+  return _jobs.map(function(j) {
+    const copy = Object.assign({}, j);
+    copy.photosBefore = [];
+    copy.photosAfter = [];
+    if (copy.asHistory) {
+      copy.asHistory = copy.asHistory.map(function(a) {
+        const ac = Object.assign({}, a);
+        ac.photosBefore = [];
+        ac.photosAfter = [];
+        return ac;
+      });
+    }
+    return copy;
+  });
 }
 
 async function saveJobs(force) {
@@ -1073,8 +1151,25 @@ async function saveJobs(force) {
       }
     } catch(e) {}
   }
-  try { await db.collection('users').doc(_uid).set({jobs: JSON.stringify(_jobs)}, {merge:true}); }
-  catch(e) { console.error('saveJobs:', e); }
+  // 로컬에도 사진 백업 (이중 안전장치)
+  try { savePhotosLocal(); } catch(e) {}
+  // Firestore에 사진 포함 저장 (사진이 이미 압축됐으므로 1MB 이내)
+  try {
+    const jobsJson = JSON.stringify(_jobs);
+    const sizeMB = (jobsJson.length / 1024 / 1024).toFixed(2);
+    if (jobsJson.length > 900000) {
+      console.warn('saveJobs: 데이터 크기 주의 ' + sizeMB + 'MB (1MB 제한)');
+      showToast('⚠️ 데이터가 커요 (' + sizeMB + 'MB). 오래된 작업은 삭제하세요');
+    }
+    await db.collection('users').doc(_uid).set({jobs: jobsJson}, {merge: true});
+  } catch(e) {
+    console.error('saveJobs:', e);
+    if (e.message && e.message.includes('exceeds')) {
+      showToast('❌ 데이터 크기 초과 (1MB). 사진이 많은 오래된 작업을 삭제하세요');
+    } else {
+      showToast('저장 실패: ' + e.message);
+    }
+  }
 }
 
 async function saveBizData() {
@@ -1283,11 +1378,20 @@ function addAsPhoto(type, idx) {
 function handleAsPhotoUpload(e) {
   const file = e.target.files[0];
   if (!file || !_asPhotoTarget) return;
+  showToast('사진 처리 중...');
   const reader = new FileReader();
-  reader.onload = function(ev) {
-    _tempAsPhotos[_asPhotoTarget.type][_asPhotoTarget.idx] = ev.target.result;
-    renderAsPhotoSlots();
-    _asPhotoTarget = null;
+  reader.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 1400, 0.72);
+      _tempAsPhotos[_asPhotoTarget.type][_asPhotoTarget.idx] = compressed;
+      renderAsPhotoSlots();
+      _asPhotoTarget = null;
+      const sizeKB = Math.round(compressed.length * 0.75 / 1024);
+      showToast('사진 추가됨 (' + sizeKB + 'KB) ✓');
+    } catch(err) {
+      showToast('사진 처리 실패: ' + err.message);
+      _asPhotoTarget = null;
+    }
   };
   reader.readAsDataURL(file);
   e.target.value = '';
@@ -1724,14 +1828,60 @@ function addPhoto(type, idx) {
   document.getElementById('photo-input').click();
 }
 
+// 이미지 압축 함수 (Firestore 1MB 제한 대응)
+// 최대 가로 1400px, JPEG 품질 0.72 → 보통 80~150KB
+function compressImage(dataUrl, maxWidth, quality) {
+  return new Promise(function(resolve, reject) {
+    maxWidth = maxWidth || 1400;
+    quality = quality || 0.72;
+    const img = new Image();
+    img.onload = function() {
+      try {
+        let w = img.width, h = img.height;
+        // 가로 최대값 제한
+        if (w > maxWidth) {
+          h = Math.round(h * maxWidth / w);
+          w = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        // 고품질 리사이징 설정
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        // 흰 배경 (투명 PNG 처리)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        // JPEG로 압축 (PNG보다 훨씬 작음)
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } catch(e) { reject(e); }
+    };
+    img.onerror = function() { reject(new Error('이미지 로드 실패')); };
+    img.src = dataUrl;
+  });
+}
+
+
 function handlePhotoUpload(e) {
   const file = e.target.files[0];
   if (!file || !_photoTarget) return;
+  showToast('사진 처리 중...');
   const reader = new FileReader();
-  reader.onload = ev => {
-    _tempPhotos[_photoTarget.type][_photoTarget.idx] = ev.target.result;
-    renderPhotoSlots();
-    _photoTarget = null;
+  reader.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 1400, 0.72);
+      _tempPhotos[_photoTarget.type][_photoTarget.idx] = compressed;
+      renderPhotoSlots();
+      _photoTarget = null;
+      const sizeKB = Math.round(compressed.length * 0.75 / 1024);
+      showToast('사진 추가됨 (' + sizeKB + 'KB) ✓');
+    } catch(err) {
+      showToast('사진 처리 실패: ' + err.message);
+      _photoTarget = null;
+    }
   };
   reader.readAsDataURL(file);
   e.target.value = '';
@@ -2284,13 +2434,20 @@ function renderDocPreview() {
 // 영수증
 function handleInsReceipt(e) {
   const files = Array.from(e.target.files);
-  files.forEach(file => {
+  files.forEach(async function(file) {
     const reader = new FileReader();
-    reader.onload = ev => { _insReceipts.push(ev.target.result); renderInsReceiptList(); };
+    reader.onload = async function(ev) {
+      try {
+        const compressed = await compressImage(ev.target.result, 1400, 0.72);
+        _insReceipts.push(compressed);
+        renderInsReceiptList();
+      } catch(err) { console.error('영수증 압축 실패:', err); }
+    };
     reader.readAsDataURL(file);
   });
   e.target.value = '';
 }
+
 function openReceiptInput() {
   var inp = document.getElementById('ins-receipt-input');
   if (inp) inp.click();
@@ -2799,12 +2956,15 @@ function saveBizInfo() {
 function handleSigUpload(e) {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
-  r.onload = ev => {
-    _biz.signatureImg = ev.target.result; saveBizData();
-    document.getElementById('sig-img').src = ev.target.result;
-    document.getElementById('sig-preview').style.display = 'block';
-    document.getElementById('sig-empty').style.display = 'none';
-    showToast('서명이 저장됐습니다 ✓');
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 600, 0.85);
+      _biz.signatureImg = compressed; saveBizData();
+      document.getElementById('sig-img').src = compressed;
+      document.getElementById('sig-preview').style.display = 'block';
+      document.getElementById('sig-empty').style.display = 'none';
+      showToast('서명이 저장됐습니다 ✓');
+    } catch(err) { showToast('서명 저장 실패: ' + err.message); }
   };
   r.readAsDataURL(file); e.target.value = '';
 }
@@ -2816,12 +2976,15 @@ function removeSig() {
 function handleStampUpload(e) {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
-  r.onload = ev => {
-    _biz.stampImg = ev.target.result; saveBizData();
-    document.getElementById('stamp-img').src = ev.target.result;
-    document.getElementById('stamp-preview').style.display = 'block';
-    document.getElementById('stamp-empty').style.display = 'none';
-    showToast('도장이 저장됐습니다 ✓');
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 400, 0.85);
+      _biz.stampImg = compressed; saveBizData();
+      document.getElementById('stamp-img').src = compressed;
+      document.getElementById('stamp-preview').style.display = 'block';
+      document.getElementById('stamp-empty').style.display = 'none';
+      showToast('도장이 저장됐습니다 ✓');
+    } catch(err) { showToast('도장 저장 실패: ' + err.message); }
   };
   r.readAsDataURL(file); e.target.value = '';
 }
@@ -2833,12 +2996,15 @@ function removeStamp() {
 function handleBizRegUpload(e) {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
-  r.onload = ev => {
-    _biz.regImg = ev.target.result; saveBizData();
-    document.getElementById('bizreg-img').src = ev.target.result;
-    document.getElementById('bizreg-preview').style.display = 'block';
-    document.getElementById('bizreg-empty').style.display = 'none';
-    showToast('사업자등록증이 저장됐습니다 ✓');
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 1600, 0.80);
+      _biz.regImg = compressed; saveBizData();
+      document.getElementById('bizreg-img').src = compressed;
+      document.getElementById('bizreg-preview').style.display = 'block';
+      document.getElementById('bizreg-empty').style.display = 'none';
+      showToast('사업자등록증이 저장됐습니다 ✓');
+    } catch(err) { showToast('저장 실패: ' + err.message); }
   };
   r.readAsDataURL(file); e.target.value = '';
 }
@@ -2953,14 +3119,24 @@ function saveSigPad() {
 // ════════════════════════════════════════
 function exportBackup() {
   if (!_uid) { showToast('로그인이 필요합니다'); return; }
+  // 백업 시 localStorage 사진도 포함
+  savePhotosLocal();
+  const jobsWithPhotos = _jobs.map(function(j) {
+    const copy = Object.assign({}, j);
+    const photos = localStorage.getItem('photos_' + j.id);
+    if (photos) {
+      const p = JSON.parse(photos);
+      copy.photosBefore = p.before || [];
+      copy.photosAfter = p.after || [];
+    }
+    return copy;
+  });
   const backup = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     uid: _uid,
-    jobs: _jobs,
-    biz: Object.assign({}, _biz, {
-      // 이미지는 base64로 저장되므로 그대로 포함
-    })
+    jobs: jobsWithPhotos,
+    biz: Object.assign({}, _biz)
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type: 'application/json'});
@@ -3013,6 +3189,8 @@ function importBackup(e) {
           regImg: backup.biz.regImg || keepImg.regImg
         });
       }
+      // localStorage에 사진 저장
+      savePhotosLocal();
       // Firebase에 강제 저장 (백업 복원이므로 force=true)
       await saveJobs(true);
       await saveBizData();

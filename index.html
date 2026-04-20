@@ -12,6 +12,7 @@
 <title>누수설비 관리</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -630,10 +631,25 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="form-card">
       <div class="form-card-title">👤 고객 정보</div>
       <div class="form-row2">
-        <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
+        <div class="form-group">
+        <label class="form-label">의뢰처 (일감 받은 업체)</label>
+        <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
+          <input class="form-input" id="f-client-company" placeholder="직접 입력 또는 선택" oninput="onClientInput()" autocomplete="off">
+          <button class="btn btn-secondary btn-sm" onclick="openClientPicker()" style="padding:0;">📋 선택</button>
+        </div>
+        <div id="client-suggestions" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:4px;max-height:150px;overflow-y:auto;"></div>
+      </div>
+      <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" type="tel"></div>
       </div>
-      <div class="form-group"><label class="form-label">주소 *</label><input class="form-input" id="f-addr" placeholder="서울시 강남구 역삼동 123"></div>
+      <div class="form-group">
+        <label class="form-label">주소 *</label>
+        <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
+          <input class="form-input" id="f-addr" placeholder="주소 검색 후 자동입력" readonly onclick="openAddressSearch()" style="cursor:pointer;">
+          <button class="btn btn-secondary btn-sm" onclick="openAddressSearch()" style="padding:0;">🔍 검색</button>
+        </div>
+        <input class="form-input" id="f-addr-detail" placeholder="상세주소 (동/호수/추가정보)" style="margin-top:6px;">
+      </div>
       <div class="form-group"><label class="form-label">위치 메모</label><input class="form-input" id="f-location" placeholder="302호 화장실 / 옥상"></div>
     </div>
     <div class="form-card">
@@ -662,21 +678,21 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">💰 비용 내역</div>
-      <div class="form-row2">
-        <div class="form-group"><label class="form-label">검사비</label><input class="form-input" id="f-inspect" type="number" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">기본 공사비</label><input class="form-input" id="f-base" type="number" placeholder="0"></div>
-      </div>
-      <div class="form-group"><label class="form-label">자재비</label><input class="form-input" id="f-material-cost" type="number" placeholder="0"></div>
       <div class="form-group">
-        <label class="form-label">추가 구간</label>
-        <div id="extra-spots"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addExtraSpot()">+ 구간 추가</button>
+        <label class="form-label">항목 목록</label>
+        <div id="cost-items-list"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%;" onclick="addCostItem()">+ 항목 추가</button>
       </div>
       <div class="form-group">
-        <label class="form-label">자재 목록</label>
+        <label class="form-label">자재 목록 (참고용)</label>
         <div id="material-list"></div>
         <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addMaterialRow()">+ 자재 추가</button>
       </div>
+      <!-- 기존 호환용 숨김 필드 -->
+      <input type="hidden" id="f-inspect" value="0">
+      <input type="hidden" id="f-base" value="0">
+      <input type="hidden" id="f-material-cost" value="0">
+      <div id="extra-spots" style="display:none;"></div>
     </div>
     <div class="form-card">
       <div class="form-card-title">📷 현장 사진</div>
@@ -1021,7 +1037,11 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function handleOverlayClick(e, id) { if (e.target.id === id) closeModal(id); }
 function getNextId() { return _jobs.length ? Math.max(..._jobs.map(j=>j.id||0)) + 1 : 1; }
 function jobTotal(j) {
-  return (j.inspectCost||0) + (j.baseCost||0) + ((j.extraSpots||0)*200000) + (j.materialCost||0);
+  if (j.costTotal !== undefined) return j.costTotal;
+  if (j.costItems && j.costItems.length) {
+    return j.costItems.reduce(function(s,c){ return s + (c.amount||0); }, 0);
+  }
+  return (j.inspectCost||0) + (j.baseCost||0) + (j.materialCost||0) + (j.extraSpots||0)*200000;
 }
 function getSelJob() {
   const sel = document.getElementById('doc-job-sel');
@@ -1047,6 +1067,10 @@ async function loadUserData(uid) {
         const parsedBiz = d.biz ? (typeof d.biz === 'string' ? JSON.parse(d.biz) : d.biz) : {};
         _biz = parsedBiz || {};
       } catch { _biz = {}; }
+      try {
+        const parsedClients = d.clients ? JSON.parse(d.clients) : [];
+        _clients = Array.isArray(parsedClients) ? parsedClients : [];
+      } catch { _clients = []; }
       // 폴백: 클라우드에 사진 없으면 localStorage에서 복원
       _jobs.forEach(function(j) {
         if ((!j.photosBefore || !j.photosBefore.length) && (!j.photosAfter || !j.photosAfter.length)) {
@@ -1655,7 +1679,7 @@ function resetForm() {
   _extraSpotCount = 0;
   _tempPhotos = {before:[null,null,null], after:[null,null,null]};
   document.getElementById('field-title').innerHTML = '새 <span>작업</span>';
-  ['f-name','f-phone','f-addr','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo'].forEach(id => {
+  ['f-name','f-phone','f-addr','f-addr-detail','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo','f-client-company'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1669,8 +1693,11 @@ function resetForm() {
   document.getElementById('extra-spots').innerHTML = '';
   document.getElementById('material-list').innerHTML = '';
   document.getElementById('commission-list').innerHTML = '';
+  document.getElementById('cost-items-list').innerHTML = '';
+  addCostItem('', '');
   addMaterialRow();
   renderPhotoSlots();
+  addCostItem('', '');
   calcTotal();
 }
 
@@ -1682,9 +1709,11 @@ function editJob(id) {
   goPage('page-field');
   // 페이지 이동 후 폼 채우기
   document.getElementById('field-title').innerHTML = '작업 <span style="color:var(--accent)">수정</span>';
+  document.getElementById('f-client-company').value = j.clientCompany || '';
   document.getElementById('f-name').value = j.name || '';
   document.getElementById('f-phone').value = j.phone || '';
-  document.getElementById('f-addr').value = j.addr || '';
+  document.getElementById('f-addr').value = j.addrBase || j.addr || '';
+  document.getElementById('f-addr-detail').value = j.addrDetail || '';
   document.getElementById('f-location').value = j.location || '';
   document.getElementById('f-date').value = j.date || '';
   document.getElementById('f-status').value = j.status || 'pending';
@@ -1693,9 +1722,18 @@ function editJob(id) {
   document.getElementById('f-action').value = j.action || '';
   document.getElementById('f-after-desc').value = j.afterDesc || '';
   document.getElementById('f-expert-opinion').value = j.expertOpinion || '';
-  document.getElementById('f-inspect').value = j.inspectCost || '';
-  document.getElementById('f-base').value = j.baseCost || '';
-  document.getElementById('f-material-cost').value = j.materialCost || '';
+  // 비용 항목 불러오기
+  document.getElementById('cost-items-list').innerHTML = '';
+  if (j.costItems && j.costItems.length) {
+    j.costItems.forEach(function(c){ addCostItem(c.name, c.amount); });
+  } else {
+    // 기존 형식 호환: 검사비/공사비/자재비 → 항목으로 변환
+    if (j.inspectCost) addCostItem('누수 탐지 검사비', j.inspectCost);
+    if (j.baseCost) addCostItem('누수 보수 공사비', j.baseCost);
+    if (j.materialCost) addCostItem('자재비', j.materialCost);
+    if ((j.extraSpots||0) > 0) addCostItem('추가 구간 (' + j.extraSpots + '개소)', j.extraSpots * 200000);
+    if (!j.costItems && !j.inspectCost && !j.baseCost) addCostItem('', '');
+  }
   document.getElementById('f-memo').value = j.memo || '';
   // 수수료 목록 불러오기
   document.getElementById('commission-list').innerHTML = '';
@@ -1724,9 +1762,247 @@ function editJob(id) {
 }
 
 
+// ══════════════════════════════════════════
+//  의뢰처 관리
+// ══════════════════════════════════════════
+let _clients = [];
+let _editingClientId = null;
+
+function getNextClientId() {
+  return _clients.length ? Math.max.apply(null, _clients.map(function(c){return c.id||0;})) + 1 : 1;
+}
+
+// 의뢰처 목록 렌더
+function renderClientList() {
+  const list = document.getElementById('client-list');
+  if (!list) return;
+  if (!_clients.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">등록된 의뢰처가 없습니다</div></div>';
+    return;
+  }
+  // 가나다순 정렬
+  const sorted = _clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  list.innerHTML = sorted.map(function(c) {
+    return '<div class="client-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;cursor:pointer;" onclick="selectClient(' + c.id + ')">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
+      + '<span style="font-size:15px;font-weight:700;">' + (c.name||'') + '</span>'
+      + '<button class="btn-icon" onclick="event.stopPropagation();openClientForm(' + c.id + ')" style="font-size:14px;">✏️</button>'
+      + '</div>'
+      + (c.contact ? '<div style="font-size:12px;color:var(--text2);">👤 ' + c.contact + '</div>' : '')
+      + (c.phone ? '<div style="font-size:12px;color:var(--text2);">📞 ' + c.phone + '</div>' : '')
+      + (c.commissionRate ? '<div style="font-size:12px;color:var(--purple);">💰 수수료 ' + c.commissionRate + '%</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+// 의뢰처 선택 모달 열기
+function openClientPicker() {
+  renderClientList();
+  document.getElementById('client-picker-modal').classList.add('open');
+}
+
+// 의뢰처 선택 → 현장 폼에 반영
+function selectClient(id) {
+  const c = _clients.find(function(x){ return x.id === id; });
+  if (!c) return;
+  document.getElementById('f-client-company').value = c.name;
+  // 기본 수수료율이 있으면 자동으로 수수료 추가
+  if (c.commissionRate && c.name) {
+    // 이미 같은 업체 수수료가 있는지 확인
+    const comms = getCommissions();
+    const exists = comms.some(function(cm){ return cm.name === c.name; });
+    if (!exists) {
+      // 비용 합계 기준 수수료 자동 계산
+      const total = getCostItemsTotal();
+      const amount = Math.round(total * c.commissionRate / 100);
+      if (total > 0) {
+        addCommissionRow(c.name + ' (' + c.commissionRate + '%)', amount);
+      }
+    }
+  }
+  closeModal('client-picker-modal');
+  showToast('의뢰처 "' + c.name + '" 선택됨 ✓');
+}
+
+// 의뢰처 작성/수정 폼 열기
+function openClientForm(id) {
+  _editingClientId = id;
+  const titleEl = document.getElementById('client-form-title');
+  const delBtn = document.getElementById('cf-delete-btn');
+  if (id) {
+    const c = _clients.find(function(x){ return x.id === id; });
+    if (!c) return;
+    titleEl.textContent = '의뢰처 수정';
+    document.getElementById('cf-name').value = c.name || '';
+    document.getElementById('cf-contact').value = c.contact || '';
+    document.getElementById('cf-phone').value = c.phone || '';
+    document.getElementById('cf-addr').value = c.addr || '';
+    document.getElementById('cf-commission-rate').value = c.commissionRate || '';
+    document.getElementById('cf-memo').value = c.memo || '';
+    if (delBtn) delBtn.style.display = 'block';
+  } else {
+    titleEl.textContent = '새 의뢰처 추가';
+    ['cf-name','cf-contact','cf-phone','cf-addr','cf-commission-rate','cf-memo'].forEach(function(f){
+      const el = document.getElementById(f);
+      if (el) el.value = '';
+    });
+    // 현재 입력 중인 이름이 있으면 자동으로 채움
+    const typed = document.getElementById('f-client-company')?.value?.trim();
+    if (typed) document.getElementById('cf-name').value = typed;
+    if (delBtn) delBtn.style.display = 'none';
+  }
+  closeModal('client-picker-modal');
+  document.getElementById('client-form-modal').classList.add('open');
+}
+
+// 의뢰처 저장
+async function saveClient() {
+  const name = document.getElementById('cf-name').value.trim();
+  if (!name) { showToast('업체명은 필수입니다'); return; }
+  const client = {
+    id: _editingClientId || getNextClientId(),
+    name: name,
+    contact: document.getElementById('cf-contact').value.trim(),
+    phone: document.getElementById('cf-phone').value.trim(),
+    addr: document.getElementById('cf-addr').value.trim(),
+    commissionRate: parseFloat(document.getElementById('cf-commission-rate').value) || 0,
+    memo: document.getElementById('cf-memo').value.trim(),
+  };
+  if (_editingClientId) {
+    _clients = _clients.map(function(c){ return c.id === _editingClientId ? client : c; });
+    showToast('의뢰처가 수정됐습니다 ✓');
+  } else {
+    _clients.push(client);
+    showToast('의뢰처가 추가됐습니다 ✓');
+  }
+  await saveClients();
+  closeModal('client-form-modal');
+  // 바로 선택 적용
+  document.getElementById('f-client-company').value = client.name;
+}
+
+// 의뢰처 삭제
+async function deleteClient() {
+  if (!_editingClientId) return;
+  if (!confirm('이 의뢰처를 삭제하시겠습니까?')) return;
+  _clients = _clients.filter(function(c){ return c.id !== _editingClientId; });
+  await saveClients();
+  closeModal('client-form-modal');
+  showToast('의뢰처가 삭제됐습니다');
+}
+
+// Firestore에 의뢰처 저장
+async function saveClients() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({clients: JSON.stringify(_clients)}, {merge: true});
+  } catch(e) { console.error('saveClients:', e); }
+}
+
+// 입력 중 자동완성 제안
+function onClientInput() {
+  const input = document.getElementById('f-client-company');
+  const box = document.getElementById('client-suggestions');
+  if (!input || !box) return;
+  const q = input.value.trim().toLowerCase();
+  if (!q) { box.style.display = 'none'; return; }
+  const matches = _clients.filter(function(c){
+    return (c.name||'').toLowerCase().includes(q);
+  }).slice(0, 5);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(function(c){
+    return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="selectClient(' + c.id + ');document.getElementById(\'client-suggestions\').style.display=\'none\'">'
+      + '<span style="font-weight:600;">' + c.name + '</span>'
+      + (c.commissionRate ? '<span style="font-size:11px;color:var(--purple);margin-left:8px;">수수료 ' + c.commissionRate + '%</span>' : '')
+      + '</div>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+// 새 의뢰처 자동 저장 (저장된 의뢰처에 없으면 추가)
+async function autoSaveClient(companyName) {
+  if (!companyName) return;
+  const existing = _clients.find(function(c){ return c.name === companyName; });
+  if (existing) return; // 이미 있으면 저장 안 함
+  _clients.push({
+    id: getNextClientId(),
+    name: companyName,
+    contact: '',
+    phone: '',
+    addr: '',
+    commissionRate: 0,
+    memo: ''
+  });
+  await saveClients();
+}
+
+
+// ══════════════════════════════════════════
+//  다음 주소 검색
+// ══════════════════════════════════════════
+function openAddressSearch() {
+  if (typeof daum === 'undefined' || !daum.Postcode) {
+    showToast('주소 검색 로딩 중입니다. 잠시 후 다시 시도해주세요');
+    return;
+  }
+  new daum.Postcode({
+    oncomplete: function(data) {
+      var fullAddr = data.address;
+      // 참고항목 (건물명, 아파트명)
+      if (data.buildingName && data.apartment === 'Y') {
+        fullAddr += ' (' + data.buildingName + ')';
+      }
+      document.getElementById('f-addr').value = fullAddr;
+      // 상세주소 입력으로 포커스
+      setTimeout(function() {
+        document.getElementById('f-addr-detail').focus();
+      }, 100);
+    },
+    theme: {
+      bgColor: '#ffffff',
+      searchBgColor: '#2c5f9e',
+      queryTextColor: '#ffffff',
+      contentBgColor: '#ffffff'
+    }
+  }).open();
+}
+
+// ══════════════════════════════════════════
+//  비용 항목 (자유 추가)
+// ══════════════════════════════════════════
+function addCostItem(name, amount) {
+  const list = document.getElementById('cost-items-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'cost-item-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:6px;margin-bottom:6px;';
+  div.innerHTML = '<input class="form-input cost-item-name" placeholder="항목명 (예: 누수탐지, 배관교체)" value="'+(name||'')+'">'
+    + '<input class="form-input cost-item-amount" type="number" placeholder="0" value="'+(amount||'')+'" oninput="calcTotal()" style="text-align:right;">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove();calcTotal()">×</button>';
+  list.appendChild(div);
+  calcTotal();
+}
+
+function getCostItems() {
+  const rows = document.querySelectorAll('.cost-item-row');
+  const result = [];
+  rows.forEach(function(row) {
+    const nameEl = row.querySelector('.cost-item-name');
+    const amountEl = row.querySelector('.cost-item-amount');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const amount = amountEl ? (parseFloat(amountEl.value) || 0) : 0;
+    if (name || amount > 0) result.push({name: name, amount: amount});
+  });
+  return result;
+}
+
+function getCostItemsTotal() {
+  return getCostItems().reduce(function(s, c){ return s + c.amount; }, 0);
+}
+
+
 function calcTotal() {
-  const v = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const total = v('f-inspect') + v('f-base') + v('f-material-cost') + _extraSpotCount * 200000;
+  const total = getCostItemsTotal();
   const el = document.getElementById('total-display');
   if (el) el.textContent = fmtMoney(total);
   calcNetProfit();
@@ -1762,8 +2038,7 @@ function getTotalCommission() {
 }
 
 function calcNetProfit() {
-  const v = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const total = v('f-inspect') + v('f-base') + v('f-material-cost') + _extraSpotCount * 200000;
+  const total = getCostItemsTotal();
   const totalComm = getTotalCommission();
   const net = total - totalComm;
   const el = document.getElementById('net-profit-display');
@@ -1898,9 +2173,21 @@ function saveJob() {
   const addr = document.getElementById('f-addr').value.trim();
   const date = document.getElementById('f-date').value;
   if (!name || !addr || !date) { showToast('고객명, 주소, 작업일은 필수입니다'); return; }
+  const addrDetail = document.getElementById('f-addr-detail').value.trim();
+  const fullAddr = addrDetail ? (addr + ' ' + addrDetail) : addr;
+  const costItems = getCostItems();
+  const costTotal = getCostItemsTotal();
+  const clientCompany = document.getElementById('f-client-company').value.trim();
+  // 새 의뢰처면 자동 저장
+  if (clientCompany) autoSaveClient(clientCompany);
   const job = {
     id: _editingJobId || getNextId(),
-    name, addr, date,
+    clientCompany: clientCompany,
+    name,
+    addr: fullAddr,
+    addrBase: addr,
+    addrDetail: addrDetail,
+    date,
     phone: document.getElementById('f-phone').value.trim(),
     location: document.getElementById('f-location').value.trim(),
     status: document.getElementById('f-status').value,
@@ -1909,10 +2196,13 @@ function saveJob() {
     action: document.getElementById('f-action').value.trim(),
     afterDesc: document.getElementById('f-after-desc').value.trim(),
     expertOpinion: document.getElementById('f-expert-opinion').value.trim(),
-    inspectCost: parseFloat(document.getElementById('f-inspect').value) || 0,
-    baseCost: parseFloat(document.getElementById('f-base').value) || 0,
-    materialCost: parseFloat(document.getElementById('f-material-cost').value) || 0,
-    extraSpots: _extraSpotCount,
+    costItems: costItems,
+    costTotal: costTotal,
+    // 기존 호환용 필드 (계산 결과를 inspect에 모두 몰아넣음)
+    inspectCost: costTotal,
+    baseCost: 0,
+    materialCost: 0,
+    extraSpots: 0,
     materials: getMaterials(),
     photosBefore: _tempPhotos.before.filter(Boolean),
     photosAfter: _tempPhotos.after.filter(Boolean),
@@ -2201,8 +2491,19 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
           + '</tr>';
       }
     });
+  } else if (j.costItems && j.costItems.length > 0) {
+    // 새 형식: costItems 사용
+    j.costItems.forEach(function(item) {
+      if (item.name || item.amount > 0) {
+        itemRows += '<tr>'
+          + '<td contenteditable="'+ce+'">'+(item.name||'')+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '</tr>';
+      }
+    });
   } else {
-    // 기본 항목 (DB에서)
+    // 기존 형식 호환: 검사비/공사비/자재비
     var defaultItems = [
       {name:'누수 탐지 검사비', amount: j.inspectCost||0},
       {name:'누수 보수 공사비', amount: j.baseCost||0},
@@ -3222,15 +3523,20 @@ function importBackup(e) {
 }
 
 
+document.addEventListener('click', function(e) {
+  const box = document.getElementById('client-suggestions');
+  const input = document.getElementById('f-client-company');
+  if (box && input && e.target !== input && !box.contains(e.target)) {
+    box.style.display = 'none';
+  }
+});
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('as-date').value = new Date().toISOString().slice(0,10);
   addMaterialRow();
   renderPhotoSlots();
-  ['f-inspect','f-base','f-material-cost'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', calcTotal);
-  });
+  addCostItem('', '');
+  // 비용 항목은 동적으로 생성되므로 oninput 속성으로 처리
   window.addEventListener('resize', function() {
     scaleDocPage();
     scaleA4();
@@ -3258,6 +3564,44 @@ document.addEventListener('DOMContentLoaded', function() {
         <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">또는 이미지 업로드</div>
         <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="document.getElementById('sig-input').click()">📁 파일에서 업로드</button>
         <input type="file" id="sig-input" accept="image/*" style="display:none" onchange="handleSigUpload(event)">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 의뢰처 선택/관리 모달 -->
+<div class="modal-overlay" id="client-picker-modal" onclick="handleOverlayClick(event,'client-picker-modal')">
+  <div class="modal-sheet" style="max-height:80vh;">
+    <div class="modal-header">
+      <div class="modal-title">📋 의뢰처 선택</div>
+      <button class="modal-close" onclick="closeModal('client-picker-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">저장된 의뢰처를 선택하거나 새로 추가할 수 있어요</div>
+      <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openClientForm(null)">+ 새 의뢰처 추가</button>
+      <div id="client-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 의뢰처 작성/수정 모달 -->
+<div class="modal-overlay" id="client-form-modal" onclick="handleOverlayClick(event,'client-form-modal')">
+  <div class="modal-sheet" style="max-height:85vh;">
+    <div class="modal-header">
+      <div class="modal-title" id="client-form-title">의뢰처 정보</div>
+      <button class="modal-close" onclick="closeModal('client-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">업체명 *</label><input class="form-input" id="cf-name" placeholder="예: OO중개, OO관리단"></div>
+      <div class="form-group"><label class="form-label">담당자</label><input class="form-input" id="cf-contact" placeholder="담당자명"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000"></div>
+      <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
+      <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cf-memo" placeholder="결제 조건, 특이사항 등"></textarea></div>
+      <div class="btn-group">
+        <button class="btn btn-danger" id="cf-delete-btn" onclick="deleteClient()" style="display:none;">🗑️ 삭제</button>
+        <button class="btn btn-primary" onclick="saveClient()" style="flex:2;">💾 저장</button>
       </div>
     </div>
   </div>

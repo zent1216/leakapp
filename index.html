@@ -911,6 +911,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <button class="btn btn-secondary" onclick="exportBackup()">📥 백업 저장 (.json)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('backup-input').click()">📤 백업 불러오기</button>
       </div>
+      <button class="btn btn-primary" style="width:100%;margin-bottom:8px;background:var(--purple-bg);color:var(--purple);border:1px solid rgba(168,85,247,0.3);" onclick="openAutoBackupModal()">📅 날짜별 자동 백업 (최근 7일)</button>
       <input type="file" id="backup-input" accept=".json" style="display:none" onchange="importBackup(event)">
       <div id="backup-status" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;text-align:center;"></div>
     </div>
@@ -1161,7 +1162,7 @@ function jobsWithoutPhotos() {
 }
 
 async function saveJobs(force) {
-  if (!_uid) return;
+  if (!_uid) return false;
   // 안전장치: force=true 이면 무조건 저장 (백업 복원 등)
   if (!force && (!_jobs || _jobs.length === 0)) {
     try {
@@ -1170,29 +1171,61 @@ async function saveJobs(force) {
         const existing = doc.data().jobs;
         if (existing && existing.length > 2) {
           console.warn('saveJobs: _jobs가 비어있지만 DB에 데이터 있음 - 저장 건너뜀');
-          return;
+          return false;
         }
       }
     } catch(e) {}
   }
   // 로컬에도 사진 백업 (이중 안전장치)
   try { savePhotosLocal(); } catch(e) {}
-  // Firestore에 사진 포함 저장 (사진이 이미 압축됐으므로 1MB 이내)
+
   try {
     const jobsJson = JSON.stringify(_jobs);
     const sizeMB = (jobsJson.length / 1024 / 1024).toFixed(2);
+
+    // 크기 경고
     if (jobsJson.length > 900000) {
-      console.warn('saveJobs: 데이터 크기 주의 ' + sizeMB + 'MB (1MB 제한)');
+      console.warn('saveJobs: 데이터 크기 주의 ' + sizeMB + 'MB');
       showToast('⚠️ 데이터가 커요 (' + sizeMB + 'MB). 오래된 작업은 삭제하세요');
     }
+    // 크기 초과 사전 차단
+    if (jobsJson.length > 1048000) {
+      showToast('❌ 저장 실패: 1MB 초과 (' + sizeMB + 'MB). 사진이 많은 작업을 정리하세요');
+      return false;
+    }
+
+    // 실제 저장
     await db.collection('users').doc(_uid).set({jobs: jobsJson}, {merge: true});
+
+    // ── 검증: 저장한 걸 다시 읽어서 확인 ──
+    const verify = await db.collection('users').doc(_uid).get();
+    if (verify.exists) {
+      const savedJobs = verify.data().jobs || '';
+      const savedCount = (function(){ try { return JSON.parse(savedJobs).length; } catch { return -1; } })();
+      if (savedCount !== _jobs.length) {
+        console.error('검증 실패:', savedCount, 'vs', _jobs.length);
+        showToast('❌ 저장 검증 실패! 백업을 받으세요');
+        // 실패 시 자동 백업 다운로드 제안
+        if (confirm('⚠️ 데이터가 Firebase에 제대로 저장되지 않았습니다.\n\n지금 백업 파일을 다운로드하시겠습니까?')) {
+          exportBackup();
+        }
+        return false;
+      }
+    }
+    return true;
   } catch(e) {
     console.error('saveJobs:', e);
-    if (e.message && e.message.includes('exceeds')) {
+    const msg = e.message || '알 수 없는 오류';
+    if (msg.includes('exceeds') || msg.includes('size')) {
       showToast('❌ 데이터 크기 초과 (1MB). 사진이 많은 오래된 작업을 삭제하세요');
     } else {
-      showToast('저장 실패: ' + e.message);
+      showToast('❌ Firebase 저장 실패: ' + msg);
     }
+    // 실패 시 백업 제안
+    if (confirm('⚠️ Firebase 저장에 실패했습니다 (' + msg + ').\n\n안전을 위해 백업 파일을 다운로드하시겠습니까?')) {
+      exportBackup();
+    }
+    return false;
   }
 }
 
@@ -1219,6 +1252,8 @@ auth.onAuthStateChanged(async user => {
     if (nameEl) nameEl.textContent = user.displayName || user.email.split('@')[0];
     showPage('page-main');
     updateMainStats();
+    // 앱 시작 시 자동 백업 (당일 한 번만)
+    setTimeout(autoBackupToLocal, 2000);
   } else {
     showPage('page-login');
   }
@@ -2168,7 +2203,7 @@ function removePhoto(type, idx, e) {
   renderPhotoSlots();
 }
 
-function saveJob() {
+async function saveJob() {
   const name = document.getElementById('f-name').value.trim();
   const addr = document.getElementById('f-addr').value.trim();
   const date = document.getElementById('f-date').value;
@@ -2214,15 +2249,18 @@ function saveJob() {
     const existing = _jobs.find(j => j.id === _editingJobId);
     if (existing) job.asHistory = existing.asHistory;
     _jobs = _jobs.map(j => j.id === _editingJobId ? job : j);
-    showToast('수정됐습니다 ✓');
   } else {
     _jobs.push(job);
-    showToast('저장됐습니다 ✓');
   }
-  saveJobs();
-  updateMainStats();
-  resetForm();
-  goBack();
+  // 저장 결과 확인 후 메시지
+  const ok = await saveJobs();
+  if (ok) {
+    showToast(_editingJobId ? '✅ 수정됐습니다' : '✅ 저장됐습니다');
+    updateMainStats();
+    resetForm();
+    goBack();
+  }
+  // 실패 시에는 폼 유지 (사용자가 다시 시도할 수 있게)
 }
 
 // ════════════════════════════════════════
@@ -3523,6 +3561,140 @@ function importBackup(e) {
 }
 
 
+// ══════════════════════════════════════════
+//  자동 주기 백업 (브라우저 localStorage에 7일치)
+// ══════════════════════════════════════════
+function autoBackupToLocal() {
+  if (!_uid || !_jobs) return;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const key = 'auto_backup_' + today;
+    // 오늘 이미 백업했으면 스킵 (앱 자주 열어도 한 번만)
+    if (localStorage.getItem(key)) return;
+
+    const snapshot = {
+      date: today,
+      timestamp: new Date().toISOString(),
+      uid: _uid,
+      jobCount: _jobs.length,
+      jobs: _jobs,
+      biz: _biz,
+      clients: _clients || []
+    };
+    localStorage.setItem(key, JSON.stringify(snapshot));
+
+    // 7일 넘은 자동백업은 삭제
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(function(k) {
+      if (k.startsWith('auto_backup_')) {
+        const date = k.replace('auto_backup_', '');
+        const diff = (new Date(today) - new Date(date)) / (1000 * 60 * 60 * 24);
+        if (diff > 7) {
+          localStorage.removeItem(k);
+        }
+      }
+    });
+    console.log('자동 백업 저장됨:', today, '작업', _jobs.length, '건');
+  } catch(e) {
+    console.warn('자동 백업 실패:', e.message);
+  }
+}
+
+// 자동 백업 목록 가져오기
+function getAutoBackups() {
+  const result = [];
+  const allKeys = Object.keys(localStorage);
+  allKeys.forEach(function(k) {
+    if (k.startsWith('auto_backup_')) {
+      try {
+        const snap = JSON.parse(localStorage.getItem(k));
+        result.push({
+          date: snap.date,
+          timestamp: snap.timestamp,
+          jobCount: snap.jobCount || 0,
+          key: k
+        });
+      } catch(e) {}
+    }
+  });
+  result.sort(function(a, b){ return b.date.localeCompare(a.date); });
+  return result;
+}
+
+// 자동 백업 복원 모달 열기
+function openAutoBackupModal() {
+  const backups = getAutoBackups();
+  const modal = document.getElementById('auto-backup-modal');
+  const body = document.getElementById('auto-backup-list');
+  if (!modal || !body) return;
+
+  if (backups.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">자동 백업 내역이 없습니다</div></div>';
+  } else {
+    body.innerHTML = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">브라우저에 매일 자동 저장된 백업입니다 (최근 7일)</div>'
+      + backups.map(function(b) {
+        const time = new Date(b.timestamp).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+        return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+          + '<div><span style="font-size:15px;font-weight:700;">📅 ' + b.date + '</span>'
+          + '<span style="font-size:11px;color:var(--text2);margin-left:8px;">' + time + '</span></div>'
+          + '<span style="font-size:12px;color:var(--accent);">' + b.jobCount + '건</span></div>'
+          + '<div class="btn-group" style="margin-top:8px;">'
+          + '<button class="btn btn-secondary btn-sm" onclick="downloadAutoBackup(\'' + b.key + '\')">📥 다운로드</button>'
+          + '<button class="btn btn-primary btn-sm" style="flex:2;" onclick="restoreAutoBackup(\'' + b.key + '\')">🔄 이 시점으로 복원</button>'
+          + '</div></div>';
+      }).join('');
+  }
+  modal.classList.add('open');
+}
+
+// 자동 백업 파일 다운로드
+function downloadAutoBackup(key) {
+  try {
+    const snap = JSON.parse(localStorage.getItem(key));
+    const backup = {
+      version: 2,
+      exportedAt: snap.timestamp,
+      uid: snap.uid,
+      jobs: snap.jobs,
+      biz: snap.biz,
+      clients: snap.clients || []
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '누수설비_자동백업_' + snap.date + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('백업 다운로드 완료 ✓');
+  } catch(e) { showToast('다운로드 실패: ' + e.message); }
+}
+
+// 자동 백업 복원
+async function restoreAutoBackup(key) {
+  try {
+    const snap = JSON.parse(localStorage.getItem(key));
+    if (!confirm('⚠️ ' + snap.date + ' 시점으로 복원합니다.\n\n현재 데이터(' + _jobs.length + '건)가 이 시점 데이터(' + snap.jobCount + '건)로 교체됩니다.\n\n계속하시겠습니까?')) {
+      return;
+    }
+    _jobs = snap.jobs || [];
+    _biz = snap.biz || _biz;
+    _clients = snap.clients || _clients || [];
+    const ok = await saveJobs(true);
+    await saveBizData();
+    if (typeof saveClients === 'function') await saveClients();
+    updateMainStats();
+    if (typeof loadBizForm === 'function') loadBizForm();
+    if (ok) {
+      showToast('✅ ' + snap.date + ' 시점으로 복원됨 (' + snap.jobCount + '건)');
+      closeModal('auto-backup-modal');
+    }
+  } catch(e) { showToast('복원 실패: ' + e.message); }
+}
+
+
 document.addEventListener('click', function(e) {
   const box = document.getElementById('client-suggestions');
   const input = document.getElementById('f-client-company');
@@ -3603,6 +3775,20 @@ document.addEventListener('DOMContentLoaded', function() {
         <button class="btn btn-danger" id="cf-delete-btn" onclick="deleteClient()" style="display:none;">🗑️ 삭제</button>
         <button class="btn btn-primary" onclick="saveClient()" style="flex:2;">💾 저장</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 자동 백업 목록 모달 -->
+<div class="modal-overlay" id="auto-backup-modal" onclick="handleOverlayClick(event,'auto-backup-modal')">
+  <div class="modal-sheet" style="max-height:80vh;">
+    <div class="modal-header">
+      <div class="modal-title">📅 자동 백업 내역</div>
+      <button class="modal-close" onclick="closeModal('auto-backup-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="auto-backup-list"></div>
     </div>
   </div>
 </div>

@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsExisting() {
+      return signedIn() && request.auth.uid == resource.data.ownerId;
+    }
+
+    function ownsIncoming() {
+      return signedIn() && request.auth.uid == request.resource.data.ownerId;
+    }
+
+    function ownerDoesNotChange() {
+      return !('ownerId' in request.resource.data) || request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /jobs/{jobId} {
+      allow create: if ownsIncoming();
+      allow read, delete: if ownsExisting();
+      allow update: if ownsExisting() && ownerDoesNotChange();
+    }
+
+    match /clients/{clientId} {
+      allow create: if ownsIncoming();
+      allow read, delete: if ownsExisting();
+      allow update: if ownsExisting() && ownerDoesNotChange();
+    }
+
+    match /companies/{companyId} {
+      allow create: if ownsIncoming();
+      allow read, delete: if ownsExisting();
+      allow update: if ownsExisting() && ownerDoesNotChange();
+    }
+  }
+}

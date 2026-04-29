@@ -74,6 +74,17 @@ firebase deploy --only hosting
 firebase deploy
 ```
 
+현재 Firebase 프로젝트는 `leakapp-c603d`로 연결되어 있습니다.
+
+- Firebase Console: https://console.firebase.google.com/project/leakapp-c603d/overview
+- 배포된 앱: https://leakapp-c603d.web.app
+
+사진 업로드를 사용하려면 Firebase Console > Storage에서 `Get started`를 눌러 Storage를 먼저 활성화한 뒤 아래 명령으로 Storage 규칙을 배포합니다.
+
+```bash
+firebase deploy --only storage --project leakapp-c603d
+```
+
 ## 현재 포함된 기능
 
 - 작업 등록, 수정, 삭제

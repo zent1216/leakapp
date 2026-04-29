@@ -2,6 +2,7 @@ node_modules/
 dist/
 .tools/
 .vite/
+.firebase/
 .env
 *.log
 *.tsbuildinfo

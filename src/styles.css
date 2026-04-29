@@ -168,7 +168,7 @@ button.secondary,
 .shell {
   width: 100%;
   max-width: 480px;
-  min-height: 100dvh;
+  height: 100dvh;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -241,6 +241,7 @@ header b {
 
 .content {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 12px 16px 92px;
   -webkit-overflow-scrolling: touch;
@@ -614,12 +615,12 @@ section h2 {
 
 .doc {
   width: 100%;
-  min-height: auto;
-  aspect-ratio: 210 / 297;
+  min-height: 640px;
+  height: auto;
   margin-bottom: 16px;
   padding: 26px 24px;
   border-radius: var(--r);
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
   color: #111;
   box-shadow: var(--shadow);

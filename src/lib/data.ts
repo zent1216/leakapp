@@ -4,6 +4,8 @@ import { db, storage } from './firebase';
 import { compressImage, now } from './utils';
 import type { Client, Company, Job, JobPhoto, PhotoGroup } from '../types/app';
 
+export type CompanyAsset = 'signature' | 'stamp' | 'bizReg';
+
 export function watchJobs(ownerId: string, cb: (jobs: Job[]) => void) {
   const q = query(collection(db, 'jobs'), where('ownerId', '==', ownerId));
   return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)).sort((a, b) => (b.workDate || '').localeCompare(a.workDate || ''))));
@@ -51,4 +53,14 @@ export async function getCompany(ownerId: string): Promise<Company | null> {
 export async function saveCompany(ownerId: string, company: Partial<Company> & { id?: string }) {
   if (company.id) await setDoc(doc(db, 'companies', company.id), { ...company, ownerId, updatedAt: now() }, { merge: true });
   else await addDoc(collection(db, 'companies'), { ...company, ownerId, updatedAt: now() });
+}
+
+export async function uploadCompanyAsset(ownerId: string, file: File, asset: CompanyAsset) {
+  const isPdf = file.type === 'application/pdf';
+  const body = isPdf ? file : await compressImage(file, 1800, 0.82);
+  const ext = isPdf ? 'pdf' : 'jpg';
+  const storagePath = `users/${ownerId}/company/${asset}.${ext}`;
+  await uploadBytes(ref(storage, storagePath), body, { contentType: isPdf ? 'application/pdf' : 'image/jpeg' });
+  const url = await getDownloadURL(ref(storage, storagePath));
+  return { url, storagePath };
 }

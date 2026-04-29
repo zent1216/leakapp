@@ -429,6 +429,31 @@ section h2 {
   font-size: 12px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.stats-grid div {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg2);
+}
+
+.stats-grid b {
+  display: block;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.stats-grid span {
+  color: var(--text2);
+  font-size: 11px;
+}
+
 .badge {
   display: inline-block;
   padding: 3px 8px;
@@ -457,6 +482,12 @@ section h2 {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 10px;
+}
+
+.share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .grid2 {
@@ -580,6 +611,88 @@ section h2 {
   background: #1a3a6e;
   color: white;
   text-align: left;
+}
+
+.doc-signs {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.doc-signs div {
+  width: 80px;
+  text-align: center;
+  font-size: 10px;
+  color: #555;
+}
+
+.doc-signs img,
+.doc-signs i {
+  display: block;
+  width: 80px;
+  height: 42px;
+  margin-top: 4px;
+  border: 1px solid #c8d8f0;
+  object-fit: contain;
+}
+
+.doc-note {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #f0f5ff;
+  color: #1a3a6e;
+  font-weight: 700;
+}
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.asset-upload {
+  min-height: 112px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--r-sm);
+  background: var(--bg2);
+  color: var(--text2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.asset-upload.wide {
+  min-height: 150px;
+}
+
+.asset-upload span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.asset-upload b {
+  color: var(--accent);
+}
+
+.asset-upload em {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.asset-upload img {
+  width: 100%;
+  max-height: 90px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: white;
 }
 
 @media (max-width: 360px) {

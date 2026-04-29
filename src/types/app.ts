@@ -27,4 +27,22 @@ export type Job = {
   updatedAt: number;
 };
 export type Client = { id: string; ownerId: string; name: string; contact?: string; phone?: string; address?: string; commissionRate?: number; memo?: string; createdAt: number; updatedAt: number };
-export type Company = { id: string; ownerId: string; name?: string; ceo?: string; regNo?: string; tel?: string; address?: string; bank?: string; account?: string; holder?: string; stampUrl?: string; signatureUrl?: string; bizRegUrl?: string; updatedAt: number };
+export type Company = {
+  id: string;
+  ownerId: string;
+  name?: string;
+  ceo?: string;
+  regNo?: string;
+  tel?: string;
+  address?: string;
+  bank?: string;
+  account?: string;
+  holder?: string;
+  stampUrl?: string;
+  stampPath?: string;
+  signatureUrl?: string;
+  signaturePath?: string;
+  bizRegUrl?: string;
+  bizRegPath?: string;
+  updatedAt: number;
+};

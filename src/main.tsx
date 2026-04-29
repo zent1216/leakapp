@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Camera,
   ClipboardList,
+  Download,
   FileText,
   LogOut,
   Plus,
@@ -33,6 +34,7 @@ import {
   saveClient,
   saveCompany,
   saveJob,
+  uploadCompanyAsset,
   uploadJobPhoto,
   watchClients,
   watchJobs,
@@ -41,7 +43,7 @@ import { jobTotal, money, netProfit, shortMoney, uid } from './lib/utils';
 import type { Client, Company, CostItem, Job, JobPhoto, PhotoGroup } from './types/app';
 import './styles.css';
 
-type Tab = 'today' | 'jobs' | 'new' | 'clients' | 'docs' | 'settings';
+type Tab = 'today' | 'jobs' | 'new' | 'clients' | 'docs' | 'stats' | 'as' | 'settings';
 type DocumentType = 'estimate' | 'opinion' | 'insurance';
 
 const leakTypes = ['배관 누수', '수전 누수', '옥상 방수', '외벽 누수', '화장실 방수', '지하 누수', '기타'];
@@ -180,6 +182,8 @@ function Workspace({ user }: { user: User }) {
               setTab('new');
             }}
             onJobs={() => setTab('jobs')}
+            onStats={() => setTab('stats')}
+            onAs={() => setTab('as')}
             onDocs={() => setTab('docs')}
             onClients={() => setTab('clients')}
             onSettings={() => setTab('settings')}
@@ -205,6 +209,16 @@ function Workspace({ user }: { user: User }) {
             onSaved={() => {
               setEditing(null);
               setTab('jobs');
+            }}
+          />
+        )}
+        {tab === 'stats' && <StatsPage jobs={jobs} />}
+        {tab === 'as' && (
+          <AsPage
+            jobs={jobs}
+            onEdit={(job) => {
+              setEditing(job);
+              setTab('new');
             }}
           />
         )}
@@ -245,6 +259,8 @@ function Dashboard({
   asCount,
   onNew,
   onJobs,
+  onStats,
+  onAs,
   onDocs,
   onClients,
   onSettings,
@@ -253,6 +269,8 @@ function Dashboard({
   asCount: number;
   onNew: () => void;
   onJobs: () => void;
+  onStats: () => void;
+  onAs: () => void;
   onDocs: () => void;
   onClients: () => void;
   onSettings: () => void;
@@ -288,7 +306,7 @@ function Dashboard({
           <span className="menu-title">보험서류</span>
           <span className="menu-sub">보험사 제출용</span>
         </button>
-        <button className="menu-card wide" onClick={onJobs}>
+        <button className="menu-card wide" onClick={onStats}>
           <span className="menu-icon blue">
             <BarChart3 />
           </span>
@@ -308,7 +326,7 @@ function Dashboard({
         </button>
       </div>
       <div className="bottom-btns">
-        <button onClick={onJobs}>AS 관리 {asCount > 0 ? asCount : ''}</button>
+        <button onClick={onAs}>AS 관리 {asCount > 0 ? asCount : ''}</button>
         <button onClick={onClients}>고객 연락처</button>
         <button onClick={onSettings}>사업자 정보</button>
       </div>
@@ -587,6 +605,78 @@ function Clients({ userId, clients }: { userId: string; clients: Client[] }) {
   );
 }
 
+function StatsPage({ jobs }: { jobs: Job[] }) {
+  const rows = useMemo(() => {
+    const groups = new Map<string, { month: string; total: number; net: number; done: number; count: number; as: number }>();
+    for (const job of jobs) {
+      const month = (job.workDate || '날짜 없음').slice(0, 7);
+      const row = groups.get(month) || { month, total: 0, net: 0, done: 0, count: 0, as: 0 };
+      row.count += 1;
+      if (job.status === 'done') row.done += 1;
+      if (job.status === 'as') row.as += 1;
+      row.total += jobTotal(job);
+      row.net += netProfit(job);
+      groups.set(month, row);
+    }
+    return Array.from(groups.values()).sort((a, b) => b.month.localeCompare(a.month));
+  }, [jobs]);
+
+  return (
+    <section>
+      <h2>실적 관리</h2>
+      {rows.length === 0 && <Empty text="집계할 작업이 없습니다." />}
+      {rows.map((row) => (
+        <article className="card stats-row" key={row.month}>
+          <div className="row">
+            <h3>{row.month}</h3>
+            <span className="badge done">완료 {row.done}건</span>
+          </div>
+          <div className="stats-grid">
+            <div>
+              <b>{row.count}</b>
+              <span>전체 건수</span>
+            </div>
+            <div>
+              <b>{money(row.total)}</b>
+              <span>매출</span>
+            </div>
+            <div>
+              <b>{money(row.net)}</b>
+              <span>순수익</span>
+            </div>
+            <div>
+              <b>{row.as}</b>
+              <span>AS</span>
+            </div>
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function AsPage({ jobs, onEdit }: { jobs: Job[]; onEdit: (job: Job) => void }) {
+  const asJobs = jobs.filter((job) => job.status === 'as');
+  return (
+    <section>
+      <h2>AS 관리</h2>
+      {asJobs.length === 0 && <Empty text="AS로 표시된 작업이 없습니다." />}
+      {asJobs.map((job) => (
+        <article className="card as-card" key={job.id}>
+          <div className="row">
+            <h3>{job.clientName}</h3>
+            <span className="badge as">AS 접수</span>
+          </div>
+          <p>{job.workDate} · {job.address} {job.addressDetail}</p>
+          <p>전화번호 {job.clientPhone || '-'}</p>
+          <p className="muted">{job.afterNote || job.memo || '처리 내용이 아직 없습니다.'}</p>
+          <button onClick={() => onEdit(job)}>AS 내용 수정</button>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) {
   const [id, setId] = useState(jobs[0]?.id || '');
   const [type, setType] = useState<DocumentType>('estimate');
@@ -595,10 +685,30 @@ function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) 
   async function pdf() {
     const el = document.getElementById('doc-preview');
     if (!el || !job) return;
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff' });
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
     const p = new jsPDF('p', 'mm', 'a4');
     p.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 297);
     p.save(`${job.workDate}_${job.clientName}_${docTitle(type)}.pdf`);
+  }
+
+  async function image() {
+    const el = document.getElementById('doc-preview');
+    if (!el || !job) return;
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) return;
+    const fileName = `${job.workDate}_${job.clientName}_${docTitle(type)}.png`;
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: fileName });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -621,7 +731,14 @@ function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) 
       {job ? (
         <>
           <DocumentPreview job={job} company={company} type={type} />
-          <button onClick={pdf}>PDF 저장</button>
+          <div className="share-actions">
+            <button onClick={pdf}>
+              <Download size={16} /> PDF 저장
+            </button>
+            <button className="secondary" onClick={image}>
+              이미지 저장/공유
+            </button>
+          </div>
         </>
       ) : (
         <Empty text="문서로 만들 작업이 없습니다." />
@@ -691,6 +808,19 @@ function DocumentPreview({ job, company, type }: { job: Job; company: Company | 
       <p>
         입금계좌: {company?.bank || ''} {company?.account || ''} {company?.holder || ''}
       </p>
+      <div className="doc-signs">
+        <div>
+          <span>서명</span>
+          {company?.signatureUrl ? <img src={company.signatureUrl} alt="" /> : <i />}
+        </div>
+        <div>
+          <span>도장</span>
+          {company?.stampUrl ? <img src={company.stampUrl} alt="" /> : <i />}
+        </div>
+      </div>
+      {type === 'insurance' && (
+        <p className="doc-note">사업자등록증 사본: {company?.bizRegUrl ? '첨부됨' : '사업자 정보에서 업로드 필요'}</p>
+      )}
     </div>
   );
 }
@@ -705,6 +835,7 @@ function SettingsPage({
   onSaved: (company: Company) => void;
 }) {
   const [item, setItem] = useState<Company>(company || { id: '', ownerId: userId, updatedAt: Date.now() });
+  const [uploading, setUploading] = useState('');
   const patch = (next: Partial<Company>) => setItem((current) => ({ ...current, ...next }));
 
   async function save() {
@@ -712,6 +843,27 @@ function SettingsPage({
     const fresh = await getCompany(userId);
     if (fresh) onSaved(fresh);
     alert('사업자 정보가 저장되었습니다.');
+  }
+
+  async function upload(file: File | undefined, asset: 'signature' | 'stamp' | 'bizReg') {
+    if (!file) return;
+    setUploading(asset);
+    try {
+      const uploaded = await uploadCompanyAsset(userId, file, asset);
+      const next =
+        asset === 'signature'
+          ? { signatureUrl: uploaded.url, signaturePath: uploaded.storagePath }
+          : asset === 'stamp'
+            ? { stampUrl: uploaded.url, stampPath: uploaded.storagePath }
+            : { bizRegUrl: uploaded.url, bizRegPath: uploaded.storagePath };
+      const merged = { ...item, ...next };
+      setItem(merged);
+      await saveCompany(userId, merged);
+      const fresh = await getCompany(userId);
+      if (fresh) onSaved(fresh);
+    } finally {
+      setUploading('');
+    }
   }
 
   return (
@@ -752,11 +904,42 @@ function SettingsPage({
           계좌번호
           <input value={item.account || ''} onChange={(e) => patch({ account: e.target.value })} />
         </label>
+        <h3>서명 / 도장</h3>
+        <div className="asset-grid">
+          <AssetUpload title="서명" url={item.signatureUrl} busy={uploading === 'signature'} onFile={(file) => upload(file, 'signature')} />
+          <AssetUpload title="도장" url={item.stampUrl} busy={uploading === 'stamp'} onFile={(file) => upload(file, 'stamp')} />
+        </div>
+        <h3>사업자등록증 사본</h3>
+        <p className="muted">보험청구 서류에 자동 첨부할 수 있도록 보관합니다.</p>
+        <AssetUpload title="사업자등록증" url={item.bizRegUrl} busy={uploading === 'bizReg'} onFile={(file) => upload(file, 'bizReg')} wide />
         <button onClick={save}>
           <BriefcaseBusiness size={16} /> 저장
         </button>
       </div>
     </section>
+  );
+}
+
+function AssetUpload({
+  title,
+  url,
+  busy,
+  wide,
+  onFile,
+}: {
+  title: string;
+  url?: string;
+  busy: boolean;
+  wide?: boolean;
+  onFile: (file?: File) => void;
+}) {
+  return (
+    <label className={`asset-upload ${wide ? 'wide' : ''}`}>
+      <span>{title}</span>
+      {url ? <img src={url} alt="" /> : <b>업로드</b>}
+      <em>{busy ? '저장 중...' : '터치해서 업로드'}</em>
+      <input hidden type="file" accept="image/*,application/pdf" onChange={(event) => onFile(event.target.files?.[0])} />
+    </label>
   );
 }
 

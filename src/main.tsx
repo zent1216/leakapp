@@ -46,6 +46,29 @@ import './styles.css';
 
 type Tab = 'today' | 'jobs' | 'new' | 'clients' | 'docs' | 'stats' | 'as' | 'settings';
 type DocumentType = 'estimate' | 'opinion' | 'insurance';
+type DocMode = 'edit' | 'preview';
+type DocDraft = {
+  title: string;
+  issueDate: string;
+  companyName: string;
+  companyCeo: string;
+  companyTel: string;
+  companyRegNo: string;
+  companyAddress: string;
+  clientName: string;
+  clientPhone: string;
+  address: string;
+  workDate: string;
+  leakType: string;
+  beforeNote: string;
+  actionNote: string;
+  afterNote: string;
+  expertOpinion: string;
+  footerNote: string;
+  bankLine: string;
+  costItems: CostItem[];
+  total: number;
+};
 
 const leakTypes = ['배관 누수', '수전 누수', '옥상 방수', '외벽 누수', '화장실 방수', '지하 누수', '기타'];
 
@@ -681,27 +704,52 @@ function AsPage({ jobs, onEdit }: { jobs: Job[]; onEdit: (job: Job) => void }) {
 function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) {
   const [id, setId] = useState(jobs[0]?.id || '');
   const [type, setType] = useState<DocumentType>('estimate');
+  const [mode, setMode] = useState<DocMode>('edit');
   const job = useMemo(() => jobs.find((item) => item.id === id) || jobs[0], [id, jobs]);
+  const [draft, setDraft] = useState<DocDraft | null>(null);
+
+  useEffect(() => {
+    if (!job) {
+      setDraft(null);
+      return;
+    }
+    setDraft(createDocDraft(job, company, type));
+  }, [job?.id, type, company?.id]);
+
+  const patch = (next: Partial<DocDraft>) => setDraft((current) => (current ? { ...current, ...next } : current));
+  const updateCost = (idx: number, next: Partial<CostItem>) =>
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            costItems: current.costItems.map((item, itemIdx) => (itemIdx === idx ? { ...item, ...next } : item)),
+          }
+        : current,
+    );
+
+  async function capture() {
+    const el = document.getElementById('doc-preview');
+    if (!el || !job || !draft) return null;
+    return html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
+  }
 
   async function pdf() {
-    const el = document.getElementById('doc-preview');
-    if (!el || !job) return;
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
+    const canvas = await capture();
+    if (!canvas || !job || !draft) return;
     const p = new jsPDF('p', 'mm', 'a4');
     p.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, 297);
-    p.save(`${job.workDate}_${job.clientName}_${docTitle(type)}.pdf`);
+    p.save(`${draft.workDate}_${draft.clientName}_${draft.title}.pdf`);
   }
 
   async function image() {
-    const el = document.getElementById('doc-preview');
-    if (!el || !job) return;
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#fff', useCORS: true });
+    const canvas = await capture();
+    if (!canvas || !draft) return;
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) return;
-    const fileName = `${job.workDate}_${job.clientName}_${docTitle(type)}.png`;
+    const fileName = `${draft.workDate}_${draft.clientName}_${draft.title}.png`;
     const file = new File([blob], fileName, { type: 'image/png' });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: fileName });
+      await navigator.share({ files: [file], title: fileName, text: `${draft.clientName} ${draft.title}` });
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -729,15 +777,23 @@ function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) 
           <option value="insurance">보험서류</option>
         </select>
       </div>
-      {job ? (
+      {job && draft ? (
         <>
-          <DocumentPreview job={job} company={company} type={type} />
+          <div className="doc-mode-tabs">
+            <button className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>편집</button>
+            <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>미리보기</button>
+          </div>
+          {mode === 'edit' ? (
+            <DocEditor draft={draft} patch={patch} updateCost={updateCost} />
+          ) : (
+            <DocumentPreview draft={draft} company={company} type={type} job={job} />
+          )}
           <div className="share-actions">
             <button onClick={pdf}>
               <Download size={16} /> PDF 저장
             </button>
             <button className="secondary" onClick={image}>
-              이미지 저장/공유
+              이미지/문자 공유
             </button>
           </div>
         </>
@@ -748,45 +804,110 @@ function Documents({ jobs, company }: { jobs: Job[]; company: Company | null }) 
   );
 }
 
-function DocumentPreview({ job, company, type }: { job: Job; company: Company | null; type: DocumentType }) {
+function DocEditor({
+  draft,
+  patch,
+  updateCost,
+}: {
+  draft: DocDraft;
+  patch: (next: Partial<DocDraft>) => void;
+  updateCost: (idx: number, next: Partial<CostItem>) => void;
+}) {
+  return (
+    <div className="card form doc-editor">
+      <h3>문서 기본 정보</h3>
+      <div className="grid2">
+        <label>문서 제목<input value={draft.title} onChange={(e) => patch({ title: e.target.value })} /></label>
+        <label>발행일<input value={draft.issueDate} onChange={(e) => patch({ issueDate: e.target.value })} /></label>
+      </div>
+      <h3>업체 정보</h3>
+      <label>업체명<input value={draft.companyName} onChange={(e) => patch({ companyName: e.target.value })} /></label>
+      <div className="grid2">
+        <label>대표자<input value={draft.companyCeo} onChange={(e) => patch({ companyCeo: e.target.value })} /></label>
+        <label>전화번호<input value={draft.companyTel} onChange={(e) => patch({ companyTel: e.target.value })} /></label>
+      </div>
+      <label>사업자번호<input value={draft.companyRegNo} onChange={(e) => patch({ companyRegNo: e.target.value })} /></label>
+      <label>업체 주소<input value={draft.companyAddress} onChange={(e) => patch({ companyAddress: e.target.value })} /></label>
+      <h3>고객 / 현장 정보</h3>
+      <div className="grid2">
+        <label>고객명<input value={draft.clientName} onChange={(e) => patch({ clientName: e.target.value })} /></label>
+        <label>전화번호<input value={draft.clientPhone} onChange={(e) => patch({ clientPhone: e.target.value })} /></label>
+      </div>
+      <label>주소<input value={draft.address} onChange={(e) => patch({ address: e.target.value })} /></label>
+      <div className="grid2">
+        <label>작업일<input value={draft.workDate} onChange={(e) => patch({ workDate: e.target.value })} /></label>
+        <label>누수 유형<input value={draft.leakType} onChange={(e) => patch({ leakType: e.target.value })} /></label>
+      </div>
+      <h3>본문</h3>
+      <label>현장 내용<textarea value={draft.beforeNote} onChange={(e) => patch({ beforeNote: e.target.value })} /></label>
+      <label>조치 내용<textarea value={draft.actionNote} onChange={(e) => patch({ actionNote: e.target.value })} /></label>
+      <label>조치 후 상태<textarea value={draft.afterNote} onChange={(e) => patch({ afterNote: e.target.value })} /></label>
+      <label>전문가 소견<textarea value={draft.expertOpinion} onChange={(e) => patch({ expertOpinion: e.target.value })} /></label>
+      <h3>금액 항목</h3>
+      {draft.costItems.map((item, idx) => (
+        <div className="cost" key={item.id}>
+          <input value={item.name} onChange={(e) => updateCost(idx, { name: e.target.value })} />
+          <input type="number" value={item.amount || ''} onChange={(e) => updateCost(idx, { amount: Number(e.target.value) })} />
+          <button type="button" onClick={() => patch({ costItems: draft.costItems.filter((x) => x.id !== item.id) })}>×</button>
+        </div>
+      ))}
+      <button type="button" className="secondary" onClick={() => patch({ costItems: [...draft.costItems, { id: uid(), name: '', amount: 0 }] })}>
+        + 항목 추가
+      </button>
+      <label>하단 문구<textarea value={draft.footerNote} onChange={(e) => patch({ footerNote: e.target.value })} /></label>
+      <label>입금 계좌 문구<input value={draft.bankLine} onChange={(e) => patch({ bankLine: e.target.value })} /></label>
+    </div>
+  );
+}
+
+function DocumentPreview({ draft, company, type, job }: { draft: DocDraft; company: Company | null; type: DocumentType; job: Job }) {
   return (
     <div id="doc-preview" className="doc">
-      <h1>{docTitle(type)}</h1>
-      <p className="right">발행일 {new Date().toLocaleDateString('ko-KR')}</p>
-      <h3>{company?.name || '업체명'}</h3>
+      <h1>{draft.title}</h1>
+      <p className="right">발행일 {draft.issueDate}</p>
+      <h3>{draft.companyName || '업체명'}</h3>
       <p>
-        대표 {company?.ceo || '-'} · TEL {company?.tel || '-'} · 사업자번호 {company?.regNo || '-'}
+        대표 {draft.companyCeo || '-'} · TEL {draft.companyTel || '-'} · 사업자번호 {draft.companyRegNo || '-'}
       </p>
+      {draft.companyAddress && <p>{draft.companyAddress}</p>}
       <table>
         <tbody>
           <tr>
             <th>고객명</th>
-            <td>{job.clientName}</td>
+            <td>{draft.clientName}</td>
+          </tr>
+          <tr>
+            <th>연락처</th>
+            <td>{draft.clientPhone || '-'}</td>
           </tr>
           <tr>
             <th>주소</th>
-            <td>
-              {job.address} {job.addressDetail}
-            </td>
+            <td>{draft.address}</td>
           </tr>
           <tr>
             <th>작업일</th>
-            <td>{job.workDate}</td>
+            <td>{draft.workDate}</td>
           </tr>
           <tr>
             <th>누수 유형</th>
-            <td>{job.leakType}</td>
+            <td>{draft.leakType}</td>
           </tr>
         </tbody>
       </table>
       <h3>현장 내용</h3>
-      <p>{job.beforeNote || '조치 전 상황 기록 없음'}</p>
+      <p>{draft.beforeNote || '조치 전 상황 기록 없음'}</p>
       <h3>조치 내용</h3>
-      <p>{job.actionNote || '조치 내용 기록 없음'}</p>
+      <p>{draft.actionNote || '조치 내용 기록 없음'}</p>
+      {draft.afterNote && (
+        <>
+          <h3>조치 후 상태</h3>
+          <p>{draft.afterNote}</p>
+        </>
+      )}
       {type !== 'estimate' && (
         <>
           <h3>전문가 소견</h3>
-          <p>{job.expertOpinion || job.afterNote || '소견 기록 없음'}</p>
+          <p>{draft.expertOpinion || '소견 기록 없음'}</p>
         </>
       )}
       <table>
@@ -797,7 +918,7 @@ function DocumentPreview({ job, company, type }: { job: Job; company: Company | 
           </tr>
         </thead>
         <tbody>
-          {job.costItems.map((item) => (
+          {draft.costItems.map((item) => (
             <tr key={item.id}>
               <td>{item.name}</td>
               <td>{money(item.amount)}</td>
@@ -805,10 +926,16 @@ function DocumentPreview({ job, company, type }: { job: Job; company: Company | 
           ))}
         </tbody>
       </table>
-      <h2>합계 {money(jobTotal(job))}</h2>
-      <p>
-        입금계좌: {company?.bank || ''} {company?.account || ''} {company?.holder || ''}
-      </p>
+      <h2>합계 {money(draft.costItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))}</h2>
+      <p>{draft.bankLine}</p>
+      {draft.footerNote && <p className="doc-note">{draft.footerNote}</p>}
+      {(job.photos || []).length > 0 && (
+        <div className="doc-photo-strip">
+          {job.photos.slice(0, 4).map((photo) => (
+            <img key={photo.id} src={photo.url} alt="" />
+          ))}
+        </div>
+      )}
       <div className="doc-signs">
         <div>
           <span>서명</span>
@@ -1149,6 +1276,32 @@ function statusLabel(status: Job['status']) {
   if (status === 'done') return '완료';
   if (status === 'as') return 'AS';
   return '진행중';
+}
+
+function createDocDraft(job: Job, company: Company | null, type: DocumentType): DocDraft {
+  const title = docTitle(type);
+  return {
+    title,
+    issueDate: new Date().toLocaleDateString('ko-KR'),
+    companyName: company?.name || '',
+    companyCeo: company?.ceo || '',
+    companyTel: company?.tel || '',
+    companyRegNo: company?.regNo || '',
+    companyAddress: company?.address || '',
+    clientName: job.clientName || '',
+    clientPhone: job.clientPhone || '',
+    address: `${job.address || ''} ${job.addressDetail || ''}`.trim(),
+    workDate: job.workDate || '',
+    leakType: job.leakType || '',
+    beforeNote: job.beforeNote || '',
+    actionNote: job.actionNote || '',
+    afterNote: job.afterNote || '',
+    expertOpinion: job.expertOpinion || job.afterNote || '',
+    footerNote: type === 'estimate' ? '본 견적서는 발행일로부터 15일간 유효합니다.' : '',
+    bankLine: `입금계좌: ${company?.bank || ''} ${company?.account || ''} ${company?.holder || ''}`.trim(),
+    costItems: (job.costItems || []).map((item) => ({ ...item })),
+    total: jobTotal(job),
+  };
 }
 
 function docTitle(type: DocumentType) {

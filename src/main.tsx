@@ -9,12 +9,15 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
+  BarChart3,
   BriefcaseBusiness,
   CalendarDays,
   Camera,
+  ClipboardList,
   FileText,
   LogOut,
   Plus,
+  ShieldCheck,
   Settings,
   Trash2,
   Users,
@@ -140,6 +143,7 @@ function Workspace({ user }: { user: User }) {
   const monthJobs = jobs.filter((job) => job.workDate?.startsWith(monthPrefix));
   const doneJobs = monthJobs.filter((job) => job.status === 'done');
   const asJobs = jobs.filter((job) => job.status === 'as');
+  const pendingJobs = monthJobs.filter((job) => job.status !== 'done');
   const revenue = doneJobs.reduce((sum, job) => sum + jobTotal(job), 0);
   const profit = doneJobs.reduce((sum, job) => sum + netProfit(job), 0);
   const nav = [
@@ -155,27 +159,30 @@ function Workspace({ user }: { user: User }) {
     <div className="shell">
       <header>
         <div>
-          <b>{user.displayName || user.email?.split('@')[0]}</b>님의 업무장
+          <b>{user.displayName || user.email?.split('@')[0]}</b> 사장님, 오늘도 화이팅!
         </div>
         <button className="ghost" onClick={() => signOut(auth)}>
           <LogOut size={16} /> 로그아웃
         </button>
       </header>
       <section className="stats">
-        <Stat label="이번 달 완료" value={doneJobs.length} />
-        <Stat label="AS 관리" value={asJobs.length} />
-        <Stat label="순매출" value={shortMoney(profit || revenue)} />
+        <Stat label="이달 완료" value={doneJobs.length} tone="green" />
+        <Stat label="진행중" value={pendingJobs.length} tone="orange" />
+        <Stat label="이달 수입" value={shortMoney(profit || revenue)} tone="accent" />
       </section>
       <main className="content">
         {tab === 'today' && (
-          <JobList
-            title="이번 달 작업"
-            jobs={monthJobs}
-            onEdit={(job) => {
-              setEditing(job);
+          <Dashboard
+            monthJobs={monthJobs}
+            asCount={asJobs.length}
+            onNew={() => {
+              setEditing(null);
               setTab('new');
             }}
-            onDelete={removeJob}
+            onJobs={() => setTab('jobs')}
+            onDocs={() => setTab('docs')}
+            onClients={() => setTab('clients')}
+            onSettings={() => setTab('settings')}
           />
         )}
         {tab === 'jobs' && (
@@ -224,12 +231,88 @@ function Workspace({ user }: { user: User }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value, tone }: { label: string; value: string | number; tone?: 'green' | 'orange' | 'accent' }) {
   return (
     <div className="stat">
-      <strong>{value}</strong>
+      <strong className={tone || ''}>{value}</strong>
       <span>{label}</span>
     </div>
+  );
+}
+
+function Dashboard({
+  monthJobs,
+  asCount,
+  onNew,
+  onJobs,
+  onDocs,
+  onClients,
+  onSettings,
+}: {
+  monthJobs: Job[];
+  asCount: number;
+  onNew: () => void;
+  onJobs: () => void;
+  onDocs: () => void;
+  onClients: () => void;
+  onSettings: () => void;
+}) {
+  return (
+    <section className="dashboard">
+      <div className="menu-grid">
+        <button className="menu-card" onClick={onNew}>
+          <span className="menu-icon blue">
+            <Plus />
+          </span>
+          <span className="menu-title">새 작업</span>
+          <span className="menu-sub">현장 기록 등록</span>
+        </button>
+        <button className="menu-card" onClick={onDocs}>
+          <span className="menu-icon green">
+            <FileText />
+          </span>
+          <span className="menu-title">견적서</span>
+          <span className="menu-sub">A4 · PDF 출력</span>
+        </button>
+        <button className="menu-card" onClick={onDocs}>
+          <span className="menu-icon orange">
+            <ClipboardList />
+          </span>
+          <span className="menu-title">소견서</span>
+          <span className="menu-sub">기술 소견 작성</span>
+        </button>
+        <button className="menu-card" onClick={onDocs}>
+          <span className="menu-icon purple">
+            <ShieldCheck />
+          </span>
+          <span className="menu-title">보험서류</span>
+          <span className="menu-sub">보험사 제출용</span>
+        </button>
+        <button className="menu-card wide" onClick={onJobs}>
+          <span className="menu-icon blue">
+            <BarChart3 />
+          </span>
+          <span className="menu-copy">
+            <span className="menu-title">실적관리</span>
+            <span className="menu-sub">월별 매출 · 건수 · 통계</span>
+          </span>
+        </button>
+        <button className="menu-card wide" onClick={onJobs}>
+          <span className="menu-icon green">
+            <Wrench />
+          </span>
+          <span className="menu-copy">
+            <span className="menu-title">현장관리</span>
+            <span className="menu-sub">전체 작업 현황 확인 · 이번 달 {monthJobs.length}건</span>
+          </span>
+        </button>
+      </div>
+      <div className="bottom-btns">
+        <button onClick={onJobs}>AS 관리 {asCount > 0 ? asCount : ''}</button>
+        <button onClick={onClients}>고객 연락처</button>
+        <button onClick={onSettings}>사업자 정보</button>
+      </div>
+    </section>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   User,
@@ -23,6 +23,7 @@ import {
   Trash2,
   Users,
   Wrench,
+  X,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -836,6 +837,7 @@ function SettingsPage({
 }) {
   const [item, setItem] = useState<Company>(company || { id: '', ownerId: userId, updatedAt: Date.now() });
   const [uploading, setUploading] = useState('');
+  const [signOpen, setSignOpen] = useState(false);
   const patch = (next: Partial<Company>) => setItem((current) => ({ ...current, ...next }));
 
   async function save() {
@@ -866,10 +868,46 @@ function SettingsPage({
     }
   }
 
+  async function saveSignature(file: File) {
+    await upload(file, 'signature');
+    setSignOpen(false);
+  }
+
+  async function removeAsset(asset: 'signature' | 'stamp' | 'bizReg') {
+    const next =
+      asset === 'signature'
+        ? { signatureUrl: '', signaturePath: '' }
+        : asset === 'stamp'
+          ? { stampUrl: '', stampPath: '' }
+          : { bizRegUrl: '', bizRegPath: '' };
+    const merged = { ...item, ...next };
+    setItem(merged);
+    await saveCompany(userId, merged);
+    const fresh = await getCompany(userId);
+    if (fresh) onSaved(fresh);
+  }
+
+  function exportCompany() {
+    const data = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      company: item,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `누수설비_사업자정보_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section>
       <h2>사업자 정보</h2>
-      <div className="card form">
+      <div className="settings-stack">
+      <div className="card form form-section">
+        <h3>기본 정보</h3>
         <label>
           업체명
           <input value={item.name || ''} onChange={(e) => patch({ name: e.target.value })} />
@@ -904,18 +942,42 @@ function SettingsPage({
           계좌번호
           <input value={item.account || ''} onChange={(e) => patch({ account: e.target.value })} />
         </label>
-        <h3>서명 / 도장</h3>
-        <div className="asset-grid">
-          <AssetUpload title="서명" url={item.signatureUrl} busy={uploading === 'signature'} onFile={(file) => upload(file, 'signature')} />
-          <AssetUpload title="도장" url={item.stampUrl} busy={uploading === 'stamp'} onFile={(file) => upload(file, 'stamp')} />
-        </div>
-        <h3>사업자등록증 사본</h3>
-        <p className="muted">보험청구 서류에 자동 첨부할 수 있도록 보관합니다.</p>
-        <AssetUpload title="사업자등록증" url={item.bizRegUrl} busy={uploading === 'bizReg'} onFile={(file) => upload(file, 'bizReg')} wide />
         <button onClick={save}>
-          <BriefcaseBusiness size={16} /> 저장
+          <BriefcaseBusiness size={16} /> 기본 정보 저장
         </button>
       </div>
+      <div className="card form form-section">
+        <h3>서명 / 도장</h3>
+        <div className="asset-grid">
+          <AssetUpload
+            title="서명"
+            url={item.signatureUrl}
+            busy={uploading === 'signature'}
+            onFile={(file) => upload(file, 'signature')}
+            onRemove={() => removeAsset('signature')}
+            extraAction={<button type="button" className="asset-action" onClick={(event) => { event.preventDefault(); setSignOpen(true); }}>직접 작성</button>}
+          />
+          <AssetUpload
+            title="도장"
+            url={item.stampUrl}
+            busy={uploading === 'stamp'}
+            onFile={(file) => upload(file, 'stamp')}
+            onRemove={() => removeAsset('stamp')}
+          />
+        </div>
+      </div>
+      <div className="card form form-section">
+        <h3>사업자등록증 사본</h3>
+        <p className="muted">보험청구 서류에 자동 첨부할 수 있도록 보관합니다.</p>
+        <AssetUpload title="사업자등록증" url={item.bizRegUrl} busy={uploading === 'bizReg'} onFile={(file) => upload(file, 'bizReg')} onRemove={() => removeAsset('bizReg')} wide />
+      </div>
+      <div className="card form form-section">
+        <h3>데이터 백업</h3>
+        <p className="muted">현재 사업자 정보와 첨부 URL을 JSON 파일로 내려받습니다.</p>
+        <button className="secondary" onClick={exportCompany}>사업자 정보 백업 저장</button>
+      </div>
+      </div>
+      {signOpen && <SignaturePad onClose={() => setSignOpen(false)} onSave={saveSignature} />}
     </section>
   );
 }
@@ -925,21 +987,161 @@ function AssetUpload({
   url,
   busy,
   wide,
+  extraAction,
+  onRemove,
   onFile,
 }: {
   title: string;
   url?: string;
   busy: boolean;
   wide?: boolean;
+  extraAction?: React.ReactNode;
+  onRemove?: () => void;
   onFile: (file?: File) => void;
 }) {
   return (
     <label className={`asset-upload ${wide ? 'wide' : ''}`}>
       <span>{title}</span>
-      {url ? <img src={url} alt="" /> : <b>업로드</b>}
-      <em>{busy ? '저장 중...' : '터치해서 업로드'}</em>
+      {url ? (
+        <span className="asset-preview">
+          <img src={url} alt="" />
+          {onRemove && (
+            <button
+              type="button"
+              className="remove-btn"
+              onClick={(event) => {
+                event.preventDefault();
+                onRemove();
+              }}
+            >
+              ×
+            </button>
+          )}
+        </span>
+      ) : (
+        <b>업로드</b>
+      )}
+      <em>{busy ? '저장 중...' : url ? '터치해서 교체' : '터치해서 업로드'}</em>
+      {extraAction}
       <input hidden type="file" accept="image/*,application/pdf" onChange={(event) => onFile(event.target.files?.[0])} />
     </label>
+  );
+}
+
+function SignaturePad({ onClose, onSave }: { onClose: () => void; onSave: (file: File) => Promise<void> }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawing = useRef(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * ratio);
+    canvas.height = Math.round(180 * ratio);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(ratio, ratio);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, rect.width, 180);
+    ctx.strokeStyle = '#111827';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }, []);
+
+  function point(event: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function start(event: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    drawing.current = true;
+    canvas.setPointerCapture(event.pointerId);
+    const p = point(event);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+
+  function move(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    const p = point(event);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+
+  function end() {
+    drawing.current = false;
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, rect.width, 180);
+  }
+
+  async function save() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let hasInk = false;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i] < 245 || pixels[i + 1] < 245 || pixels[i + 2] < 245) {
+        hasInk = true;
+        break;
+      }
+    }
+    if (!hasInk) {
+      alert('서명을 먼저 작성해주세요.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) return;
+      await onSave(new File([blob], 'signature.png', { type: 'image/png' }));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-sheet">
+        <div className="modal-header">
+          <strong>서명 작성</strong>
+          <button className="modal-close" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="muted">아래 흰색 영역에 손가락이나 마우스로 서명해주세요.</p>
+          <canvas
+            ref={canvasRef}
+            className="signature-canvas"
+            onPointerDown={start}
+            onPointerMove={move}
+            onPointerUp={end}
+            onPointerCancel={end}
+          />
+          <div className="actions">
+            <button className="secondary" onClick={clear}>지우기</button>
+            <button onClick={save} disabled={saving}>{saving ? '저장 중...' : '서명 저장'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

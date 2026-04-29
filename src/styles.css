@@ -3,6 +3,7 @@
   --bg2: #1a1d27;
   --bg3: #22263a;
   --card: #1e2235;
+  --card2: #242942;
   --border: rgba(255, 255, 255, 0.08);
   --border2: rgba(255, 255, 255, 0.15);
   --text: #f0f2ff;
@@ -30,7 +31,7 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: #090b10;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -172,7 +173,10 @@ button.secondary,
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, rgba(79, 142, 247, 0.08), transparent 210px),
+    var(--bg);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 30px 80px rgba(0,0,0,0.45);
 }
 
 header {
@@ -181,7 +185,7 @@ header {
   justify-content: space-between;
   gap: 12px;
   padding: 20px 16px 12px;
-  background: var(--bg);
+  background: transparent;
 }
 
 header b {
@@ -203,7 +207,7 @@ header b {
 }
 
 .stat {
-  background: var(--card);
+  background: linear-gradient(180deg, var(--card2), var(--card));
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 12px;
@@ -266,7 +270,7 @@ header b {
   padding: 18px 14px;
   border: 1px solid var(--border);
   border-radius: var(--r);
-  background: var(--card);
+  background: linear-gradient(180deg, var(--card2), var(--card));
   color: var(--text);
   text-align: left;
 }
@@ -397,7 +401,8 @@ section h2 {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--r);
-  background: var(--card);
+  background: linear-gradient(180deg, rgba(36, 41, 66, 0.96), var(--card));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
 
 .form.card {
@@ -408,6 +413,16 @@ section h2 {
   margin: 16px 0 10px;
   color: var(--text2);
   font-size: 13px;
+  letter-spacing: 0;
+}
+
+.form-section h3:first-child {
+  margin-top: 0;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 12px;
 }
 
 .row {
@@ -658,7 +673,7 @@ section h2 {
   padding: 10px;
   border: 1.5px dashed var(--border2);
   border-radius: var(--r-sm);
-  background: var(--bg2);
+  background: rgba(15, 17, 23, 0.42);
   color: var(--text2);
   display: flex;
   flex-direction: column;
@@ -687,12 +702,92 @@ section h2 {
   font-size: 11px;
 }
 
+.asset-preview {
+  width: 100%;
+  position: relative;
+  display: block;
+}
+
 .asset-upload img {
   width: 100%;
   max-height: 90px;
   object-fit: contain;
   border-radius: 6px;
   background: white;
+}
+
+.asset-action {
+  width: 100%;
+  padding: 8px;
+  background: var(--purple-bg);
+  color: var(--purple);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 12px;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: white;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 86dvh;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--bg3);
+  color: var(--text2);
+}
+
+.modal-body {
+  padding: 16px 20px 24px;
+}
+
+.signature-canvas {
+  width: 100%;
+  height: 180px;
+  display: block;
+  margin: 10px 0 12px;
+  border: 2px solid var(--border2);
+  border-radius: var(--r-sm);
+  background: white;
+  touch-action: none;
 }
 
 @media (max-width: 360px) {

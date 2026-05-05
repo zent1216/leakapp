@@ -18,6 +18,25 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
+/* 브라우저 다크모드 간섭 방지 */
+html, body {
+  color-scheme: dark;
+  -webkit-text-fill-color: initial;
+}
+input, textarea, select, button {
+  color-scheme: dark;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+}
+/* A4 문서는 라이트 모드 강제 (PDF/인쇄용) */
+.a4-preview-page, .a4-scale-page, .doc-a4-page {
+  color-scheme: light !important;
+  color: #1a1a2e !important;
+  -webkit-text-fill-color: #1a1a2e !important;
+}
+.a4-preview-page *, .a4-scale-page *, .doc-a4-page * {
+  -webkit-text-fill-color: inherit !important;
+}
 :root{
   --bg:#0f1117;--bg2:#1a1d27;--bg3:#22263a;
   --card:#1e2235;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
@@ -201,8 +220,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .menu-card:active{transform:scale(0.97);border-color:var(--accent);}
 .menu-card.wide{grid-column:1/-1;flex-direction:row;align-items:center;}
 .menu-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.menu-card-title{font-size:14px;font-weight:700;}
-.menu-card-sub{font-size:11px;color:var(--text2);}
+.menu-card-title{font-size:16px;font-weight:800;letter-spacing:-0.3px;}
+.menu-card-sub{font-size:12px;color:var(--text2);margin-top:2px;}
 .menu-card-info{flex:1;}
 .bottom-btns{padding:0 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .bottom-btn{background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Noto Sans KR',sans-serif;transition:border-color 0.2s;}
@@ -367,6 +386,51 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .a4-preview .est-del-btn,
 .a4-preview-page .est-del-btn {
   display: none !important;
+}
+
+
+/* 하단 고정 탭 네비게이션 */
+.bottom-tab-nav {
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  display:flex;justify-content:space-around;align-items:center;
+  padding:6px 0 env(safe-area-inset-bottom, 8px);
+  z-index:999;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.tab-btn {
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:none;border:none;color:var(--text3);
+  font-size:10px;padding:4px 0;cursor:pointer;
+  min-width:52px;transition:color 0.2s;
+}
+.tab-btn.active { color:var(--accent); }
+.tab-btn .tab-icon { font-size:20px;line-height:1; }
+.tab-btn .tab-label { font-weight:600; }
+/* 페이지 하단 여백 (탭바에 가리지 않도록) */
+.page { padding-bottom:70px !important; }
+
+/* 다크모드 텍스트 색상 강제 */
+.stat-card, .form-card, .month-row, .detail-info-card, .modal-sheet {
+  color: var(--text1);
+  -webkit-text-fill-color: var(--text1);
+}
+.form-label {
+  color: var(--text2) !important;
+  -webkit-text-fill-color: var(--text2) !important;
+}
+.form-input, .form-textarea, .form-select {
+  color: var(--text1) !important;
+  -webkit-text-fill-color: var(--text1) !important;
+  background: var(--bg3) !important;
+  border-color: var(--border) !important;
+}
+.form-input::placeholder, .form-textarea::placeholder {
+  color: var(--text3) !important;
+  -webkit-text-fill-color: var(--text3) !important;
+  opacity: 1;
 }
 
 @media print{
@@ -573,34 +637,34 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="page-body" style="padding:0;">
     <div class="main-menu-grid">
       <button class="menu-card" onclick="goPage('page-field')">
-        <div class="menu-card-icon" style="background:rgba(79,142,247,0.15);">📝</div>
+        <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:24px;font-weight:900;">＋</div>
         <div><div class="menu-card-title">새 작업</div><div class="menu-card-sub">현장 기록 등록</div></div>
       </button>
       <button class="menu-card" onclick="goPage('page-docs','estimate')">
-        <div class="menu-card-icon" style="background:rgba(62,207,142,0.15);">📋</div>
+        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📑</div>
         <div><div class="menu-card-title">견적서</div><div class="menu-card-sub">A4 · PDF 출력</div></div>
       </button>
       <button class="menu-card" onclick="goPage('page-docs','opinion')">
-        <div class="menu-card-icon" style="background:rgba(139,144,168,0.2);">📝</div>
+        <div class="menu-card-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:22px;">📄</div>
         <div><div class="menu-card-title">소견서</div><div class="menu-card-sub">기술 소견 작성</div></div>
       </button>
       <button class="menu-card" onclick="goPage('page-docs','insurance')">
-        <div class="menu-card-icon" style="background:rgba(245,158,11,0.15);">🏛️</div>
+        <div class="menu-card-icon" style="background:rgba(168,85,247,0.2);color:#a855f7;font-size:22px;">🛡️</div>
         <div><div class="menu-card-title">보험서류</div><div class="menu-card-sub">보험사 제출용</div></div>
       </button>
       <button class="menu-card wide" onclick="goPage('page-stats')">
-        <div class="menu-card-icon" style="background:rgba(79,142,247,0.15);">📊</div>
+        <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:22px;">📊</div>
         <div class="menu-card-info"><div class="menu-card-title">실적관리</div><div class="menu-card-sub">월별 매출 · 건수 · 통계</div></div>
       </button>
       <button class="menu-card wide" onclick="goPage('page-calendar')">
-        <div class="menu-card-icon" style="background:rgba(62,207,142,0.15);">📆</div>
+        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">🔧</div>
         <div class="menu-card-info"><div class="menu-card-title">현장관리</div><div class="menu-card-sub">전체 작업 현황 확인</div></div>
       </button>
     </div>
     <div class="bottom-btns">
-      <button class="bottom-btn" onclick="goPage('page-as')">🔧 AS 관리</button>
-      <button class="bottom-btn" onclick="goPage('page-contacts')">👥 고객 연락처</button>
-      <button class="bottom-btn" style="grid-column:1/-1;" onclick="goPage('page-biz')">🏢 사업자 정보</button>
+      <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
+      <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
+      <button class="bottom-btn" style="grid-column:1/-1;" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
   </div>
 </div>
@@ -976,6 +1040,12 @@ let _insReceipts = [];
 //  페이지 이동
 // ════════════════════════════════════════
 function showPage(id) {
+  // 하단 탭 활성화
+  document.querySelectorAll('.tab-btn').forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-page') === id);
+  });
+  var bnav = document.getElementById('bottom-tab-nav');
+  if (bnav) bnav.style.display = ['page-login','page-signup','page-verify','page-reset'].indexOf(id) >= 0 ? 'none' : 'flex';
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
     p.style.display = 'none';
@@ -3914,6 +3984,29 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="auto-backup-list"></div>
     </div>
   </div>
+</div>
+
+
+<!-- 하단 고정 탭 네비게이션 -->
+<div class="bottom-tab-nav" id="bottom-tab-nav">
+  <button class="tab-btn active" onclick="goPage('page-main')" data-page="page-main">
+    <span class="tab-icon">📅</span><span class="tab-label">오늘</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-calendar')" data-page="page-calendar">
+    <span class="tab-icon">🔧</span><span class="tab-label">현장</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-field')" data-page="page-field">
+    <span class="tab-icon">➕</span><span class="tab-label">등록</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-contacts')" data-page="page-contacts">
+    <span class="tab-icon">👥</span><span class="tab-label">고객</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-docs')" data-page="page-docs">
+    <span class="tab-icon">📄</span><span class="tab-label">문서</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-biz')" data-page="page-biz">
+    <span class="tab-icon">⚙️</span><span class="tab-label">사업자</span>
+  </button>
 </div>
 
 </body>

@@ -2606,6 +2606,8 @@ function toggleDocsMode() {
         var rBody = document.getElementById('receipt-body');
         if (rAmt) j2._receiptAmount = parseFloat(rAmt.value) || 0;
         if (rTo) j2._receiptTo = rTo.value;
+        var rAddr = document.getElementById('receipt-addr');
+        if (rAddr) j2._receiptAddr = rAddr.value;
         if (rBody) j2._receiptBody = rBody.value;
       }
     } else if (_curDocType === 'estimate') {
@@ -2838,15 +2840,7 @@ function renderInsuranceEdit(j, el) {
 
   var html = '';
 
-  // 보험 정보 입력
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">🏛️ 보험 정보</div>';
-  html += '<div class="form-group"><label class="form-label">보험사</label><input class="form-input" id="ins-company" placeholder="삼성화재, DB손보 등" value="'+(j._insCompany||'')+'"></div>';
-  html += '<div class="form-group"><label class="form-label">증권번호</label><input class="form-input" id="ins-policy" placeholder="보험 증권번호" value="'+(j._insPolicy||'')+'"></div>';
-  html += '<div class="form-group"><label class="form-label">입금 은행</label><input class="form-input" id="ins-bank" placeholder="국민은행" value="'+((_biz.bank)||'')+'"></div>';
-  html += '<div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="ins-account" placeholder="000-0000-0000-00" value="'+((_biz.account)||'')+'"></div>';
-  html += '<div class="form-group"><label class="form-label">예금주</label><input class="form-input" id="ins-holder" placeholder="예금주명" value="'+(_biz.ceo||j.name||'')+'"></div>';
-  html += '</div>';
+  // 보험 정보 입력 - 삭제됨 (불필요)
 
   // 현장 사진
   html += '<div class="form-card">';
@@ -2868,8 +2862,12 @@ function renderInsuranceEdit(j, el) {
     + '金 ' + numToKorean(j._receiptAmount !== undefined ? j._receiptAmount : jobTotal(j)) + ' 원정</div>'
     + '</div>';
   html += '<div class="form-group">'
-    + '<label class="form-label">수령인 (귀하) - 기본값: 작업 주소</label>'
-    + '<input class="form-input" id="receipt-to" placeholder="작업 주소" value="'+(j._receiptTo || (j.addr||'') + (j.location ? ' ' + j.location : ''))+'">'
+    + '<label class="form-label">수령인 (귀하) - 고객명</label>'
+    + '<input class="form-input" id="receipt-to" placeholder="고객명" value="'+(j._receiptTo || j.name || '')+'">'
+    + '</div>';
+  html += '<div class="form-group">'
+    + '<label class="form-label">주소 (선택 - 영수증에 주소 표시)</label>'
+    + '<input class="form-input" id="receipt-addr" placeholder="주소 입력 시 영수증에 표시" value="'+(j._receiptAddr || '')+'">'
     + '</div>';
   html += '<div class="form-group">'
     + '<label class="form-label">영수증 본문</label>'
@@ -2969,36 +2967,31 @@ function renderDocPreview() {
     // === 4페이지: 영수증 (엑셀 양식 기반) - 편집된 값 우선 ===
     var receiptAmount = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
     var koreanAmount = numToKorean(receiptAmount);
-    var fullAddr = j._receiptTo || (j.addr + (j.location ? ' ' + j.location : ''));
+    var receiptTo = j._receiptTo || j.name || '';
+    var receiptAddr = j._receiptAddr || '';
     var receiptBody = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로<br>정히 영수 합니다.';
-    // 개행 처리
     receiptBody = receiptBody.replace(/\n/g, '<br>');
     var receiptHtml = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 영수증</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div style="background:white;padding:80px 60px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;">'
-      // 제목
-      + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:12px;margin-bottom:60px;">영&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증</div>'
-      // 귀하 (주소)
-      + '<div style="display:flex;justify-content:center;align-items:flex-end;gap:20px;margin-bottom:40px;font-size:17px;">'
-      + '<span contenteditable="' + ce + '">' + fullAddr + '</span>'
-      + '<span style="font-weight:600;">귀하</span>'
+      + '<div class="a4-preview"><div style="background:white;padding:50px 40px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;">'
+      + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:12px;margin-bottom:50px;">영&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증</div>'
+      + '<div style="text-align:center;margin-bottom:6px;font-size:18px;">'
+      + '<span contenteditable="' + ce + '" style="font-weight:600;">' + receiptTo + '</span>'
+      + '<span style="font-weight:600;margin-left:8px;">귀하</span>'
       + '</div>'
-      + '<div style="border-bottom:1px solid #333;margin-bottom:40px;"></div>'
-      // 金 한글금액
-      + '<div style="display:flex;align-items:baseline;gap:30px;margin-bottom:20px;padding:0 20px;font-size:22px;">'
+      + (receiptAddr ? '<div style="text-align:center;margin-bottom:16px;font-size:13px;color:#555;" contenteditable="' + ce + '">' + receiptAddr + '</div>' : '')
+      + '<div style="border-bottom:2px solid #333;margin-bottom:30px;"></div>'
+      + '<div style="display:flex;align-items:baseline;gap:16px;margin-bottom:14px;font-size:22px;">'
       + '<span style="font-weight:700;">金</span>'
-      + '<span style="font-weight:700;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
+      + '<span style="font-weight:700;flex:1;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
       + '</div>'
-      // ₩ 숫자금액
-      + '<div style="display:flex;align-items:baseline;gap:30px;margin-bottom:50px;padding:0 20px;font-size:20px;">'
+      + '<div style="display:flex;align-items:baseline;gap:16px;margin-bottom:36px;font-size:20px;">'
       + '<span>&#8361;</span>'
-      + '<span style="font-weight:600;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
+      + '<span style="font-weight:600;flex:1;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
       + '</div>'
-      // 본문
-      + '<div style="font-size:15px;line-height:2;margin-bottom:60px;padding:0 20px;" contenteditable="' + ce + '">'
+      + '<div style="font-size:15px;line-height:2.2;margin-bottom:50px;" contenteditable="' + ce + '">'
       + receiptBody
       + '</div>'
-      // 업체 정보
-      + '<div style="font-size:14px;line-height:2;padding:0 40px;margin-bottom:40px;">'
+      + '<div style="font-size:14px;line-height:2.4;margin-bottom:30px;">'
       + '<div>업체명 : <span contenteditable="' + ce + '">' + co + '</span></div>'
       + '<div>사업자번호 : <span contenteditable="' + ce + '">' + (biz.reg||'-') + '</span></div>'
       + '<div>전화번호 : <span contenteditable="' + ce + '">' + (biz.tel||'-') + '</span></div>'
@@ -3006,8 +2999,7 @@ function renderDocPreview() {
       + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:48px;height:48px;object-fit:contain;margin-left:10px;">' : '<span style="color:#999;">(인)</span>')
       + '</div>'
       + '</div>'
-      // 발행일
-      + '<div style="font-size:14px;padding:0 20px;margin-top:60px;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
+      + '<div style="font-size:14px;margin-top:40px;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
       + '</div></div>';
 
     el.innerHTML = page1 + page2 + photoPage + receiptHtml;

@@ -670,6 +670,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
+      <button class="bottom-btn" onclick="goPage('page-catalog')">🗂️ 자재 카탈로그</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
   </div>
@@ -754,9 +755,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%;" onclick="addCostItem()">+ 항목 추가</button>
       </div>
       <div class="form-group">
-        <label class="form-label">자재 목록 (참고용)</label>
+        <label class="form-label">자재 목록</label>
         <div id="material-list"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addMaterialRow()">+ 자재 추가</button>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="addMaterialRow()">+ 직접 입력</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="openCatalogPicker(function(c){ addMaterialRow(c.name, 1); })">🗂️ 카탈로그</button>
+        </div>
       </div>
       <!-- 기존 호환용 숨김 필드 -->
       <input type="hidden" id="f-inspect" value="0">
@@ -927,6 +931,24 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   </div>
 </div>
 
+
+<!-- ════════════ 자재 카탈로그 ════════════ -->
+<div class="page" id="page-catalog">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">←</button>
+    <div class="topbar-title">자재 <span>카탈로그</span></div>
+    <div></div>
+  </div>
+  <div class="page-body">
+    <div style="position:relative;margin-bottom:12px;">
+      <input class="form-input" id="catalog-search" placeholder="자재명 검색..." oninput="renderCatalog()" style="padding-left:36px;">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);">🔍</span>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openCatalogForm()">➕ 자재 등록</button>
+    <div id="catalog-list"></div>
+  </div>
+</div>
+
 <!-- ════════════ 사업자 정보 ════════════ -->
 <div class="page" id="page-biz">
   <div class="topbar">
@@ -1093,6 +1115,7 @@ function goPage(id, extra) {
   else if (id === 'page-stats') renderStats();
   else if (id === 'page-materials') renderMaterialList();
   else if (id === 'page-contacts') renderContacts();
+  else if (id === 'page-catalog') renderCatalog();
   else if (id === 'page-biz') loadBizForm();
   else if (id === 'page-as') renderAs();
   else if (id === 'page-docs') initDocs(extra || 'estimate');
@@ -1171,6 +1194,10 @@ async function loadUserData(uid) {
       try {
         const parsedMats = d.materials ? JSON.parse(d.materials) : [];
         _materials = Array.isArray(parsedMats) ? parsedMats : [];
+      try {
+        var parsedCat = d.catalog ? JSON.parse(d.catalog) : [];
+        _catalog = Array.isArray(parsedCat) ? parsedCat : [];
+      } catch { _catalog = []; }
       } catch { _materials = []; }
       // 폴백: 클라우드에 사진 없으면 localStorage에서 복원
       _jobs.forEach(function(j) {
@@ -2736,8 +2763,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     // 기존 형식 호환: 검사비/공사비/자재비
     var defaultItems = [
       {name:'누수 탐지 검사비', amount: j.inspectCost||0},
-      {name:'누수 보수 공사비', amount: j.baseCost||0},
-      {name:'자재비', amount: j.materialCost||0}
+      {name:'누수 보수 공사비', amount: j.baseCost||0}
     ];
     defaultItems.forEach(function(item) {
       if (ce === 'true' || item.amount > 0) {
@@ -3947,6 +3973,134 @@ function getNextMaterialId() {
   return _materials.length ? Math.max.apply(null, _materials.map(function(m){return m.id||0;})) + 1 : 1;
 }
 
+
+// ════════════════════════════════════════
+//  자재 카탈로그
+// ════════════════════════════════════════
+var _catalog = [];
+var _editingCatalogId = null;
+var _catalogPhotoData = null;
+var _catalogPickerCallback = null;
+
+function getNextCatalogId() {
+  if (!_catalog.length) return 1;
+  return Math.max.apply(null, _catalog.map(function(c){ return c.id||0; })) + 1;
+}
+
+async function saveCatalog() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({catalog: JSON.stringify(_catalog)}, {merge: true});
+  } catch(e) { console.error('catalog save err', e); }
+}
+
+function handleCatalogPhoto(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxS = 300, w = img.width, h = img.height;
+      if (w > maxS || h > maxS) { if (w > h) { h = h*maxS/w; w = maxS; } else { w = w*maxS/h; h = maxS; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      _catalogPhotoData = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('catalog-photo-preview').innerHTML = '<img src="'+_catalogPhotoData+'" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function openCatalogForm(id) {
+  _editingCatalogId = id || null; _catalogPhotoData = null;
+  var t = document.getElementById('catalog-form-title'), d = document.getElementById('cat-delete-btn'), p = document.getElementById('catalog-photo-preview');
+  if (id) {
+    var c = _catalog.find(function(x){return x.id===id;}); if(!c) return;
+    t.textContent = '자재 수정';
+    document.getElementById('cat-name').value = c.name||'';
+    document.getElementById('cat-spec').value = c.spec||'';
+    document.getElementById('cat-price').value = c.price||'';
+    document.getElementById('cat-category').value = c.category||'';
+    document.getElementById('cat-memo').value = c.memo||'';
+    if(c.photo){_catalogPhotoData=c.photo; p.innerHTML='<img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;">';}
+    else p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
+    if(d) d.style.display='block';
+  } else {
+    t.textContent = '자재 등록';
+    ['cat-name','cat-spec','cat-price','cat-category','cat-memo'].forEach(function(f){var el=document.getElementById(f);if(el)el.value='';});
+    p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
+    if(d) d.style.display='none';
+  }
+  document.getElementById('catalog-form-modal').classList.add('open');
+}
+
+async function saveCatalogItem() {
+  var nm = document.getElementById('cat-name').value.trim();
+  if(!nm){showToast('자재명은 필수입니다');return;}
+  var ex = _editingCatalogId?(_catalog.find(function(c){return c.id===_editingCatalogId;})||{}):{};
+  var item = {id:_editingCatalogId||getNextCatalogId(), name:nm, spec:document.getElementById('cat-spec').value.trim(), price:parseFloat(document.getElementById('cat-price').value)||0, category:document.getElementById('cat-category').value.trim(), memo:document.getElementById('cat-memo').value.trim(), photo:_catalogPhotoData||ex.photo||null};
+  if(_editingCatalogId){_catalog=_catalog.map(function(c){return c.id===_editingCatalogId?item:c;});showToast('자재 수정됨');}
+  else{_catalog.push(item);showToast('자재 등록됨');}
+  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog();
+}
+
+async function deleteCatalogItem() {
+  if(!_editingCatalogId) return;
+  if(!confirm('이 자재를 삭제하시겠습니까?')) return;
+  _catalog=_catalog.filter(function(c){return c.id!==_editingCatalogId;});
+  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog(); showToast('삭제됨');
+}
+
+function renderCatalog() {
+  var list=document.getElementById('catalog-list'); if(!list) return;
+  var kw=(document.getElementById('catalog-search')||{}).value||''; kw=kw.trim().toLowerCase();
+  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0||(c.category||'').toLowerCase().indexOf(kw)>=0;});
+  if(!f.length){list.innerHTML='<div class="empty-state"><div class="empty-icon">🗂️</div><div class="empty-text">'+(kw?'검색 결과가 없습니다':'등록된 자재가 없습니다')+'</div></div>';return;}
+  var cats={}; f.forEach(function(c){var cat=c.category||'미분류';if(!cats[cat])cats[cat]=[];cats[cat].push(c);});
+  var html='';
+  Object.keys(cats).sort().forEach(function(cat){
+    html+='<div style="font-size:12px;font-weight:600;color:var(--accent);padding:10px 0 6px;border-bottom:1px solid var(--border);">'+cat+' ('+cats[cat].length+')</div>';
+    cats[cat].forEach(function(c){
+      html+='<div class="month-job-row" onclick="openCatalogForm('+c.id+')" style="cursor:pointer;align-items:center;">';
+      html+=c.photo?'<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;margin-right:10px;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:44px;height:44px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;font-size:20px;">📦</div>';
+      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
+      if(c.price) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;white-space:nowrap;">'+c.price.toLocaleString()+'원</div>';
+      html+='</div>';
+    });
+  });
+  list.innerHTML=html;
+}
+
+function openCatalogPicker(callback) {
+  _catalogPickerCallback=callback;
+  var s=document.getElementById('catalog-picker-search'); if(s)s.value='';
+  renderCatalogPicker();
+  document.getElementById('catalog-picker-modal').classList.add('open');
+}
+
+function renderCatalogPicker() {
+  var list=document.getElementById('catalog-picker-list'); if(!list) return;
+  var kw=(document.getElementById('catalog-picker-search')||{}).value||''; kw=kw.trim().toLowerCase();
+  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0;});
+  if(!f.length){list.innerHTML='<div style="text-align:center;padding:30px;color:var(--text2);">'+(kw?'검색 결과 없음':'등록된 자재가 없습니다')+'</div>';return;}
+  var html='';
+  f.forEach(function(c){
+    html+='<div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;" onclick="pickCatalogItem('+c.id+')">';
+    html+=c.photo?'<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:40px;height:40px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">📦</div>';
+    html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+(c.price?' · '+c.price.toLocaleString()+'원':'')+'</div></div></div>';
+  });
+  list.innerHTML=html;
+}
+
+function pickCatalogItem(id) {
+  var c=_catalog.find(function(x){return x.id===id;}); if(!c) return;
+  closeModal('catalog-picker-modal');
+  if(_catalogPickerCallback) _catalogPickerCallback(c);
+}
+
 // Firestore에 자재 저장
 async function saveMaterials() {
   if (!_uid) return;
@@ -4215,7 +4369,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">구매일 *</label><input class="form-input" id="mp-date" type="date"></div>
-      <div class="form-group"><label class="form-label">품목명 *</label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
+      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">품목명 *<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openCatalogPicker(function(c){ document.getElementById('mp-name').value=c.name; if(c.price) document.getElementById('mp-amount').value=c.price; })">🗂️ 카탈로그</button></label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
       <div class="form-group"><label class="form-label">금액 (원) *</label><input class="form-input" id="mp-amount" type="number" placeholder="0"></div>
       <div class="form-group"><label class="form-label">구매처</label><input class="form-input" id="mp-vendor" placeholder="예: 동아자재, 온라인쇼핑"></div>
       <div class="form-group"><label class="form-label">수량</label><input class="form-input" id="mp-qty" placeholder="예: 10개, 2박스"></div>
@@ -4224,6 +4378,49 @@ document.addEventListener('DOMContentLoaded', function() {
         <button class="btn btn-danger" id="mp-delete-btn" onclick="deleteMaterialPurchase()" style="display:none;">🗑️</button>
         <button class="btn btn-primary" onclick="saveMaterialPurchase()" style="flex:2;">💾 저장</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 자재 카탈로그 등록/수정 모달 -->
+<div class="modal-overlay" id="catalog-form-modal" onclick="handleOverlayClick(event,'catalog-form-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="catalog-form-title">🗂️ 자재 등록</div>
+      <button class="modal-close" onclick="closeModal('catalog-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">사진</label>
+        <div id="catalog-photo-preview" style="width:100px;height:100px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;margin-bottom:6px;" onclick="document.getElementById('catalog-photo-input').click()">
+          <span id="catalog-photo-placeholder" style="font-size:32px;color:var(--text2);">📷</span>
+        </div>
+        <input type="file" id="catalog-photo-input" accept="image/*" style="display:none" onchange="handleCatalogPhoto(event)">
+      </div>
+      <div class="form-group"><label class="form-label">자재명 *</label><input class="form-input" id="cat-name" placeholder="예: PVC 파이프 20mm"></div>
+      <div class="form-group"><label class="form-label">규격/사양</label><input class="form-input" id="cat-spec" placeholder="예: 20mm × 3m, 백색"></div>
+      <div class="form-group"><label class="form-label">단가 (원)</label><input class="form-input" id="cat-price" type="number" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">카테고리</label><input class="form-input" id="cat-category" placeholder="예: 배관, 부속, 공구, 실링"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cat-memo" rows="2" placeholder="구매처, 특이사항 등"></textarea></div>
+      <div class="btn-group">
+        <button class="btn btn-danger" id="cat-delete-btn" onclick="deleteCatalogItem()" style="display:none;">🗑️</button>
+        <button class="btn btn-primary" onclick="saveCatalogItem()" style="flex:2;">💾 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 자재 카탈로그 선택 모달 (새작업/구매등록에서 사용) -->
+<div class="modal-overlay" id="catalog-picker-modal" onclick="handleOverlayClick(event,'catalog-picker-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">🗂️ 자재 선택</div>
+      <button class="modal-close" onclick="closeModal('catalog-picker-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input class="form-input" id="catalog-picker-search" placeholder="자재명 검색..." oninput="renderCatalogPicker()" style="margin-bottom:10px;">
+      <div id="catalog-picker-list" style="max-height:400px;overflow-y:auto;"></div>
     </div>
   </div>
 </div>

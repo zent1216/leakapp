@@ -2965,42 +2965,44 @@ function renderDocPreview() {
       photoPage += '</div></div>';
     }
 
-    // === 4페이지: 영수증 (엑셀 양식 기반) - 편집된 값 우선 ===
+    // === 4페이지: 영수증 (공식 양식) ===
     var receiptAmount = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
     var koreanAmount = numToKorean(receiptAmount);
     var receiptTo = j._receiptTo || j.name || '';
     var receiptAddr = j._receiptAddr || '';
-    var receiptBody = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로<br>정히 영수 합니다.';
+    var receiptBody = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
     receiptBody = receiptBody.replace(/\n/g, '<br>');
     var receiptHtml = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 영수증</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div style="background:white;padding:50px 40px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;">'
-      + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:12px;margin-bottom:50px;">영&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증</div>'
-      + '<div style="text-align:center;margin-bottom:6px;font-size:18px;">'
-      + '<span contenteditable="' + ce + '" style="font-weight:600;">' + receiptTo + '</span>'
-      + '<span style="font-weight:600;margin-left:8px;">귀하</span>'
+      + '<div class="a4-preview"><div style="background:#e8f0f8;padding:40px 36px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;display:flex;flex-direction:column;align-items:center;">'
+      + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 50px;flex:1;display:flex;flex-direction:column;">'
+      + '<div style="text-align:center;font-size:32px;font-weight:700;letter-spacing:14px;margin-bottom:50px;color:#222;">영 수 증</div>'
+      + '<div style="text-align:right;margin-bottom:40px;font-size:17px;color:#333;padding-right:30%;">'
+      + '<span contenteditable="' + ce + '" style="font-weight:600;letter-spacing:4px;">' + receiptTo + '</span>'
+      + '<span style="font-weight:400;margin-left:10px;letter-spacing:2px;">귀하</span>'
       + '</div>'
-      + (receiptAddr ? '<div style="text-align:center;margin-bottom:16px;font-size:13px;color:#555;" contenteditable="' + ce + '">' + receiptAddr + '</div>' : '')
-      + '<div style="border-bottom:2px solid #333;margin-bottom:30px;"></div>'
-      + '<div style="display:flex;align-items:baseline;gap:16px;margin-bottom:14px;font-size:22px;">'
-      + '<span style="font-weight:700;">金</span>'
-      + '<span style="font-weight:700;flex:1;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
+      + (receiptAddr ? '<div style="text-align:center;margin-top:-30px;margin-bottom:30px;font-size:13px;color:#666;" contenteditable="' + ce + '">주소: ' + receiptAddr + '</div>' : '')
+      + '<div style="border-bottom:1px solid #999;margin-bottom:30px;"></div>'
+      + '<div style="text-align:center;margin-bottom:10px;font-size:18px;color:#333;">'
+      + '<span style="font-weight:700;margin-right:12px;">金</span>'
+      + '<span style="font-weight:700;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
       + '</div>'
-      + '<div style="display:flex;align-items:baseline;gap:16px;margin-bottom:36px;font-size:20px;">'
-      + '<span>&#8361;</span>'
-      + '<span style="font-weight:600;flex:1;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
+      + '<div style="text-align:center;margin-bottom:40px;font-size:17px;color:#333;">'
+      + '<span style="margin-right:12px;">&#8361;</span>'
+      + '<span style="font-weight:600;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
       + '</div>'
-      + '<div style="font-size:15px;line-height:2.2;margin-bottom:50px;" contenteditable="' + ce + '">'
+      + '<div style="font-size:14px;line-height:2.2;margin-bottom:40px;text-align:center;color:#333;" contenteditable="' + ce + '">'
       + receiptBody
       + '</div>'
-      + '<div style="font-size:14px;line-height:2.4;margin-bottom:30px;">'
-      + '<div>업체명 : <span contenteditable="' + ce + '">' + co + '</span></div>'
-      + '<div>사업자번호 : <span contenteditable="' + ce + '">' + (biz.reg||'-') + '</span></div>'
-      + '<div>전화번호 : <span contenteditable="' + ce + '">' + (biz.tel||'-') + '</span></div>'
-      + '<div style="display:flex;align-items:center;gap:8px;">성명 : <span contenteditable="' + ce + '">' + (biz.ceo||'-') + '</span>'
-      + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:48px;height:48px;object-fit:contain;margin-left:10px;">' : '<span style="color:#999;">(인)</span>')
+      + '<div style="background:#f5f8fb;border:1px solid #d0dce8;border-radius:4px;padding:16px 24px;font-size:13px;line-height:2.2;color:#333;margin-bottom:30px;">'
+      + '<div>영수인:&nbsp;&nbsp;주소: <span contenteditable="' + ce + '">' + (biz.addr||'-') + '</span></div>'
+      + '<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;사업자번호: <span contenteditable="' + ce + '">' + (biz.reg||'-') + '</span></div>'
+      + '<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;전화번호: <span contenteditable="' + ce + '">' + (biz.tel||'-') + '</span></div>'
+      + '<div style="display:flex;align-items:center;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;성명: <span contenteditable="' + ce + '" style="margin-left:4px;">' + (biz.ceo||'-') + '</span>'
+      + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:40px;height:40px;object-fit:contain;margin-left:8px;">' : '<span style="color:#999;margin-left:8px;">(인)</span>')
       + '</div>'
       + '</div>'
-      + '<div style="font-size:14px;margin-top:40px;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
+      + '<div style="font-size:13px;color:#333;margin-top:auto;text-align:center;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
+      + '</div>'
       + '</div></div>';
 
     el.innerHTML = page1 + page2 + photoPage + receiptHtml;

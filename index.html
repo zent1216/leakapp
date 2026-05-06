@@ -626,7 +626,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="main-header">
     <div class="main-header-top">
       <div class="main-user">👋 <span id="main-user-name">사장님</span>, 오늘도 화이팅!</div>
-      <button class="logout-btn" id="logout-btn">로그아웃</button>
+      <div style="display:flex;gap:6px;">
+        <button class="logout-btn" onclick="openSearchModal()" style="background:var(--accent);color:white;">🔍 검색</button>
+        <button class="logout-btn" id="logout-btn">로그아웃</button>
+      </div>
     </div>
     <div class="main-stats">
       <div class="stat-card"><div class="stat-num green" id="ms-done">0</div><div class="stat-label">이달 완료</div></div>
@@ -670,7 +673,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
-      <button class="bottom-btn" onclick="goPage('page-catalog')">🗂️ 자재 카탈로그</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
   </div>
@@ -681,7 +683,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title">현장 <span>관리</span></div>
-    <button class="topbar-action" onclick="goPage('page-field')">+ 새 작업</button>
+    <div style="display:flex;gap:6px;">
+      <button class="topbar-action" onclick="openSearchModal()" style="padding:4px 8px;">🔍</button>
+      <button class="topbar-action" onclick="goPage('page-field')">+ 새 작업</button>
+    </div>
   </div>
   <div class="cal-nav">
     <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
@@ -926,7 +931,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="stat-card"><div class="stat-num accent" id="mat-year-cost">0</div><div class="stat-label">올해 자재비</div></div>
       <div class="stat-card"><div class="stat-num green" id="mat-count">0</div><div class="stat-label">등록 건수</div></div>
     </div>
-    <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openMaterialPurchaseForm()">➕ 자재 구매 등록</button>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="openMaterialPurchaseForm()">➕ 자재 구매 등록</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="goPage('page-catalog')">🗂️ 자재 카탈로그</button>
+    </div>
     <div id="material-purchase-list"></div>
   </div>
 </div>
@@ -4025,12 +4033,14 @@ function openCatalogForm(id) {
     document.getElementById('cat-price').value = c.price||'';
     document.getElementById('cat-category').value = c.category||'';
     document.getElementById('cat-memo').value = c.memo||'';
+    renderPriceHistoryRows(c.priceHistory);
     if(c.photo){_catalogPhotoData=c.photo; p.innerHTML='<img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;">';}
     else p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
     if(d) d.style.display='block';
   } else {
     t.textContent = '자재 등록';
-    ['cat-name','cat-spec','cat-price','cat-category','cat-memo'].forEach(function(f){var el=document.getElementById(f);if(el)el.value='';});
+    ['cat-name','cat-spec','cat-category','cat-memo'].forEach(function(f){var el=document.getElementById(f);if(el)el.value='';});
+    renderPriceHistoryRows(null);
     p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
     if(d) d.style.display='none';
   }
@@ -4041,7 +4051,7 @@ async function saveCatalogItem() {
   var nm = document.getElementById('cat-name').value.trim();
   if(!nm){showToast('자재명은 필수입니다');return;}
   var ex = _editingCatalogId?(_catalog.find(function(c){return c.id===_editingCatalogId;})||{}):{};
-  var item = {id:_editingCatalogId||getNextCatalogId(), name:nm, spec:document.getElementById('cat-spec').value.trim(), price:parseFloat(document.getElementById('cat-price').value)||0, category:document.getElementById('cat-category').value.trim(), memo:document.getElementById('cat-memo').value.trim(), photo:_catalogPhotoData||ex.photo||null};
+  var item = {id:_editingCatalogId||getNextCatalogId(), name:nm, spec:document.getElementById('cat-spec').value.trim(), priceHistory:getPriceHistory(), price:getCatalogCurrentPrice({priceHistory:getPriceHistory()}), category:document.getElementById('cat-category').value.trim(), memo:document.getElementById('cat-memo').value.trim(), photo:_catalogPhotoData||ex.photo||null};
   if(_editingCatalogId){_catalog=_catalog.map(function(c){return c.id===_editingCatalogId?item:c;});showToast('자재 수정됨');}
   else{_catalog.push(item);showToast('자재 등록됨');}
   await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog();
@@ -4067,7 +4077,7 @@ function renderCatalog() {
       html+='<div class="month-job-row" onclick="openCatalogForm('+c.id+')" style="cursor:pointer;align-items:center;">';
       html+=c.photo?'<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;margin-right:10px;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:44px;height:44px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;font-size:20px;">📦</div>';
       html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
-      if(c.price) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;white-space:nowrap;">'+c.price.toLocaleString()+'원</div>';
+      var curP=getCatalogCurrentPrice(c); if(curP) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;white-space:nowrap;">'+curP.toLocaleString()+'원</div>';
       html+='</div>';
     });
   });
@@ -4090,7 +4100,7 @@ function renderCatalogPicker() {
   f.forEach(function(c){
     html+='<div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;" onclick="pickCatalogItem('+c.id+')">';
     html+=c.photo?'<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:40px;height:40px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">📦</div>';
-    html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+(c.price?' · '+c.price.toLocaleString()+'원':'')+'</div></div></div>';
+    html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+(getCatalogCurrentPrice(c)?' · '+getCatalogCurrentPrice(c).toLocaleString()+'원':'')+'</div></div></div>';
   });
   list.innerHTML=html;
 }
@@ -4099,6 +4109,148 @@ function pickCatalogItem(id) {
   var c=_catalog.find(function(x){return x.id===id;}); if(!c) return;
   closeModal('catalog-picker-modal');
   if(_catalogPickerCallback) _catalogPickerCallback(c);
+}
+
+
+// 단가 이력 행 추가
+function addPriceHistoryRow(month, price) {
+  var container = document.getElementById('cat-price-history');
+  if (!container) return;
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;align-items:center;';
+  div.innerHTML = '<input type="month" class="form-input cat-ph-month" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (month||'') + '" placeholder="시작월">'
+    + '<input type="number" class="form-input cat-ph-price" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (price||'') + '" placeholder="단가(원)">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove()" style="flex-shrink:0;">×</button>';
+  container.appendChild(div);
+}
+
+// 이력 데이터 수집
+function getPriceHistory() {
+  var rows = document.querySelectorAll('#cat-price-history > div');
+  var history = [];
+  rows.forEach(function(row) {
+    var m = row.querySelector('.cat-ph-month');
+    var p = row.querySelector('.cat-ph-price');
+    if (m && p && m.value && p.value) {
+      history.push({month: m.value, price: parseFloat(p.value)||0});
+    }
+  });
+  history.sort(function(a,b){ return a.month.localeCompare(b.month); });
+  return history;
+}
+
+// 이력에서 특정 날짜의 단가 조회
+function getCatalogPriceAt(catalogItem, dateStr) {
+  var ph = catalogItem.priceHistory || [];
+  if (!ph.length) return catalogItem.price || 0;
+  var ym = (dateStr||'').slice(0,7); // "2026-04"
+  var matched = 0;
+  ph.forEach(function(h) {
+    if (h.month <= ym) matched = h.price;
+  });
+  return matched || (ph.length ? ph[0].price : 0);
+}
+
+// 현재 단가 (최신 이력 기준)
+function getCatalogCurrentPrice(catalogItem) {
+  var ph = catalogItem.priceHistory || [];
+  if (!ph.length) return catalogItem.price || 0;
+  return ph[ph.length - 1].price || 0;
+}
+
+// 이력 렌더링
+function renderPriceHistoryRows(priceHistory) {
+  var container = document.getElementById('cat-price-history');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!priceHistory || !priceHistory.length) {
+    addPriceHistoryRow('', '');
+    return;
+  }
+  priceHistory.forEach(function(h) {
+    addPriceHistoryRow(h.month, h.price);
+  });
+}
+
+
+// ════════════════════════════════════════
+//  작업 검색
+// ════════════════════════════════════════
+function openSearchModal() {
+  document.getElementById('search-keyword').value = '';
+  document.getElementById('search-date-from').value = '';
+  document.getElementById('search-date-to').value = '';
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-result-count').textContent = '';
+  document.getElementById('search-modal').classList.add('open');
+  setTimeout(function(){ document.getElementById('search-keyword').focus(); }, 300);
+}
+
+function setSearchRange(range) {
+  var now = new Date();
+  var from = '', to = now.toISOString().slice(0,10);
+  if (range === 'today') {
+    from = to;
+  } else if (range === 'week') {
+    var d = new Date(now); d.setDate(d.getDate() - d.getDay());
+    from = d.toISOString().slice(0,10);
+  } else if (range === 'month') {
+    from = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
+  } else if (range === '3month') {
+    var d2 = new Date(now); d2.setMonth(d2.getMonth() - 3);
+    from = d2.toISOString().slice(0,10);
+  } else if (range === 'year') {
+    from = now.getFullYear() + '-01-01';
+  } else {
+    from = ''; to = '';
+  }
+  document.getElementById('search-date-from').value = from;
+  document.getElementById('search-date-to').value = to;
+  doJobSearch();
+}
+
+function doJobSearch() {
+  var kw = (document.getElementById('search-keyword').value||'').trim().toLowerCase();
+  var dateFrom = document.getElementById('search-date-from').value;
+  var dateTo = document.getElementById('search-date-to').value;
+  var results = _jobs.filter(function(j) {
+    if (dateFrom && (j.date||'') < dateFrom) return false;
+    if (dateTo && (j.date||'') > dateTo) return false;
+    if (!kw) return true;
+    var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo].filter(Boolean).join(' ').toLowerCase();
+    return searchable.indexOf(kw) >= 0;
+  });
+  results.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var countEl = document.getElementById('search-result-count');
+  var listEl = document.getElementById('search-results');
+  if (!kw && !dateFrom && !dateTo) {
+    countEl.textContent = '';
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색어를 입력하거나 날짜를 선택하세요</div>';
+    return;
+  }
+  countEl.textContent = '검색 결과: ' + results.length + '건';
+  if (!results.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색 결과가 없습니다</div>';
+    return;
+  }
+  var html = '';
+  results.forEach(function(j) {
+    var statusColor = j.status==='done'?'var(--green)':j.status==='cancel'?'var(--red)':'var(--orange)';
+    var statusText = j.status==='done'?'완료':j.status==='cancel'?'취소':'진행중';
+    var totalAmt = 0;
+    if (j.costItems && j.costItems.length) { j.costItems.forEach(function(c){ totalAmt += (c.amount||0); }); }
+    else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
+    html += '<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+    html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + '</div>';
+    html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
+    if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
+    html += '</div>';
+  });
+  listEl.innerHTML = html;
 }
 
 // Firestore에 자재 저장
@@ -4400,7 +4552,11 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div class="form-group"><label class="form-label">자재명 *</label><input class="form-input" id="cat-name" placeholder="예: PVC 파이프 20mm"></div>
       <div class="form-group"><label class="form-label">규격/사양</label><input class="form-input" id="cat-spec" placeholder="예: 20mm × 3m, 백색"></div>
-      <div class="form-group"><label class="form-label">단가 (원)</label><input class="form-input" id="cat-price" type="number" placeholder="0"></div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">단가 이력<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="addPriceHistoryRow()">+ 단가 추가</button></label>
+        <div id="cat-price-history" style="margin-top:4px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">시작월 기준으로 해당 기간의 단가가 적용됩니다</div>
+      </div>
       <div class="form-group"><label class="form-label">카테고리</label><input class="form-input" id="cat-category" placeholder="예: 배관, 부속, 공구, 실링"></div>
       <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cat-memo" rows="2" placeholder="구매처, 특이사항 등"></textarea></div>
       <div class="btn-group">
@@ -4421,6 +4577,42 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-body">
       <input class="form-input" id="catalog-picker-search" placeholder="자재명 검색..." oninput="renderCatalogPicker()" style="margin-bottom:10px;">
       <div id="catalog-picker-list" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 작업 검색 모달 -->
+<div class="modal-overlay" id="search-modal" onclick="handleOverlayClick(event,'search-modal')">
+  <div class="modal-sheet" style="max-height:90vh;">
+    <div class="modal-header">
+      <div class="modal-title">🔍 작업 검색</div>
+      <button class="modal-close" onclick="closeModal('search-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;">
+      <div class="form-group">
+        <input class="form-input" id="search-keyword" placeholder="고객명, 주소, 전화번호, 의뢰처..." oninput="doJobSearch()" style="font-size:15px;padding:12px;">
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div class="form-group" style="flex:1;margin:0;">
+          <label class="form-label" style="font-size:11px;">시작일</label>
+          <input class="form-input" id="search-date-from" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
+        </div>
+        <div class="form-group" style="flex:1;margin:0;">
+          <label class="form-label" style="font-size:11px;">종료일</label>
+          <input class="form-input" id="search-date-to" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="search-quick-btns">
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('today')">오늘</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('week')">이번주</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('month')">이번달</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('3month')">최근3개월</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('year')">올해</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('all')">전체</button>
+      </div>
+      <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
+      <div id="search-results"></div>
     </div>
   </div>
 </div>

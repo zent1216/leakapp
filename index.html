@@ -1120,6 +1120,7 @@ function showPage(id) {
 function goPage(id, extra) {
   const cur = document.querySelector('.page.active');
   if (cur) _pageHistory.push(cur.id);
+  history.pushState({page: id}, '', '');
   showPage(id);
   if (id === 'page-calendar') renderCalendar();
   else if (id === 'page-stats') renderStats();
@@ -1147,6 +1148,24 @@ function goBack() {
   if (prev) showPage(prev);
   else showPage('page-main');
 }
+
+// 브라우저 뒤로가기 버튼 → 앱 내 뒤로가기
+window.addEventListener('popstate', function(e) {
+  if (_pageHistory.length > 0) {
+    var prev = _pageHistory.pop();
+    showPage(prev);
+  } else {
+    var activePage = document.querySelector('.page.active');
+    if (activePage && activePage.id !== 'page-main' && activePage.id !== 'page-login') {
+      showPage('page-main');
+    } else {
+      history.pushState({page: 'main'}, '', '');
+    }
+  }
+});
+
+// 초기 상태 설정
+history.replaceState({page: 'init'}, '', '');
 
 // ════════════════════════════════════════
 //  유틸
@@ -4301,6 +4320,14 @@ async function uploadPhotoToStorage(base64Data, jobId, type, index) {
 async function uploadJobPhotos(job) {
   if (!job || !job.id) return job;
   var changed = false;
+  var totalNew = 0;
+  var uploaded = 0;
+  (job.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  (job.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  if (totalNew === 0) return job;
+
+  await acquireWakeLock();
+  showUploadProgress(0, totalNew, '사진 업로드 준비 중...');
 
   // before 사진
   if (job.photosBefore && job.photosBefore.length > 0) {
@@ -4308,7 +4335,8 @@ async function uploadJobPhotos(job) {
     for (var i = 0; i < job.photosBefore.length; i++) {
       var ph = job.photosBefore[i];
       if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosBefore.length + ')');
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
         var url = await uploadPhotoToStorage(ph, job.id, 'before', i);
         newBefore.push(url || ph);
         if (url) changed = true;
@@ -4325,7 +4353,8 @@ async function uploadJobPhotos(job) {
     for (var i = 0; i < job.photosAfter.length; i++) {
       var ph = job.photosAfter[i];
       if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosAfter.length + ')');
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
         var url = await uploadPhotoToStorage(ph, job.id, 'after', i);
         newAfter.push(url || ph);
         if (url) changed = true;
@@ -4336,6 +4365,8 @@ async function uploadJobPhotos(job) {
     job.photosAfter = newAfter.filter(Boolean);
   }
 
+  hideUploadProgress();
+  releaseWakeLock();
   return job;
 }
 
@@ -4380,6 +4411,42 @@ async function migratePhotosToStorage() {
   if (count > 0) {
     await saveJobs(true);
     showToast('사진 마이그레이션 완료! (' + total + '장) ✓');
+  }
+}
+
+
+// ════════════════════════════════════════
+//  업로드 프로그레스 바 + 화면 잠금
+// ════════════════════════════════════════
+var _wakeLock = null;
+
+function showUploadProgress(current, total, text) {
+  var bar = document.getElementById('upload-progress-bar');
+  if (!bar) return;
+  bar.style.display = 'block';
+  var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('upload-progress-text').textContent = text || '사진 업로드 중...';
+  document.getElementById('upload-progress-pct').textContent = pct + '%';
+  document.getElementById('upload-progress-fill').style.width = pct + '%';
+}
+
+function hideUploadProgress() {
+  var bar = document.getElementById('upload-progress-bar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) { console.log('WakeLock not available'); }
+}
+
+function releaseWakeLock() {
+  if (_wakeLock) {
+    _wakeLock.release().catch(function(){});
+    _wakeLock = null;
   }
 }
 
@@ -4744,6 +4811,18 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
       <div id="search-results"></div>
     </div>
+  </div>
+</div>
+
+
+<!-- 업로드 프로그레스 바 -->
+<div id="upload-progress-bar" style="display:none;position:fixed;bottom:56px;left:0;right:0;z-index:9999;background:var(--bg2);padding:8px 16px;border-top:1px solid var(--border);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <span id="upload-progress-text" style="font-size:12px;color:var(--text1);">사진 업로드 중...</span>
+    <span id="upload-progress-pct" style="font-size:12px;font-weight:600;color:var(--accent);">0%</span>
+  </div>
+  <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
+    <div id="upload-progress-fill" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.3s ease;"></div>
   </div>
 </div>
 

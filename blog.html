@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>누수프로 블로그 작성기</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #0066FF;
+  --primary-dark: #0052CC;
+  --primary-light: #E6F0FF;
+  --accent: #FF6B35;
+  --bg: #F5F7FA;
+  --card: #FFFFFF;
+  --text: #1A1A2E;
+  --text-sub: #6B7280;
+  --border: #E5E7EB;
+  --success: #10B981;
+  --danger: #EF4444;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --radius: 16px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--primary) 0%, #0044AA 100%);
+  color: white;
+  padding: 20px 20px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,102,255,0.3);
+}
+.header h1 {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+.header p {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+/* Steps indicator */
+.steps {
+  display: flex;
+  gap: 8px;
+  padding: 16px 20px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.step-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.step-dot.active { background: var(--primary); }
+.step-dot.done { background: var(--success); }
+
+/* Main content */
+.content {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Section titles */
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title .icon {
+  width: 32px;
+  height: 32px;
+  background: var(--primary-light);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+/* Form elements */
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
+input[type="text"], textarea, select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 15px;
+  font-family: 'Noto Sans KR', sans-serif;
+  transition: border-color 0.2s;
+  background: #FAFBFC;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+}
+textarea { resize: vertical; min-height: 80px; }
+.form-group { margin-bottom: 16px; }
+
+/* Photo upload */
+.photo-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #FAFBFC;
+  margin-bottom: 12px;
+}
+.photo-zone:hover, .photo-zone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.photo-zone .upload-icon { font-size: 36px; margin-bottom: 8px; }
+.photo-zone p { font-size: 14px; color: var(--text-sub); }
+.photo-zone small { font-size: 12px; color: #9CA3AF; }
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-thumb .badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.photo-thumb .remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tag selector */
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag {
+  padding: 8px 16px;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+  user-select: none;
+}
+.tag.selected {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Buttons */
+.btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(0,102,255,0.3);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,102,255,0.4); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn-secondary {
+  background: white;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent) 0%, #E55A2B 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(255,107,53,0.3);
+}
+.btn-outline {
+  background: transparent;
+  color: var(--text-sub);
+  border: 2px solid var(--border);
+}
+.btn-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.btn-group .btn { flex: 1; }
+
+/* Result area */
+.result-box {
+  background: #F8FAFC;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Loading */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.loading-overlay.show { display: flex; }
+.loading-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+  margin: 20px;
+  max-width: 300px;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-card p { font-size: 15px; font-weight: 500; }
+.loading-card small { font-size: 13px; color: var(--text-sub); display: block; margin-top: 8px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #1A1A2E;
+  color: white;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 300;
+  transition: transform 0.3s ease;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Page transitions */
+.page { display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* History */
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.history-item:hover { background: var(--primary-light); }
+.history-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.history-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.history-info { flex: 1; min-width: 0; }
+.history-info h4 { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-info p { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+/* Nav bar */
+.nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 11px;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: color 0.2s;
+  text-decoration: none;
+  border: none;
+  background: none;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.nav-item.active { color: var(--primary); }
+.nav-item .nav-icon { font-size: 22px; margin-bottom: 2px; }
+
+body { padding-bottom: 70px; }
+
+/* Saved list */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-sub);
+}
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+/* Import modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  margin: 20px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.job-item {
+  padding: 14px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.job-item:hover, .job-item.selected { border-color: var(--primary); background: var(--primary-light); }
+.job-item h4 { font-size: 14px; font-weight: 600; }
+.job-item p { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+.login-box {
+  text-align: center;
+  padding: 20px;
+}
+.login-box p { font-size: 14px; color: var(--text-sub); margin-bottom: 16px; }
+.firebase-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.firebase-status.connected { background: #ECFDF5; color: #059669; }
+.firebase-status.disconnected { background: #FEF2F2; color: #DC2626; }
+</style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>💧 누수프로 블로그 작성기</h1>
+  <p>현장 사진 → 블로그 글 자동 생성</p>
+</div>
+
+<!-- Steps -->
+<div class="steps" id="stepsBar">
+  <div class="step-dot active" data-step="0"></div>
+  <div class="step-dot" data-step="1"></div>
+  <div class="step-dot" data-step="2"></div>
+</div>
+
+<!-- PAGE 1: 작성하기 -->
+<div class="page active" id="page-write">
+  <div class="content">
+
+    <!-- Step 0: 기본 정보 -->
+    <div id="step0" class="step-content">
+      <div class="section-title">
+        <div class="icon">📋</div>
+        작업 기본 정보
+      </div>
+
+      <!-- Firebase Import -->
+      <div class="card" style="border-left:4px solid var(--primary);">
+        <div id="fbStatus" class="firebase-status disconnected">
+          <span id="fbStatusIcon">🔴</span>
+          <span id="fbStatusText">누수앱 미연결</span>
+          <button id="fbLoginBtn" onclick="firebaseLogin()" style="margin-left:auto;padding:6px 14px;border:1px solid var(--primary);border-radius:8px;background:white;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;">로그인</button>
+        </div>
+        <button class="btn btn-secondary" onclick="openImportModal()" id="importBtn" disabled style="margin-top:8px;">
+          📥 누수앱에서 작업 불러오기
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="form-group">
+          <label>작업 유형</label>
+          <div class="tag-group" id="workType">
+            <div class="tag" data-val="누수탐지">💧 누수탐지</div>
+            <div class="tag" data-val="누수수리">🔧 누수수리</div>
+            <div class="tag" data-val="배관공사">🔩 배관공사</div>
+            <div class="tag" data-val="방수공사">🛡️ 방수공사</div>
+            <div class="tag" data-val="화장실수리">🚿 화장실수리</div>
+            <div class="tag" data-val="보일러배관">♨️ 보일러배관</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>작업 장소</label>
+          <div class="tag-group" id="placeType">
+            <div class="tag" data-val="아파트">🏢 아파트</div>
+            <div class="tag" data-val="빌라">🏘️ 빌라</div>
+            <div class="tag" data-val="주택">🏠 주택</div>
+            <div class="tag" data-val="상가">🏪 상가</div>
+            <div class="tag" data-val="사무실">🏬 사무실</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>작업 지역 (예: 서울 강남구, 수원시 영통구)</label>
+          <input type="text" id="location" placeholder="지역을 입력하세요">
+        </div>
+
+        <div class="form-group">
+          <label>누수 위치 (예: 화장실 천장, 거실 바닥)</label>
+          <input type="text" id="leakSpot" placeholder="누수 발생 위치">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="goStep(1)">다음: 사진 등록 →</button>
+    </div>
+
+    <!-- Step 1: 사진 -->
+    <div id="step1" class="step-content" style="display:none;">
+      <div class="section-title">
+        <div class="icon">📸</div>
+        작업 사진 등록
+      </div>
+
+      <div class="card">
+        <label>작업 전 사진</label>
+        <div class="photo-zone" id="beforeZone" onclick="document.getElementById('beforeInput').click()">
+          <div class="upload-icon">📷</div>
+          <p>탭하여 작업 전 사진 추가</p>
+          <small>최대 5장</small>
+        </div>
+        <input type="file" id="beforeInput" accept="image/*" multiple hidden>
+        <div class="photo-grid" id="beforeGrid"></div>
+      </div>
+
+      <div class="card">
+        <label>작업 후 사진</label>
+        <div class="photo-zone" id="afterZone" onclick="document.getElementById('afterInput').click()">
+          <div class="upload-icon">📷</div>
+          <p>탭하여 작업 후 사진 추가</p>
+          <small>최대 5장</small>
+        </div>
+        <input type="file" id="afterInput" accept="image/*" multiple hidden>
+        <div class="photo-grid" id="afterGrid"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="goStep(0)">← 이전</button>
+        <button class="btn btn-primary" onclick="goStep(2)">다음: 상세 정보 →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: 상세 + 생성 -->
+    <div id="step2" class="step-content" style="display:none;">
+      <div class="section-title">
+        <div class="icon">✏️</div>
+        상세 정보 & 생성
+      </div>
+
+      <div class="card">
+        <div class="form-group">
+          <label>누수 원인 (선택)</label>
+          <div class="tag-group" id="causeType">
+            <div class="tag" data-val="배관 노후">배관 노후</div>
+            <div class="tag" data-val="배관 파손">배관 파손</div>
+            <div class="tag" data-val="방수층 손상">방수층 손상</div>
+            <div class="tag" data-val="결로">결로</div>
+            <div class="tag" data-val="시공 불량">시공 불량</div>
+            <div class="tag" data-val="동파">동파</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>작업 내용 메모 (간단히)</label>
+          <textarea id="workMemo" placeholder="예: 화장실 바닥 배관 누수, 배관 교체 후 방수 처리 완료"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>💡 현장 에피소드 (선택 - 넣으면 글이 훨씬 자연스러워요!)</label>
+          <textarea id="episodeMemo" placeholder="예: 고객님이 아랫집에서 연락받고 급하게 전화하셨는데, 가보니 배관이 20년 된 구형이라 교체가 필수였음. 작업 중에 옆집도 같은 문제 있을 수 있다고 말씀드렸더니 감사하다고 하심." style="min-height:100px;"></textarea>
+          <small style="color:var(--text-sub);font-size:12px;">고객과의 대화, 현장 분위기, 느낀 점 등 — AI 감지를 피하는 핵심!</small>
+        </div>
+
+        <div class="form-group">
+          <label>작업 도구/자재 (선택)</label>
+          <input type="text" id="toolsMemo" placeholder="예: 열화상카메라, 청음탐지기, PPC배관, 우레탄방수">
+        </div>
+
+        <div class="form-group">
+          <label>블로그 글 스타일</label>
+          <div class="tag-group" id="toneType">
+            <div class="tag selected" data-val="전문+친근">🎯 전문+친근 (추천)</div>
+            <div class="tag" data-val="전문적">📋 전문적</div>
+            <div class="tag" data-val="상세한">📝 상세한</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="goStep(1)">← 이전</button>
+        <button class="btn btn-accent" id="generateBtn" onclick="generatePost()">✨ 블로그 글 생성</button>
+      </div>
+
+      <!-- Result -->
+      <div id="resultArea" style="display:none; margin-top: 20px;">
+        <div class="section-title">
+          <div class="icon">📄</div>
+          생성된 블로그 글
+        </div>
+        <div class="card">
+          <div class="form-group">
+            <label>제목</label>
+            <input type="text" id="resultTitle" style="font-weight:700;">
+          </div>
+          <label>본문</label>
+          <div class="result-box" id="resultBody" contenteditable="true"></div>
+          <div class="btn-group" style="margin-top:16px;">
+            <button class="btn btn-primary" onclick="copyTitle()">📋 제목 복사</button>
+            <button class="btn btn-accent" onclick="copyBody()">📋 본문 복사</button>
+          </div>
+
+          <div style="background:#FFF7ED;border:1px solid #FDBA74;border-radius:12px;padding:16px;margin-top:16px;">
+            <div style="font-weight:700;font-size:14px;margin-bottom:8px;">✏️ 복사 전에 이것만 수정하세요!</div>
+            <div style="font-size:13px;color:#92400E;line-height:1.7;">
+              1. <b>[작업 전/후 사진]</b> 위치에 실제 사진을 넣을 자리 확인<br>
+              2. <b>현장 에피소드</b>를 내 말로 좀 더 자연스럽게 다듬기<br>
+              3. <b>수치/금액</b> 등 구체적 정보 추가하면 신뢰도 UP<br>
+              4. AI가 쓴 표현 중 <b>내 말투가 아닌 것</b>은 고치기
+            </div>
+          </div>
+
+          <button class="btn btn-secondary" style="margin-top:10px;" onclick="savePost()">💾 저장하기</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PAGE 2: 저장 목록 -->
+<div class="page" id="page-saved">
+  <div class="content">
+    <div class="section-title">
+      <div class="icon">📂</div>
+      저장된 글 목록
+    </div>
+    <div id="savedList"></div>
+  </div>
+</div>
+
+<!-- PAGE 3: 설정 -->
+<div class="page" id="page-settings">
+  <div class="content">
+    <div class="section-title">
+      <div class="icon">⚙️</div>
+      설정
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>업체명</label>
+        <input type="text" id="bizName" placeholder="누수프로" value="누수프로">
+      </div>
+      <div class="form-group">
+        <label>연락처</label>
+        <input type="text" id="bizPhone" placeholder="010-XXXX-XXXX">
+      </div>
+      <div class="form-group">
+        <label>카카오톡 채널 (선택)</label>
+        <input type="text" id="bizKakao" placeholder="카카오톡 채널 URL">
+      </div>
+      <div class="form-group">
+        <label>블로그 하단 문구</label>
+        <textarea id="bizFooter" placeholder="예: 누수수리 전문 누수프로! 24시간 상담 가능합니다.">누수수리 전문 누수프로! 24시간 상담 가능합니다.</textarea>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">💾 설정 저장</button>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <label style="margin-bottom:12px;">데이터 관리</label>
+      <button class="btn btn-outline" onclick="exportData()" style="margin-bottom:8px;">📥 데이터 내보내기 (JSON)</button>
+      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="clearAllData()">🗑️ 모든 데이터 삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nav Bar -->
+<div class="nav-bar">
+  <button class="nav-item active" onclick="showPage('write')">
+    <span class="nav-icon">✏️</span>
+    작성
+  </button>
+  <button class="nav-item" onclick="showPage('saved')">
+    <span class="nav-icon">📂</span>
+    저장목록
+  </button>
+  <button class="nav-item" onclick="showPage('settings')">
+    <span class="nav-icon">⚙️</span>
+    설정
+  </button>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-card">
+    <h3>📥 누수앱 작업 불러오기</h3>
+    <div id="importJobList">
+      <p style="text-align:center;color:var(--text-sub);">불러오는 중...</p>
+    </div>
+    <div class="btn-group" style="margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeImportModal()">닫기</button>
+      <button class="btn btn-primary" onclick="applyImportedJob()" id="applyImportBtn" disabled>선택한 작업 적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <p>블로그 글 생성 중...</p>
+    <small>충훈님 말투로 작성 중입니다 (약 15~30초)</small>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== State =====
+var currentStep = 0;
+var beforePhotos = [];
+var afterPhotos = [];
+var selectedTags = { workType: '', placeType: '', causeType: '', toneType: '전문+친근' };
+
+// ===== Tag Selection =====
+document.querySelectorAll('.tag-group').forEach(function(group) {
+  group.addEventListener('click', function(e) {
+    var tag = e.target.closest('.tag');
+    if (!tag) return;
+    var groupId = group.id;
+    // single select
+    group.querySelectorAll('.tag').forEach(function(t) { t.classList.remove('selected'); });
+    tag.classList.add('selected');
+    selectedTags[groupId] = tag.dataset.val;
+  });
+});
+
+// ===== Steps Navigation =====
+function goStep(n) {
+  // Validation
+  if (n === 1 && currentStep === 0) {
+    if (!selectedTags.workType) { showToast('작업 유형을 선택해주세요'); return; }
+    if (!selectedTags.placeType) { showToast('작업 장소를 선택해주세요'); return; }
+    if (!document.getElementById('location').value.trim()) { showToast('작업 지역을 입력해주세요'); return; }
+  }
+  currentStep = n;
+  document.querySelectorAll('.step-content').forEach(function(s, i) {
+    s.style.display = i === n ? 'block' : 'none';
+  });
+  document.querySelectorAll('.step-dot').forEach(function(d, i) {
+    d.className = 'step-dot' + (i < n ? ' done' : (i === n ? ' active' : ''));
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== Photo Upload =====
+function setupPhotoUpload(inputId, zoneId, gridId, arr, label) {
+  var input = document.getElementById(inputId);
+  var zone = document.getElementById(zoneId);
+  var grid = document.getElementById(gridId);
+
+  input.addEventListener('change', function(e) {
+    var files = Array.from(e.target.files);
+    if (arr.length + files.length > 5) {
+      showToast('사진은 최대 5장까지 가능합니다');
+      files = files.slice(0, 5 - arr.length);
+    }
+    files.forEach(function(file) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        arr.push({ name: file.name, data: ev.target.result });
+        renderPhotos(grid, arr, label);
+      };
+      reader.readAsDataURL(file);
+    });
+    input.value = '';
+  });
+
+  // Drag and drop
+  zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    var files = Array.from(e.dataTransfer.files).filter(function(f) { return f.type.startsWith('image/'); });
+    if (arr.length + files.length > 5) files = files.slice(0, 5 - arr.length);
+    files.forEach(function(file) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        arr.push({ name: file.name, data: ev.target.result });
+        renderPhotos(grid, arr, label);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+}
+
+function renderPhotos(grid, arr, label) {
+  grid.innerHTML = '';
+  arr.forEach(function(photo, i) {
+    var div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = '<img src="' + photo.data + '"><div class="badge">' + label + ' ' + (i+1) + '</div><button class="remove-btn" data-idx="' + i + '">✕</button>';
+    grid.appendChild(div);
+  });
+  grid.querySelectorAll('.remove-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      arr.splice(parseInt(btn.dataset.idx), 1);
+      renderPhotos(grid, arr, label);
+    });
+  });
+}
+
+setupPhotoUpload('beforeInput', 'beforeZone', 'beforeGrid', beforePhotos, '전');
+setupPhotoUpload('afterInput', 'afterZone', 'afterGrid', afterPhotos, '후');
+
+// ===== Generate Blog Post =====
+async function generatePost() {
+  var workType = selectedTags.workType;
+  var placeType = selectedTags.placeType;
+  var location = document.getElementById('location').value.trim();
+  var leakSpot = document.getElementById('leakSpot').value.trim();
+  var cause = selectedTags.causeType || '확인 후 조치';
+  var memo = document.getElementById('workMemo').value.trim();
+  var episode = document.getElementById('episodeMemo').value.trim();
+  var tools = document.getElementById('toolsMemo').value.trim();
+  var tone = selectedTags.toneType || '전문+친근';
+  var settings = loadSettings();
+
+  if (!workType || !placeType || !location) {
+    showToast('기본 정보를 먼저 입력해주세요');
+    return;
+  }
+
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('generateBtn').disabled = true;
+
+  var prompt = '';
+  prompt += '당신은 누수설비 전문업체 사장이자 현장 기사입니다. 네이버 블로그에 올릴 시공 사례 글을 작성합니다.\n\n';
+
+  prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
+  prompt += '아래는 이 업체 사장님이 직접 쓴 블로그 글에서 추출한 문체 패턴입니다. 이 말투를 최대한 살려서 작성하세요:\n\n';
+  prompt += '1. 문장 끝맺음: "~이죠", "~하죠", "~하더라고요", "~입니다", "~있습니다"를 자연스럽게 섞어 사용\n';
+  prompt += '2. 괄호 안에 본심/부연설명 넣기: "(사실 이 부분이 제일 까다롭죠..)", "(고객님 집이 소중하니까요 ^^)" 식으로\n';
+  prompt += '3. 감정 표현: "ㅎㅎ", "~하더라고요~", "^^" 등 가벼운 이모티콘을 자연스럽게 사용\n';
+  prompt += '4. 전문 용어를 쓰되 바로 다음에 쉬운 설명 추가: "공압검사(배관에 공기를 넣어서 새는 곳을 찾는 방법)"\n';
+  prompt += '5. 솔직한 추천/감탄: "정말 강추입니다!", "이건 꼭 해드려야 하는 부분이에요"\n';
+  prompt += '6. 고객 이야기를 자연스럽게 녹이기: "이번에 방문하신 고객님께서는~", "고객님께서 ~라고 하시더라고요"\n';
+  prompt += '7. 작업 과정을 단계별로 풀어쓰기: 사진 → 설명 → 다음단계 순서\n';
+  prompt += '8. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
+  prompt += '9. "그.런.데." 같은 강조 표현이나 "사실..." 같은 말머리를 가끔 사용\n';
+  prompt += '10. 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+
+  prompt += '=== 누수설비 전문 지식 (자연스럽게 녹여서 사용) ===\n';
+  prompt += '- 누수탐지 방법: 공압검사(질소주입), 가스탐지, 청음탐지, 열화상카메라, 내시경 검사\n';
+  prompt += '- 누수 원인: 배관 노후(PPC/동관 부식), 방수층 손상, 하수관 막힘, 시공불량, 동파, 결로\n';
+  prompt += '- 배관 종류: 상수도(냉온수관), 난방배관, 하수관/오수관\n';
+  prompt += '- 수리 공정: 누수지점 특정 → 바닥/벽 파쇄 → 배관 교체/보수 → 방수처리 → 모르타르/타일 복구\n';
+  prompt += '- 방수 종류: 우레탄방수, 시트방수, 인젝션방수, 침투방수\n';
+  prompt += '- 확인 과정: 수리 후 압력검사(재검), 48시간 양생 후 사용 권장\n\n';
+
+  prompt += '=== 작업 정보 ===\n';
+  prompt += '- 업체명: ' + settings.bizName + '\n';
+  prompt += '- 작업 유형: ' + workType + '\n';
+  prompt += '- 건물 유형: ' + placeType + '\n';
+  prompt += '- 작업 지역: ' + location + '\n';
+  prompt += '- 누수 위치: ' + (leakSpot || '미지정') + '\n';
+  prompt += '- 누수 원인: ' + cause + '\n';
+  prompt += '- 작업 내용: ' + (memo || '일반 ' + workType + ' 작업 수행') + '\n';
+  prompt += '- 사용 도구/자재: ' + (tools || '일반 장비') + '\n';
+  prompt += '- 작업 전 사진: ' + beforePhotos.length + '장\n';
+  prompt += '- 작업 후 사진: ' + afterPhotos.length + '장\n';
+  prompt += '- 글 스타일: ' + tone + '\n';
+  if (episode) {
+    prompt += '- 현장 에피소드 (이 내용을 반드시 본문에 자연스럽게 포함시키세요!): ' + episode + '\n';
+  }
+  prompt += '\n';
+
+  prompt += '=== 글 구조 (이 순서로 작성) ===\n';
+  prompt += '1. 도입: 계절/날씨 인사 또는 고객 상황 소개 (1~2문장)\n';
+  prompt += '2. 고객 의뢰 내용: 어디서, 어떤 문제로 연락하셨는지\n';
+  prompt += '3. 현장 진단: 도착 후 무엇을 확인했는지, 어떤 장비로 탐지했는지\n';
+  prompt += '4. [작업 전 사진] 위치 표시\n';
+  prompt += '5. 원인 분석: 왜 누수가 발생했는지 전문적으로 but 쉽게 설명\n';
+  prompt += '6. 작업 과정: 단계별로 설명 (사진 사이사이에 설명 넣기)\n';
+  prompt += '7. [작업 후 사진] 위치 표시\n';
+  prompt += '8. 마무리 확인: 수리 후 검증 과정\n';
+  prompt += '9. 고객 반응/에피소드 (있으면)\n';
+  prompt += '10. 업체 소개 + 연락처\n';
+  prompt += '11. 해시태그 10~15개\n\n';
+
+  prompt += '=== 필수 규칙 ===\n';
+  prompt += '1. 제목: "[' + location + '] ' + placeType + ' ' + workType + '" 형태로, SEO 키워드 포함\n';
+  prompt += '2. 본문 800~1200자 (너무 짧지 않게)\n';
+  prompt += '3. 매번 다른 도입부와 구조 사용 (패턴화 금지!)\n';
+  prompt += '4. 사진 위치를 "[작업 전 사진 1]", "[작업 후 사진 1]" 형태로 표시\n';
+  prompt += '5. 업체 연락처: ' + (settings.bizPhone || '문의 전화') + '\n';
+  prompt += '6. 카카오톡: ' + (settings.bizKakao || '') + '\n';
+  prompt += '7. 하단 문구: ' + settings.bizFooter + '\n';
+  prompt += '8. 절대로 "~에 대해 알아보겠습니다", "~것이 중요합니다", "~할 수 있습니다"를 3번 이상 반복하지 마세요\n';
+  prompt += '9. 마치 현장에서 직접 작업한 기사가 쓴 글처럼 생생하게 작성\n\n';
+  prompt += '응답 형식:\n제목: (제목)\n---\n(본문 전체)';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    var data = await response.json();
+    var text = data.content.map(function(c) { return c.text || ''; }).join('');
+
+    // Parse title and body
+    var titleMatch = text.match(/제목:\s*(.+)/);
+    var title = titleMatch ? titleMatch[1].trim() : '블로그 제목';
+    var body = text.replace(/제목:\s*.+\n?-*\n?/, '').trim();
+
+    document.getElementById('resultTitle').value = title;
+    document.getElementById('resultBody').innerText = body;
+    document.getElementById('resultArea').style.display = 'block';
+
+    setTimeout(function() {
+      document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+    }, 300);
+
+  } catch (err) {
+    showToast('글 생성에 실패했습니다. 다시 시도해주세요.');
+    console.error(err);
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('generateBtn').disabled = false;
+  }
+}
+
+// ===== Copy =====
+function copyTitle() {
+  var title = document.getElementById('resultTitle').value;
+  navigator.clipboard.writeText(title).then(function() {
+    showToast('✅ 제목이 복사되었습니다');
+  });
+}
+function copyBody() {
+  var body = document.getElementById('resultBody').innerText;
+  navigator.clipboard.writeText(body).then(function() {
+    showToast('✅ 본문이 복사되었습니다');
+  });
+}
+
+// ===== Save/Load =====
+function savePost() {
+  var title = document.getElementById('resultTitle').value;
+  var body = document.getElementById('resultBody').innerText;
+  if (!title || !body) { showToast('생성된 글이 없습니다'); return; }
+
+  var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+  var thumb = beforePhotos.length > 0 ? beforePhotos[0].data : '';
+  saved.unshift({
+    id: Date.now(),
+    title: title,
+    body: body,
+    thumb: thumb,
+    workType: selectedTags.workType,
+    location: document.getElementById('location').value,
+    date: new Date().toLocaleDateString('ko-KR')
+  });
+  localStorage.setItem('blogPosts', JSON.stringify(saved));
+  showToast('✅ 저장되었습니다');
+  renderSavedList();
+}
+
+function renderSavedList() {
+  var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+  var container = document.getElementById('savedList');
+  if (saved.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p>저장된 글이 없습니다</p><p style="margin-top:8px;font-size:13px;">블로그 글을 생성하고 저장해보세요!</p></div>';
+    return;
+  }
+  container.innerHTML = '';
+  saved.forEach(function(post, idx) {
+    var item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = '<div class="history-thumb">' + (post.thumb ? '<img src="' + post.thumb + '">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:20px;">📄</div>') + '</div>' +
+      '<div class="history-info"><h4>' + post.title + '</h4><p>' + post.date + ' · ' + (post.workType || '') + ' · ' + (post.location || '') + '</p></div>';
+    item.onclick = function() { viewSavedPost(idx); };
+    container.appendChild(item);
+  });
+}
+
+function viewSavedPost(idx) {
+  var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+  var post = saved[idx];
+  if (!post) return;
+
+  showPage('write');
+  goStep(2);
+  document.getElementById('resultTitle').value = post.title;
+  document.getElementById('resultBody').innerText = post.body;
+  document.getElementById('resultArea').style.display = 'block';
+}
+
+// ===== Settings =====
+function loadSettings() {
+  var s = JSON.parse(localStorage.getItem('blogSettings') || '{}');
+  return {
+    bizName: s.bizName || '누수프로',
+    bizPhone: s.bizPhone || '',
+    bizKakao: s.bizKakao || '',
+    bizFooter: s.bizFooter || '누수수리 전문 누수프로! 24시간 상담 가능합니다.'
+  };
+}
+function saveSettings() {
+  var s = {
+    bizName: document.getElementById('bizName').value,
+    bizPhone: document.getElementById('bizPhone').value,
+    bizKakao: document.getElementById('bizKakao').value,
+    bizFooter: document.getElementById('bizFooter').value
+  };
+  localStorage.setItem('blogSettings', JSON.stringify(s));
+  showToast('✅ 설정이 저장되었습니다');
+}
+function initSettings() {
+  var s = loadSettings();
+  document.getElementById('bizName').value = s.bizName;
+  document.getElementById('bizPhone').value = s.bizPhone;
+  document.getElementById('bizKakao').value = s.bizKakao;
+  document.getElementById('bizFooter').value = s.bizFooter;
+}
+
+// ===== Export/Clear =====
+function exportData() {
+  var data = {
+    posts: JSON.parse(localStorage.getItem('blogPosts') || '[]'),
+    settings: loadSettings()
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'leakpro_blog_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+function clearAllData() {
+  if (confirm('모든 저장된 글과 설정이 삭제됩니다. 계속할까요?')) {
+    localStorage.removeItem('blogPosts');
+    localStorage.removeItem('blogSettings');
+    initSettings();
+    renderSavedList();
+    showToast('모든 데이터가 삭제되었습니다');
+  }
+}
+
+// ===== Navigation =====
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  event.currentTarget.classList.add('active');
+  document.getElementById('stepsBar').style.display = name === 'write' ? 'flex' : 'none';
+  if (name === 'saved') renderSavedList();
+  window.scrollTo({ top: 0 });
+}
+
+// ===== Toast =====
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+// ===== Firebase =====
+var firebaseApp = null;
+var fbAuth = null;
+var fbDb = null;
+var fbUser = null;
+var importedJobs = [];
+var selectedImportJob = null;
+
+try {
+  var firebaseConfig = {
+    apiKey: "AIzaSyB1TNFuLwoOODj1h5YlZtUhLLy5WsXt8-U",
+    authDomain: "leakapp-c603d.firebaseapp.com",
+    projectId: "leakapp-c603d",
+    storageBucket: "leakapp-c603d.firebasestorage.app",
+    messagingSenderId: "622725609169",
+    appId: "1:622725609169:web:05f81513d953675626f7f0"
+  };
+  firebaseApp = firebase.initializeApp(firebaseConfig);
+  fbAuth = firebase.auth();
+  fbDb = firebase.firestore();
+
+  // 로그인 상태 감지
+  fbAuth.onAuthStateChanged(function(user) {
+    fbUser = user;
+    updateFirebaseStatus();
+  });
+} catch(e) {
+  console.warn('Firebase 초기화 실패:', e);
+}
+
+function updateFirebaseStatus() {
+  var statusEl = document.getElementById('fbStatus');
+  var iconEl = document.getElementById('fbStatusIcon');
+  var textEl = document.getElementById('fbStatusText');
+  var loginBtn = document.getElementById('fbLoginBtn');
+  var importBtn = document.getElementById('importBtn');
+
+  if (fbUser) {
+    statusEl.className = 'firebase-status connected';
+    iconEl.textContent = '🟢';
+    textEl.textContent = '연결됨: ' + (fbUser.displayName || fbUser.email);
+    loginBtn.textContent = '로그아웃';
+    loginBtn.onclick = firebaseLogout;
+    importBtn.disabled = false;
+  } else {
+    statusEl.className = 'firebase-status disconnected';
+    iconEl.textContent = '🔴';
+    textEl.textContent = '누수앱 미연결';
+    loginBtn.textContent = '로그인';
+    loginBtn.onclick = firebaseLogin;
+    importBtn.disabled = true;
+  }
+}
+
+async function firebaseLogin() {
+  if (!fbAuth) { showToast('Firebase 연결 실패'); return; }
+  try {
+    var provider = new firebase.auth.GoogleAuthProvider();
+    await fbAuth.signInWithPopup(provider);
+    showToast('✅ 로그인 성공!');
+  } catch(e) {
+    // 팝업 차단 시 리다이렉트 방식으로 폴백
+    if (e.code === 'auth/popup-blocked') {
+      try {
+        await fbAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+      } catch(e2) {
+        showToast('로그인 실패: ' + e2.message);
+      }
+    } else {
+      showToast('로그인 실패: ' + e.message);
+    }
+  }
+}
+
+async function firebaseLogout() {
+  if (!fbAuth) return;
+  await fbAuth.signOut();
+  fbUser = null;
+  updateFirebaseStatus();
+  showToast('로그아웃 되었습니다');
+}
+
+async function openImportModal() {
+  if (!fbUser || !fbDb) {
+    showToast('먼저 로그인해주세요');
+    return;
+  }
+
+  document.getElementById('importModal').classList.add('show');
+  document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);">불러오는 중...</p>';
+  selectedImportJob = null;
+  document.getElementById('applyImportBtn').disabled = true;
+
+  try {
+    var doc = await fbDb.collection('users').doc(fbUser.uid).get();
+    if (!doc.exists || !doc.data().jobs) {
+      document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);">저장된 작업이 없습니다.</p>';
+      return;
+    }
+
+    importedJobs = JSON.parse(doc.data().jobs);
+
+    // 최근 작업 20개만 표시 (완료된 것 우선)
+    var sorted = importedJobs.slice().sort(function(a, b) {
+      return (b.date || '').localeCompare(a.date || '');
+    }).slice(0, 20);
+
+    if (sorted.length === 0) {
+      document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);">저장된 작업이 없습니다.</p>';
+      return;
+    }
+
+    var html = '';
+    sorted.forEach(function(job, idx) {
+      var status = job.status || '진행중';
+      var statusColor = status === '완료' ? 'var(--success)' : (status === '진행중' ? 'var(--primary)' : 'var(--text-sub)');
+      html += '<div class="job-item" data-idx="' + idx + '" onclick="selectImportJob(this,' + idx + ')">';
+      html += '<h4>' + (job.customer || job.name || '고객') + ' - ' + (job.type || job.workType || '작업') + '</h4>';
+      html += '<p>' + (job.address || job.location || '주소 미입력');
+      html += ' · ' + (job.date || '날짜 미입력');
+      html += ' · <span style="color:' + statusColor + ';font-weight:600;">' + status + '</span></p>';
+      html += '</div>';
+    });
+    document.getElementById('importJobList').innerHTML = html;
+
+  } catch(e) {
+    console.error('작업 불러오기 실패:', e);
+    document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--danger);">불러오기 실패: ' + e.message + '</p>';
+  }
+}
+
+function selectImportJob(el, idx) {
+  document.querySelectorAll('.job-item').forEach(function(item) { item.classList.remove('selected'); });
+  el.classList.add('selected');
+
+  var sorted = importedJobs.slice().sort(function(a, b) {
+    return (b.date || '').localeCompare(a.date || '');
+  }).slice(0, 20);
+  selectedImportJob = sorted[idx];
+  document.getElementById('applyImportBtn').disabled = false;
+}
+
+function applyImportedJob() {
+  if (!selectedImportJob) return;
+  var job = selectedImportJob;
+
+  // 작업 유형 매핑
+  var typeMap = {
+    '누수탐지': '누수탐지', '탐지': '누수탐지',
+    '누수수리': '누수수리', '수리': '누수수리',
+    '배관': '배관공사', '배관공사': '배관공사',
+    '방수': '방수공사', '방수공사': '방수공사',
+    '화장실': '화장실수리', '화장실수리': '화장실수리',
+    '보일러': '보일러배관', '보일러배관': '보일러배관'
+  };
+  var jobType = job.type || job.workType || '';
+  var matchedType = '';
+  Object.keys(typeMap).forEach(function(key) {
+    if (jobType.indexOf(key) >= 0) matchedType = typeMap[key];
+  });
+  if (matchedType) {
+    selectedTags.workType = matchedType;
+    document.querySelectorAll('#workType .tag').forEach(function(t) {
+      t.classList.toggle('selected', t.dataset.val === matchedType);
+    });
+  }
+
+  // 장소 유형 매핑
+  var placeMap = { '아파트': '아파트', '빌라': '빌라', '주택': '주택', '상가': '상가', '사무실': '사무실' };
+  var addr = job.address || job.location || '';
+  var matchedPlace = '';
+  Object.keys(placeMap).forEach(function(key) {
+    if (addr.indexOf(key) >= 0) matchedPlace = placeMap[key];
+  });
+  if (job.buildingType) matchedPlace = job.buildingType;
+  if (matchedPlace) {
+    selectedTags.placeType = matchedPlace;
+    document.querySelectorAll('#placeType .tag').forEach(function(t) {
+      t.classList.toggle('selected', t.dataset.val === matchedPlace);
+    });
+  }
+
+  // 주소 → 지역
+  if (addr) document.getElementById('location').value = addr;
+
+  // 누수 위치
+  if (job.leakSpot || job.spot || job.detail) {
+    document.getElementById('leakSpot').value = job.leakSpot || job.spot || job.detail || '';
+  }
+
+  // 작업 메모
+  if (job.memo || job.note || job.description) {
+    document.getElementById('workMemo').value = job.memo || job.note || job.description || '';
+  }
+
+  closeImportModal();
+  showToast('✅ 작업 정보가 불러와졌습니다!');
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('show');
+}
+
+// ===== Init =====
+initSettings();
+renderSavedList();
+</script>
+</body>
+</html>

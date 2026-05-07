@@ -1979,11 +1979,9 @@ function editJob(id) {
   for (let i = 0; i < (j.extraSpots||0); i++) addExtraSpot();
   // 사진
   _tempPhotos = {
-    before: [...(j.photosBefore||[null,null,null])].slice(0,3),
-    after:  [...(j.photosAfter||[null,null,null])].slice(0,3)
+    before: (j.photosBefore||[]).filter(Boolean),
+    after:  (j.photosAfter||[]).filter(Boolean)
   };
-  while (_tempPhotos.before.length < 3) _tempPhotos.before.push(null);
-  while (_tempPhotos.after.length < 3) _tempPhotos.after.push(null);
   renderPhotoSlots();
   calcTotal();
 }
@@ -2320,16 +2318,16 @@ function renderPhotoSlots() {
     const photos = _tempPhotos[type] || [];
     const validPhotos = photos.filter(Boolean);
 
-    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
     // 기존 사진들
     validPhotos.forEach(function(src, idx) {
-      html += '<div style="aspect-ratio:1;background:var(--bg3);border-radius:var(--r-sm);overflow:hidden;position:relative;">';
+      html += '<div style="width:90px;height:90px;background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;flex-shrink:0;">';
       html += '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;">';
-      html += '<button onclick="removePhoto(\'' + type + '\',' + idx + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:white;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer;">×</button>';
+      html += '<button onclick="removePhoto(\'' + type + '\',' + idx + ')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:white;border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>';
       html += '</div>';
     });
-    // + 추가 버튼 (항상 마지막에)
-    html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="aspect-ratio:1;background:var(--bg3);border:2px dashed var(--border);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:24px;">📷</div>';
+    // + 추가 버튼
+    html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="width:90px;height:90px;background:var(--bg3);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:28px;flex-shrink:0;">📷</div>';
     html += '</div>';
     container.innerHTML = html;
   });
@@ -2451,8 +2449,8 @@ async function saveJob() {
     materialCost: 0,
     extraSpots: 0,
     materials: getMaterials(),
-    photosBefore: _tempPhotos.before.filter(Boolean),
-    photosAfter: _tempPhotos.after.filter(Boolean),
+    photosBefore: (_tempPhotos.before||[]).filter(Boolean),
+    photosAfter: (_tempPhotos.after||[]).filter(Boolean),
     memo: document.getElementById('f-memo').value.trim(),
     commissions: getCommissions(),
     commission: getTotalCommission(),
@@ -2464,12 +2462,18 @@ async function saveJob() {
   } else {
     _jobs.push(job);
   }
-  // 사진을 Firebase Storage에 업로드 (Base64 → URL)
-  showToast('사진 업로드 중...');
+  // 사진을 Firebase Storage에 업로드 (Base64 → URL, 이미 URL이면 스킵)
   try {
     var jobIdx = _jobs.findIndex(function(x){ return x.id === job.id; });
     if (jobIdx >= 0) {
-      _jobs[jobIdx] = await uploadJobPhotos(_jobs[jobIdx]);
+      var jj = _jobs[jobIdx];
+      var hasBase64 = false;
+      (jj.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) hasBase64 = true; });
+      (jj.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) hasBase64 = true; });
+      if (hasBase64) {
+        showToast('사진 업로드 중...');
+        _jobs[jobIdx] = await uploadJobPhotos(jj);
+      }
     }
   } catch(e) { console.error('사진 업로드 오류:', e); }
   // 저장 결과 확인 후 메시지

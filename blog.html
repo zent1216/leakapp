@@ -1291,7 +1291,7 @@ async function openImportModal() {
       html += '<p>' + displayAddr;
       html += ' · ' + (job.date || '날짜 미입력');
       html += ' · <span style="color:' + statusColor + ';font-weight:600;">' + status + '</span></p>';
-      if (job.spot) html += '<p style="font-size:11px;color:#6B7280;margin-top:2px;">📍 ' + job.spot + '</p>';
+      if (job.location || job.spot) html += '<p style="font-size:11px;color:#6B7280;margin-top:2px;">📍 ' + (job.location || job.spot) + '</p>';
       html += '</div>';
     });
     document.getElementById('importJobList').innerHTML = html;
@@ -1340,11 +1340,10 @@ function applyImportedJob() {
 
   // 장소 유형 매핑 (주소에서 추출)
   var placeMap = { '아파트': '아파트', '빌라': '빌라', '주택': '주택', '상가': '상가', '사무실': '사무실' };
-  var addr = job.addr || job.address || job.location || '';
-  var spot = job.spot || job.leakSpot || job.detail || '';
+  var addr = job.addr || job.address || '';
   var matchedPlace = '';
   Object.keys(placeMap).forEach(function(key) {
-    if (addr.indexOf(key) >= 0 || spot.indexOf(key) >= 0) matchedPlace = placeMap[key];
+    if (addr.indexOf(key) >= 0) matchedPlace = placeMap[key];
   });
   if (job.buildingType) matchedPlace = job.buildingType;
   if (matchedPlace) {
@@ -1357,7 +1356,8 @@ function applyImportedJob() {
   // 주소 → 작업 지역 (leakapp 필드: job.addr)
   if (addr) document.getElementById('location').value = addr;
 
-  // 누수 위치 (leakapp 필드: job.spot)
+  // 누수 위치 (leakapp 필드: job.location = "방문 위치 메모")
+  var spot = job.location || job.spot || job.leakSpot || job.detail || '';
   if (spot) document.getElementById('leakSpot').value = spot;
 
   // 작업 메모 (leakapp 필드: job.memo)

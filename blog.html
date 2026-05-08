@@ -1469,12 +1469,70 @@ function applyImportedJob() {
   var spot = job.location || job.spot || job.leakSpot || job.detail || '';
   if (spot) document.getElementById('leakSpot').value = spot;
 
-  // 작업 메모 (leakapp 필드: job.memo)
-  var memoText = job.memo || job.note || job.description || '';
+  // 작업 메모 — 소견서 + 조치 내역 합성 (leakapp 필드: before, action, afterDesc, expertOpinion)
+  var memoParts = [];
+  if (job.before) memoParts.push(job.before);
+  if (job.action) memoParts.push(job.action);
+  if (job.afterDesc) memoParts.push(job.afterDesc);
+  if (job.memo && job.memo !== '고객이 직접 의뢰한 건 수수료X') memoParts.push(job.memo);
+  var memoText = memoParts.join(' / ');
   if (memoText) document.getElementById('workMemo').value = memoText;
 
+  // 소견서 내용 → 현장 에피소드에 넣기 (더 자연스러운 글이 됨)
+  if (job.expertOpinion) {
+    document.getElementById('episodeMemo').value = job.expertOpinion;
+  }
+
+  // 자재 내역 → 도구/자재 칸에 넣기 (leakapp 필드: materials [{name, qty}])
+  var materialList = (job.materials || []).filter(function(m) { return m && m.name; });
+  if (materialList.length > 0) {
+    var toolsText = materialList.map(function(m) {
+      return m.name + (m.qty ? '(' + m.qty + ')' : '');
+    }).join(', ');
+    document.getElementById('toolsMemo').value = toolsText;
+  }
+
+  // 사진 불러오기 (leakapp 필드: photosBefore, photosAfter)
+  var jobPhotosBefore = (job.photosBefore || []).filter(Boolean);
+  var jobPhotosAfter = (job.photosAfter || []).filter(Boolean);
+  var photoCount = jobPhotosBefore.length + jobPhotosAfter.length;
+
+  if (photoCount > 0) {
+    beforePhotos.length = 0;
+    afterPhotos.length = 0;
+    var loaded = 0;
+    var totalToLoad = jobPhotosBefore.length + jobPhotosAfter.length;
+
+    function checkDone() {
+      loaded++;
+      if (loaded >= totalToLoad) {
+        renderPhotos(document.getElementById('beforeGrid'), beforePhotos, '전');
+        renderPhotos(document.getElementById('afterGrid'), afterPhotos, '후');
+        showToast('✅ 사진 ' + totalToLoad + '장 불러오기 완료!');
+      }
+    }
+
+    jobPhotosBefore.forEach(function(dataUrl, i) {
+      addWatermark(dataUrl, function(watermarked) {
+        beforePhotos.push({ name: 'before_' + (i+1) + '.jpg', data: watermarked });
+        checkDone();
+      });
+    });
+
+    jobPhotosAfter.forEach(function(dataUrl, i) {
+      addWatermark(dataUrl, function(watermarked) {
+        afterPhotos.push({ name: 'after_' + (i+1) + '.jpg', data: watermarked });
+        checkDone();
+      });
+    });
+  }
+
   closeImportModal();
-  showToast('✅ 작업 정보가 불러와졌습니다!');
+  if (photoCount > 0) {
+    showToast('✅ 작업 정보 + 사진 불러오는 중...');
+  } else {
+    showToast('✅ 작업 정보가 불러와졌습니다!');
+  }
 }
 
 function closeImportModal() {

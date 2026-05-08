@@ -691,6 +691,7 @@ body { padding-bottom: 70px; }
             </div>
           </div>
 
+          <button class="btn btn-secondary" style="margin-top:10px;" onclick="downloadAllPhotos()" id="resultDownloadBtn">📥 사진 다운로드</button>
           <button class="btn btn-secondary" style="margin-top:10px;" onclick="savePost()">💾 저장하기</button>
         </div>
       </div>
@@ -1179,6 +1180,8 @@ function savePost() {
     title: title,
     body: body,
     thumb: thumb,
+    photosBefore: beforePhotos.map(function(p) { return { name: p.name, data: p.data }; }),
+    photosAfter: afterPhotos.map(function(p) { return { name: p.name, data: p.data }; }),
     workType: selectedTags.workType,
     location: document.getElementById('location').value,
     date: new Date().toLocaleDateString('ko-KR')
@@ -1213,6 +1216,23 @@ function viewSavedPost(idx) {
   var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
   var post = saved[idx];
   if (!post) return;
+
+  // 문서번호 복원
+  currentDocNumber = post.docNumber || '';
+  if (currentDocNumber) {
+    document.getElementById('docNumberDisplay').textContent = currentDocNumber;
+    document.getElementById('docNumberBadge').style.display = 'inline-block';
+  }
+
+  // 사진 복원
+  beforePhotos.length = 0;
+  afterPhotos.length = 0;
+  if (post.photosBefore) {
+    post.photosBefore.forEach(function(p) { beforePhotos.push(p); });
+  }
+  if (post.photosAfter) {
+    post.photosAfter.forEach(function(p) { afterPhotos.push(p); });
+  }
 
   showPage('write');
   goStep(2);

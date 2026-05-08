@@ -168,6 +168,18 @@ textarea { resize: vertical; min-height: 80px; }
   height: 100%;
   object-fit: cover;
 }
+.photo-thumb .watermark {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.5);
+  color: rgba(255,255,255,0.9);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
 .photo-thumb .badge {
   position: absolute;
   top: 4px;
@@ -935,11 +947,13 @@ function setupPhotoUpload(inputId, zoneId, gridId, arr, label) {
 }
 
 function renderPhotos(grid, arr, label) {
+  var settings = loadSettings();
+  var wmText = settings.bizName || '누수프로';
   grid.innerHTML = '';
   arr.forEach(function(photo, i) {
     var div = document.createElement('div');
     div.className = 'photo-thumb';
-    div.innerHTML = '<img src="' + photo.data + '"><div class="badge">' + label + ' ' + (i+1) + '</div><button class="remove-btn" data-idx="' + i + '">✕</button>';
+    div.innerHTML = '<img src="' + photo.data + '"><div class="watermark">' + wmText + '</div><div class="badge">' + label + ' ' + (i+1) + '</div><button class="remove-btn" data-idx="' + i + '">✕</button>';
     grid.appendChild(div);
   });
   grid.querySelectorAll('.remove-btn').forEach(function(btn) {
@@ -1514,41 +1528,22 @@ function applyImportedJob() {
   if (photoCount > 0) {
     beforePhotos.length = 0;
     afterPhotos.length = 0;
-    var loaded = 0;
-    var totalToLoad = jobPhotosBefore.length + jobPhotosAfter.length;
-
-    function checkPhotoDone() {
-      loaded++;
-      if (loaded >= totalToLoad) {
-        renderPhotos(document.getElementById('beforeGrid'), beforePhotos, '전');
-        renderPhotos(document.getElementById('afterGrid'), afterPhotos, '후');
-        showToast('✅ 사진 ' + totalToLoad + '장 불러오기 완료!');
-      }
-    }
 
     jobPhotosBefore.forEach(function(dataUrl, i) {
-      addWatermark(dataUrl, function(watermarked) {
-        beforePhotos.push({ name: 'before_' + (i+1) + '.jpg', data: watermarked });
-        checkPhotoDone();
-      });
+      beforePhotos.push({ name: 'before_' + (i+1) + '.jpg', data: dataUrl });
+    });
+    jobPhotosAfter.forEach(function(dataUrl, i) {
+      afterPhotos.push({ name: 'after_' + (i+1) + '.jpg', data: dataUrl });
     });
 
-    jobPhotosAfter.forEach(function(dataUrl, i) {
-      addWatermark(dataUrl, function(watermarked) {
-        afterPhotos.push({ name: 'after_' + (i+1) + '.jpg', data: watermarked });
-        checkPhotoDone();
-      });
-    });
+    renderPhotos(document.getElementById('beforeGrid'), beforePhotos, '전');
+    renderPhotos(document.getElementById('afterGrid'), afterPhotos, '후');
   } else {
     console.log('[블로그앱] 사진 없음. job 키 목록:', Object.keys(job).join(', '));
   }
 
   closeImportModal();
-  if (photoCount > 0) {
-    showToast('✅ 작업 정보 + 사진 불러오는 중...');
-  } else {
-    showToast('✅ 작업 정보가 불러와졌습니다!');
-  }
+  showToast('✅ 작업 정보' + (photoCount > 0 ? ' + 사진 ' + photoCount + '장' : '') + ' 불러오기 완료!');
 }
 
 function closeImportModal() {

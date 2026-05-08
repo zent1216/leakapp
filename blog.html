@@ -478,7 +478,7 @@ body { padding-bottom: 70px; }
 
 <!-- Header -->
 <div class="header">
-  <h1>💧 누수프로 블로그 작성기</h1>
+  <h1>💧 누수프로 블로그 작성기 <span id="docNumberBadge" style="display:none;background:rgba(255,255,255,0.25);padding:2px 10px;border-radius:8px;font-size:14px;font-weight:600;margin-left:8px;"><span id="docNumberDisplay"></span></span></h1>
   <p>현장 사진 → 블로그 글 자동 생성</p>
 </div>
 
@@ -579,6 +579,8 @@ body { padding-bottom: 70px; }
         <div class="photo-grid" id="afterGrid"></div>
       </div>
 
+      <button class="btn btn-secondary" onclick="downloadAllPhotos()" style="margin-bottom:12px;" id="downloadPhotosBtn">📥 사진 다운로드 (워터마크 적용)</button>
+
       <div class="btn-group">
         <button class="btn btn-outline" onclick="goStep(0)">← 이전</button>
         <button class="btn btn-primary" onclick="goStep(2)">다음: 상세 정보 →</button>
@@ -633,38 +635,39 @@ body { padding-bottom: 70px; }
 
       <div class="btn-group">
         <button class="btn btn-outline" onclick="goStep(1)">← 이전</button>
-        <button class="btn btn-accent" id="generateBtn" onclick="generatePost()">✨ 블로그 글 생성</button>
+        <button class="btn btn-accent" onclick="generatePrompt()">✨ 프롬프트 생성</button>
       </div>
 
-      <!-- Fallback: 프롬프트 복사 -->
-      <div id="fallbackArea" style="display:none; margin-top: 20px;">
+      <!-- 프롬프트 결과 -->
+      <div id="promptArea" style="display:none; margin-top: 20px;">
         <div class="section-title">
           <div class="icon">📋</div>
-          API 한도 초과 - 프롬프트 복사
+          프롬프트 생성 완료
         </div>
         <div class="card">
-          <div style="background:#FFF7ED;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:#92400E;line-height:1.7;">
-            API 무료 한도가 초과되었어요. 아래 방법으로 글을 생성할 수 있어요:<br><br>
-            <b>1.</b> "프롬프트 복사" 버튼 클릭<br>
-            <b>2.</b> <a href="https://claude.ai" target="_blank" style="color:var(--primary);font-weight:600;">Claude.ai</a> 또는 <a href="https://gemini.google.com" target="_blank" style="color:var(--primary);font-weight:600;">Gemini</a> 에 붙여넣기<br>
-            <b>3.</b> 생성된 글을 아래 칸에 붙여넣기 → 적용
+          <div style="background:#F0F9FF;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:#1E40AF;line-height:1.7;">
+            <b>사용법 3단계:</b><br>
+            ① 아래 <b>"프롬프트 복사"</b> 버튼 클릭<br>
+            ② <a href="https://claude.ai" target="_blank" style="color:var(--primary);font-weight:700;">Claude.ai</a> 또는 <a href="https://gemini.google.com" target="_blank" style="color:var(--primary);font-weight:700;">Gemini</a> 또는 <a href="https://chatgpt.com" target="_blank" style="color:var(--primary);font-weight:700;">ChatGPT</a> 에 붙여넣기<br>
+            ③ 생성된 글을 아래 칸에 붙여넣기 → <b>"적용"</b> 클릭
           </div>
-          <div class="result-box" id="fallbackPrompt" style="max-height:150px;font-size:11px;"></div>
-          <button class="btn btn-accent" onclick="navigator.clipboard.writeText(document.getElementById('fallbackPrompt').innerText).then(function(){showToast('✅ 프롬프트가 복사되었습니다!');})" style="margin-top:12px;">📋 프롬프트 복사하기</button>
-          
-          <div style="margin-top:16px;">
-            <label>AI가 생성한 글을 여기에 붙여넣으세요</label>
-            <textarea id="fallbackPaste" rows="6" placeholder="Claude.ai 또는 Gemini에서 생성된 글을 여기에 붙여넣기..." style="width:100%;padding:14px;border:2px solid var(--border);border-radius:12px;font-size:14px;font-family:'Noto Sans KR',sans-serif;resize:vertical;"></textarea>
-            <button class="btn btn-primary" onclick="applyFallbackResult()" style="margin-top:10px;">✅ 적용하기</button>
-          </div>
+          <label>생성된 프롬프트 <span style="font-size:12px;color:var(--text-sub);font-weight:400;">(내용 확인용)</span></label>
+          <div class="result-box" id="promptBody" style="max-height:200px;font-size:12px;"></div>
+          <button class="btn btn-accent" onclick="copyPromptText()" style="margin-top:12px;">📋 프롬프트 복사하기</button>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <label>AI가 생성한 글을 여기에 붙여넣으세요</label>
+          <textarea id="aiResultPaste" rows="8" placeholder="Claude.ai / Gemini / ChatGPT에서 생성된 블로그 글을 여기에 붙여넣기..." style="width:100%;padding:14px;border:2px solid var(--border);border-radius:12px;font-size:14px;font-family:'Noto Sans KR',sans-serif;resize:vertical;min-height:120px;"></textarea>
+          <button class="btn btn-primary" onclick="applyAiResult()" style="margin-top:10px;">✅ 적용하기</button>
         </div>
       </div>
 
-      <!-- Result -->
+      <!-- 최종 결과 -->
       <div id="resultArea" style="display:none; margin-top: 20px;">
         <div class="section-title">
           <div class="icon">📄</div>
-          생성된 블로그 글
+          블로그 글 완성
         </div>
         <div class="card">
           <div class="form-group">
@@ -836,6 +839,15 @@ var currentStep = 0;
 var beforePhotos = [];
 var afterPhotos = [];
 var selectedTags = { workType: '', placeType: '', causeType: '', toneType: '전문+친근' };
+var currentDocNumber = '';
+
+function generateDocNumber() {
+  var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+  var nextNum = saved.length + 1;
+  var padded = String(nextNum).padStart(3, '0');
+  currentDocNumber = 'BLOG-' + padded;
+  return currentDocNumber;
+}
 
 // ===== Tag Selection =====
 document.querySelectorAll('.tag-group').forEach(function(group) {
@@ -857,6 +869,10 @@ function goStep(n) {
     if (!selectedTags.workType) { showToast('작업 유형을 선택해주세요'); return; }
     if (!selectedTags.placeType) { showToast('작업 장소를 선택해주세요'); return; }
     if (!document.getElementById('location').value.trim()) { showToast('작업 지역을 입력해주세요'); return; }
+    // 문서번호 자동 생성
+    if (!currentDocNumber) generateDocNumber();
+    document.getElementById('docNumberDisplay').textContent = currentDocNumber;
+    document.getElementById('docNumberBadge').style.display = 'inline-block';
   }
   currentStep = n;
   document.querySelectorAll('.step-content').forEach(function(s, i) {
@@ -1004,7 +1020,7 @@ setupPhotoUpload('beforeInput', 'beforeZone', 'beforeGrid', beforePhotos, '전')
 setupPhotoUpload('afterInput', 'afterZone', 'afterGrid', afterPhotos, '후');
 
 // ===== Generate Blog Post =====
-async function generatePost() {
+function generatePrompt() {
   var workType = selectedTags.workType;
   var placeType = selectedTags.placeType;
   var location = document.getElementById('location').value.trim();
@@ -1021,236 +1037,108 @@ async function generatePost() {
     return;
   }
 
-  document.getElementById('loading').classList.add('show');
-  document.getElementById('generateBtn').disabled = true;
-
   var prompt = '';
   prompt += '당신은 누수설비 전문업체 사장이자 현장 기사입니다. 네이버 블로그에 올릴 시공 사례 글을 작성합니다.\n\n';
 
-  // 문체 스타일 - 설정에 따라 다르게 적용
+  // 문체 스타일
   var stylePreset = settings.stylePreset || '전문+친근';
-
   if (stylePreset === '커스텀' && (settings.styleGuide || settings.sampleText)) {
-    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
-    if (settings.styleGuide) {
-      prompt += '다음 지시사항에 따라 문체를 작성하세요:\n';
-      prompt += settings.styleGuide + '\n\n';
-    }
-    if (settings.sampleText) {
-      prompt += '아래는 참고할 글 샘플입니다. 이 글의 문체, 말투, 문장 구조를 분석해서 최대한 비슷한 톤으로 작성하세요:\n';
-      prompt += '"""\n' + settings.sampleText.substring(0, 2000) + '\n"""\n\n';
-    }
-    prompt += '추가 규칙:\n';
-    prompt += '- 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
-    prompt += '- 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+    prompt += '=== 문체 규칙 ===\n';
+    if (settings.styleGuide) prompt += settings.styleGuide + '\n';
+    if (settings.sampleText) prompt += '참고 글:\n"""\n' + settings.sampleText.substring(0, 2000) + '\n"""\n';
+    prompt += '- 문단 2~3문장, AI 딱딱체 금지\n\n';
   } else if (stylePreset === '전문적') {
-    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
-    prompt += '1. "~입니다", "~되었습니다", "~하였습니다" 체의 격식 있는 문체 사용\n';
-    prompt += '2. 전문 용어를 적극적으로 사용하되 필요시 괄호 안에 간단히 설명\n';
-    prompt += '3. 이모티콘(ㅎㅎ, ^^)은 사용하지 않음\n';
-    prompt += '4. 작업 과정을 객관적이고 체계적으로 서술\n';
-    prompt += '5. 고객 후기나 만족도를 간결하게 언급\n';
-    prompt += '6. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
-    prompt += '7. 신뢰감 있는 전문 업체 이미지를 유지\n';
-    prompt += '8. 절대 AI 특유의 반복적 표현 사용 금지\n\n';
+    prompt += '=== 문체: 전문 업체 ===\n"~입니다" 격식체, 이모티콘 없음, 전문용어+괄호설명, 객관적 서술, 문단 2~3문장, AI 딱딱체 금지\n\n';
   } else if (stylePreset === '친근한') {
-    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
-    prompt += '1. "~했어요", "~인데요", "~거든요" 같은 부드러운 존댓말 사용\n';
-    prompt += '2. "^^", "ㅎㅎ", "~요~" 같은 자연스러운 이모티콘 활용\n';
-    prompt += '3. 괄호 안에 본심이나 재미있는 코멘트 넣기\n';
-    prompt += '4. 전문 용어는 쓰되 쉽게 풀어서 설명\n';
-    prompt += '5. 일상 대화하듯이 자연스럽게 작성\n';
-    prompt += '6. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
-    prompt += '7. 고객과의 에피소드를 재미있게 풀어쓰기\n';
-    prompt += '8. 절대 AI 특유의 딱딱한 표현 사용 금지\n\n';
+    prompt += '=== 문체: 친근 블로거 ===\n"~했어요"/"~인데요" 부드러운 말투, ^^/ㅎㅎ 활용, 괄호 코멘트, 문단 2~3문장, AI 딱딱체 금지\n\n';
   } else {
-    // 전문+친근 (기본값)
-    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
-    prompt += '1. 문장 끝맺음: "~이죠", "~하죠", "~하더라고요", "~입니다"를 자연스럽게 섞어 사용\n';
-    prompt += '2. 괄호 안에 부연설명 넣기: "(사실 이 부분이 제일 까다롭죠..)", "(고객님 집이 소중하니까요 ^^)" 식으로\n';
-    prompt += '3. "ㅎㅎ", "^^" 등 가벼운 이모티콘을 가끔 사용\n';
-    prompt += '4. 전문 용어를 쓰되 바로 다음에 쉬운 설명 추가\n';
-    prompt += '5. 고객 이야기를 자연스럽게 녹이기\n';
-    prompt += '6. 작업 과정을 단계별로 풀어쓰기\n';
-    prompt += '7. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
-    prompt += '8. 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+    prompt += '=== 문체: 전문+친근 ===\n"~이죠"/"~하더라고요"/"~입니다" 섞어 사용, 괄호 부연설명, 가끔 ^^/ㅎㅎ, 전문용어+쉬운설명, 문단 2~3문장, AI 딱딱체 금지\n\n';
   }
 
-  prompt += '=== 누수설비 전문 지식 (자연스럽게 녹여서 사용) ===\n';
-  prompt += '- 누수탐지 방법: 공압검사(질소주입), 가스탐지, 청음탐지, 열화상카메라, 내시경 검사\n';
-  prompt += '- 누수 원인: 배관 노후(PPC/동관 부식), 방수층 손상, 하수관 막힘, 시공불량, 동파, 결로\n';
-  prompt += '- 배관 종류: 상수도(냉온수관), 난방배관, 하수관/오수관\n';
-  prompt += '- 수리 공정: 누수지점 특정 → 바닥/벽 파쇄 → 배관 교체/보수 → 방수처리 → 모르타르/타일 복구\n';
-  prompt += '- 방수 종류: 우레탄방수, 시트방수, 인젝션방수, 침투방수\n';
-  prompt += '- 확인 과정: 수리 후 압력검사(재검), 48시간 양생 후 사용 권장\n\n';
+  prompt += '=== 누수 전문 지식 ===\n';
+  prompt += '탐지: 공압검사, 가스탐지, 청음탐지, 열화상카메라 / 원인: 배관노후, 방수층손상, 시공불량, 동파 / 공정: 탐지→파쇄→교체→방수→복구\n\n';
 
   prompt += '=== 작업 정보 ===\n';
-  prompt += '- 업체명: ' + settings.bizName + '\n';
-  prompt += '- 작업 유형: ' + workType + '\n';
-  prompt += '- 건물 유형: ' + placeType + '\n';
-  prompt += '- 작업 지역: ' + location + '\n';
-  prompt += '- 누수 위치: ' + (leakSpot || '미지정') + '\n';
-  prompt += '- 누수 원인: ' + cause + '\n';
-  prompt += '- 작업 내용: ' + (memo || '일반 ' + workType + ' 작업 수행') + '\n';
-  prompt += '- 사용 도구/자재: ' + (tools || '일반 장비') + '\n';
-  prompt += '- 작업 전 사진: ' + beforePhotos.length + '장\n';
-  prompt += '- 작업 후 사진: ' + afterPhotos.length + '장\n';
-  prompt += '- 글 스타일: ' + tone + '\n';
-  if (episode) {
-    prompt += '- 현장 에피소드 (이 내용을 반드시 본문에 자연스럽게 포함시키세요!): ' + episode + '\n';
-  }
+  prompt += '업체명: ' + settings.bizName + ' / 유형: ' + workType + ' / 장소: ' + placeType + ' / 지역: ' + location + '\n';
+  prompt += '누수위치: ' + (leakSpot || '미지정') + ' / 원인: ' + cause + '\n';
+  prompt += '작업내용: ' + (memo || '일반 ' + workType + ' 작업') + '\n';
+  prompt += '도구/자재: ' + (tools || '일반 장비') + '\n';
+  prompt += '작업전 사진 ' + beforePhotos.length + '장, 작업후 사진 ' + afterPhotos.length + '장\n';
+  if (episode) prompt += '현장 에피소드 (반드시 포함): ' + episode + '\n';
   prompt += '\n';
 
-  prompt += '=== 글 구조 (이 순서로 작성) ===\n';
-  prompt += '1. 도입: 계절/날씨 인사 또는 고객 상황 소개 (1~2문장)\n';
-  prompt += '2. 고객 의뢰 내용: 어디서, 어떤 문제로 연락하셨는지\n';
-  prompt += '3. 현장 진단: 도착 후 무엇을 확인했는지, 어떤 장비로 탐지했는지\n';
-  prompt += '4. [작업 전 사진] 위치 표시\n';
-  prompt += '5. 원인 분석: 왜 누수가 발생했는지 전문적으로 but 쉽게 설명\n';
-  prompt += '6. 작업 과정: 단계별로 설명 (사진 사이사이에 설명 넣기)\n';
-  prompt += '7. [작업 후 사진] 위치 표시\n';
-  prompt += '8. 마무리 확인: 수리 후 검증 과정\n';
-  prompt += '9. 고객 반응/에피소드 (있으면)\n';
-  prompt += '10. 업체 소개 + 연락처\n';
-  prompt += '11. 해시태그 10~15개\n\n';
+  prompt += '=== 글 구조 ===\n';
+  prompt += '도입(고객상황) → 현장진단 → [작업 전 사진] → 원인분석 → 작업과정 → [작업 후 사진] → 마무리확인 → 업체소개+연락처 → 해시태그 10~15개\n\n';
 
-  prompt += '=== 필수 규칙 ===\n';
-  prompt += '1. 제목: "[' + location + '] ' + placeType + ' ' + workType + '" 형태로, SEO 키워드 포함\n';
-  prompt += '2. 본문 800~1200자 (너무 짧지 않게)\n';
-  prompt += '3. 매번 다른 도입부와 구조 사용 (패턴화 금지!)\n';
-  prompt += '4. 사진 위치를 "[작업 전 사진 1]", "[작업 후 사진 1]" 형태로 표시\n';
-  prompt += '5. 업체 연락처: ' + (settings.bizPhone || '문의 전화') + '\n';
-  prompt += '6. 카카오톡: ' + (settings.bizKakao || '') + '\n';
-  prompt += '7. 하단 문구: ' + settings.bizFooter + '\n';
-  prompt += '8. 절대로 "~에 대해 알아보겠습니다", "~것이 중요합니다", "~할 수 있습니다"를 3번 이상 반복하지 마세요\n';
-  prompt += '9. 마치 현장에서 직접 작업한 기사가 쓴 글처럼 생생하게 작성\n\n';
+  prompt += '=== 규칙 ===\n';
+  prompt += '- 제목: "[' + location + '] ' + placeType + ' ' + workType + '" SEO 키워드 포함\n';
+  prompt += '- 본문 800~1200자, 사진위치 "[작업 전 사진 1]" 형태로 표시\n';
+  prompt += '- 연락처: ' + (settings.bizPhone || '문의 전화') + (settings.bizKakao ? ' / 카카오톡: ' + settings.bizKakao : '') + '\n';
+  prompt += '- 하단 문구: ' + settings.bizFooter + '\n';
+  prompt += '- AI 딱딱체 금지, 현장 기사가 직접 쓴 것처럼 생생하게\n\n';
   prompt += '응답 형식:\n제목: (제목)\n---\n(본문 전체)';
 
-  try {
-    var anthropicKey = settings.anthropicApiKey || '';
-    var geminiKey = settings.geminiApiKey || '';
+  // 프롬프트 표시
+  document.getElementById('promptBody').innerText = prompt;
+  document.getElementById('promptArea').style.display = 'block';
+  document.getElementById('resultArea').style.display = 'none';
 
-    var isClaudeEnv = (window.location.hostname.indexOf('claude.ai') >= 0 ||
-                       window.location.hostname.indexOf('anthropic') >= 0 ||
-                       document.referrer.indexOf('claude.ai') >= 0 ||
-                       window.location.protocol === 'blob:');
+  // 자동 복사
+  navigator.clipboard.writeText(prompt).then(function() {
+    showToast('✅ 프롬프트가 자동 복사되었습니다! AI에 붙여넣기하세요');
+  }).catch(function() {
+    showToast('프롬프트가 생성되었습니다. 아래에서 복사하세요');
+  });
 
-    var response, data, text;
-
-    if (anthropicKey || isClaudeEnv) {
-      // Anthropic API 사용 (API 키 또는 Claude.ai 환경)
-      var headers = {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01'
-      };
-      if (anthropicKey) {
-        headers['x-api-key'] = anthropicKey;
-        headers['anthropic-dangerous-direct-browser-access'] = 'true';
-        console.log('[블로그앱] Anthropic API 키 사용');
-      } else {
-        console.log('[블로그앱] Claude 환경 감지 - Anthropic API 사용');
-      }
-
-      response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      data = await response.json();
-      console.log('[블로그앱] Anthropic 응답:', JSON.stringify(data).substring(0, 300));
-
-      if (data.error) {
-        showToast('API 오류: ' + (data.error.message || '알 수 없는 오류'));
-        return;
-      }
-      text = (data.content || []).map(function(c) { return c.text || ''; }).join('');
-
-    } else if (geminiKey) {
-      // Gemini API 사용
-      console.log('[블로그앱] Gemini API 사용');
-
-      async function callGemini(retryCount) {
-        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 2000, temperature: 0.8 }
-          })
-        });
-        var d = await res.json();
-        if (d.error && d.error.code === 429 && retryCount < 2) {
-          var waitSec = 15 + (retryCount * 15);
-          showToast('⏳ 잠시 대기 중... ' + waitSec + '초 후 자동 재시도');
-          await new Promise(function(resolve) { setTimeout(resolve, waitSec * 1000); });
-          return callGemini(retryCount + 1);
-        }
-        return d;
-      }
-
-      data = await callGemini(0);
-      console.log('[블로그앱] Gemini 응답:', JSON.stringify(data).substring(0, 300));
-
-      if (data.error) {
-        if (data.error.code === 429) {
-          document.getElementById('fallbackArea').style.display = 'block';
-          document.getElementById('fallbackPrompt').innerText = prompt;
-          document.getElementById('fallbackArea').scrollIntoView({ behavior: 'smooth' });
-          showToast('⏳ API 한도 초과 - 아래에서 프롬프트를 복사해서 사용하세요');
-        } else if (data.error.code === 400) {
-          showToast('⚠️ API 키를 확인해주세요');
-        } else {
-          showToast('API 오류: ' + (data.error.message || '알 수 없는 오류'));
-        }
-        return;
-      }
-      text = '';
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        text = data.candidates[0].content.parts.map(function(p) { return p.text || ''; }).join('');
-      }
-    } else {
-      // API 키 없음
-      showToast('⚠️ 설정에서 API 키를 입력해주세요');
-      document.getElementById('loading').classList.remove('show');
-      document.getElementById('generateBtn').disabled = false;
-      return;
-    }
-
-    if (!text) {
-      showToast('응답이 비어있습니다. 다시 시도해주세요.');
-      return;
-    }
-
-    // Parse title and body
-    var titleMatch = text.match(/제목:\s*(.+)/);
-    var title = titleMatch ? titleMatch[1].trim() : '블로그 제목';
-    var body = text.replace(/제목:\s*.+\n?-*\n?/, '').trim();
-
-    document.getElementById('resultTitle').value = title;
-    document.getElementById('resultBody').innerText = body;
-    document.getElementById('resultArea').style.display = 'block';
-    document.getElementById('fallbackArea').style.display = 'none';
-
-    setTimeout(function() {
-      document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-
-  } catch (err) {
-    showToast('글 생성 실패: ' + err.message);
-    console.error('[블로그앱] 생성 오류:', err);
-  } finally {
-    document.getElementById('loading').classList.remove('show');
-    document.getElementById('generateBtn').disabled = false;
-  }
+  setTimeout(function() {
+    document.getElementById('promptArea').scrollIntoView({ behavior: 'smooth' });
+  }, 300);
 }
 
-// ===== Fallback =====
-function applyFallbackResult() {
-  var text = document.getElementById('fallbackPaste').value.trim();
+// ===== Photo Download =====
+function downloadPhoto(dataUrl, filename) {
+  var a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function downloadAllPhotos() {
+  if (beforePhotos.length === 0 && afterPhotos.length === 0) {
+    showToast('다운로드할 사진이 없습니다');
+    return;
+  }
+
+  var docNum = currentDocNumber || generateDocNumber();
+  var delay = 0;
+  beforePhotos.forEach(function(photo, i) {
+    setTimeout(function() {
+      downloadPhoto(photo.data, docNum + '_작업전_사진' + (i + 1) + '.jpg');
+    }, delay);
+    delay += 500;
+  });
+  afterPhotos.forEach(function(photo, i) {
+    setTimeout(function() {
+      downloadPhoto(photo.data, docNum + '_작업후_사진' + (i + 1) + '.jpg');
+    }, delay);
+    delay += 500;
+  });
+
+  var total = beforePhotos.length + afterPhotos.length;
+  showToast('📥 ' + docNum + ' 사진 ' + total + '장 다운로드 중...');
+}
+
+function copyPromptText() {
+  var text = document.getElementById('promptBody').innerText;
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('✅ 프롬프트가 복사되었습니다!');
+  });
+}
+
+function applyAiResult() {
+  var text = document.getElementById('aiResultPaste').value.trim();
   if (!text) { showToast('붙여넣기할 내용이 없습니다'); return; }
   var titleMatch = text.match(/제목[:：]\s*(.+)/);
   var title = titleMatch ? titleMatch[1].trim() : text.split('\n')[0].trim();
@@ -1258,7 +1146,6 @@ function applyFallbackResult() {
   document.getElementById('resultTitle').value = title;
   document.getElementById('resultBody').innerText = body;
   document.getElementById('resultArea').style.display = 'block';
-  document.getElementById('fallbackArea').style.display = 'none';
   document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
   showToast('✅ 글이 적용되었습니다!');
 }
@@ -1283,10 +1170,12 @@ function savePost() {
   var body = document.getElementById('resultBody').innerText;
   if (!title || !body) { showToast('생성된 글이 없습니다'); return; }
 
+  var docNum = currentDocNumber || generateDocNumber();
   var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
   var thumb = beforePhotos.length > 0 ? beforePhotos[0].data : '';
   saved.unshift({
     id: Date.now(),
+    docNumber: docNum,
     title: title,
     body: body,
     thumb: thumb,
@@ -1295,8 +1184,10 @@ function savePost() {
     date: new Date().toLocaleDateString('ko-KR')
   });
   localStorage.setItem('blogPosts', JSON.stringify(saved));
-  showToast('✅ 저장되었습니다');
+  showToast('✅ ' + docNum + ' 저장되었습니다');
   renderSavedList();
+  // 다음 글을 위해 문서번호 초기화
+  currentDocNumber = '';
 }
 
 function renderSavedList() {
@@ -1308,10 +1199,11 @@ function renderSavedList() {
   }
   container.innerHTML = '';
   saved.forEach(function(post, idx) {
+    var docBadge = post.docNumber ? '<span style="background:var(--primary);color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:6px;">' + post.docNumber + '</span>' : '';
     var item = document.createElement('div');
     item.className = 'history-item';
     item.innerHTML = '<div class="history-thumb">' + (post.thumb ? '<img src="' + post.thumb + '">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:20px;">📄</div>') + '</div>' +
-      '<div class="history-info"><h4>' + post.title + '</h4><p>' + post.date + ' · ' + (post.workType || '') + ' · ' + (post.location || '') + '</p></div>';
+      '<div class="history-info"><h4>' + docBadge + post.title + '</h4><p>' + post.date + ' · ' + (post.workType || '') + ' · ' + (post.location || '') + '</p></div>';
     item.onclick = function() { viewSavedPost(idx); };
     container.appendChild(item);
   });

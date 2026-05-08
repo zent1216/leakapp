@@ -704,6 +704,13 @@ body { padding-bottom: 70px; }
         <input type="text" id="bizKakao" placeholder="카카오톡 채널 URL">
       </div>
       <div class="form-group">
+        <label>🔑 Gemini API 키 (글 자동 생성에 필요)</label>
+        <input type="password" id="bizGeminiKey" placeholder="API 키 입력">
+        <small style="color:var(--text-sub);font-size:12px;">
+          <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--primary);">Google AI Studio</a>에서 무료로 발급 가능 (1분 소요)
+        </small>
+      </div>
+      <div class="form-group">
         <label>블로그 하단 문구</label>
         <textarea id="bizFooter" placeholder="예: 누수수리 전문 누수프로! 24시간 상담 가능합니다.">누수수리 전문 누수프로! 24시간 상담 가능합니다.</textarea>
       </div>
@@ -1092,18 +1099,41 @@ async function generatePost() {
   prompt += '응답 형식:\n제목: (제목)\n---\n(본문 전체)';
 
   try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var apiKey = settings.geminiApiKey || '';
+    if (!apiKey) {
+      showToast('⚠️ 설정에서 Gemini API 키를 입력해주세요');
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('generateBtn').disabled = false;
+      return;
+    }
+
+    var response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 2000, temperature: 0.8 }
       })
     });
 
     var data = await response.json();
-    var text = data.content.map(function(c) { return c.text || ''; }).join('');
+    console.log('[블로그앱] Gemini 응답:', JSON.stringify(data).substring(0, 500));
+
+    if (data.error) {
+      showToast('API 오류: ' + (data.error.message || '알 수 없는 오류'));
+      console.error('[블로그앱] API 에러:', data.error);
+      return;
+    }
+
+    var text = '';
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      text = data.candidates[0].content.parts.map(function(p) { return p.text || ''; }).join('');
+    }
+
+    if (!text) {
+      showToast('응답이 비어있습니다. 다시 시도해주세요.');
+      return;
+    }
 
     // Parse title and body
     var titleMatch = text.match(/제목:\s*(.+)/);
@@ -1119,8 +1149,8 @@ async function generatePost() {
     }, 300);
 
   } catch (err) {
-    showToast('글 생성에 실패했습니다. 다시 시도해주세요.');
-    console.error(err);
+    showToast('글 생성 실패: ' + err.message);
+    console.error('[블로그앱] 생성 오류:', err);
   } finally {
     document.getElementById('loading').classList.remove('show');
     document.getElementById('generateBtn').disabled = false;
@@ -1201,6 +1231,7 @@ function loadSettings() {
     bizPhone: s.bizPhone || '',
     bizKakao: s.bizKakao || '',
     bizFooter: s.bizFooter || '누수수리 전문 누수프로! 24시간 상담 가능합니다.',
+    geminiApiKey: s.geminiApiKey || '',
     stylePreset: s.stylePreset || '전문+친근',
     styleGuide: s.styleGuide || '',
     sampleText: s.sampleText || ''
@@ -1212,6 +1243,7 @@ function saveSettings() {
     bizPhone: document.getElementById('bizPhone').value,
     bizKakao: document.getElementById('bizKakao').value,
     bizFooter: document.getElementById('bizFooter').value,
+    geminiApiKey: document.getElementById('bizGeminiKey').value.trim(),
     stylePreset: selectedStylePreset || '전문+친근',
     styleGuide: document.getElementById('bizStyleGuide').value,
     sampleText: (document.getElementById('bizSampleText').value || '').substring(0, 2000)
@@ -1225,6 +1257,7 @@ function initSettings() {
   document.getElementById('bizPhone').value = s.bizPhone;
   document.getElementById('bizKakao').value = s.bizKakao;
   document.getElementById('bizFooter').value = s.bizFooter;
+  document.getElementById('bizGeminiKey').value = s.geminiApiKey;
   document.getElementById('bizStyleGuide').value = s.styleGuide;
   document.getElementById('bizSampleText').value = s.sampleText;
   // 스타일 프리셋 복원

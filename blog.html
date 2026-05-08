@@ -698,6 +698,41 @@ body { padding-bottom: 70px; }
       <button class="btn btn-primary" onclick="saveSettings()">💾 설정 저장</button>
     </div>
 
+    <!-- 글쓰기 스타일 설정 -->
+    <div class="card" style="margin-top:12px;">
+      <div style="font-size:16px;font-weight:700;margin-bottom:14px;">✍️ 글쓰기 스타일</div>
+      
+      <div class="form-group">
+        <label>문체 스타일 선택</label>
+        <div class="tag-group" id="stylePreset">
+          <div class="tag selected" data-val="전문+친근">전문+친근</div>
+          <div class="tag" data-val="전문적">전문 업체</div>
+          <div class="tag" data-val="친근한">친근 블로거</div>
+          <div class="tag" data-val="커스텀">직접 입력</div>
+        </div>
+      </div>
+
+      <div id="customStyleArea" style="display:none;">
+        <div class="form-group">
+          <label>📝 말투 지시문 (AI에게 이렇게 써달라고 지시하는 내용)</label>
+          <textarea id="bizStyleGuide" rows="4" placeholder="예: 문장 끝은 '~합니다'체를 쓰되 딱딱하지 않게. 전문 용어를 쓸 때는 괄호 안에 쉬운 설명 추가. 이모티콘은 쓰지 않기."></textarea>
+          <small style="color:var(--text-sub);font-size:12px;">여기 쓴 내용이 AI 프롬프트에 그대로 반영됩니다</small>
+        </div>
+
+        <div class="form-group">
+          <label>📋 참고 글 샘플 (내가 쓴 글이나 참고할 글을 붙여넣기)</label>
+          <textarea id="bizSampleText" rows="6" placeholder="예전에 쓴 블로그 글이나 마음에 드는 다른 업체 글을 여기 붙여넣으세요. AI가 이 문체를 분석해서 비슷한 톤으로 작성합니다."></textarea>
+          <small style="color:var(--text-sub);font-size:12px;">최대 2000자 — 많을수록 문체 반영이 정확해요</small>
+        </div>
+      </div>
+
+      <div id="presetDescription" style="background:#F0F9FF;border-radius:10px;padding:14px;font-size:13px;color:#1E40AF;line-height:1.6;margin-top:8px;">
+        <b>전문+친근:</b> "~이죠", "~하더라고요" 같은 자연스러운 존댓말에 괄호로 부연설명을 넣는 스타일. 전문 용어는 쉽게 풀어서 설명.
+      </div>
+
+      <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:12px;">💾 스타일 설정 저장</button>
+    </div>
+
     <div class="card" style="margin-top:12px;">
       <label style="margin-bottom:12px;">데이터 관리</label>
       <button class="btn btn-outline" onclick="exportData()" style="margin-bottom:8px;">📥 데이터 내보내기 (JSON)</button>
@@ -933,18 +968,54 @@ async function generatePost() {
   var prompt = '';
   prompt += '당신은 누수설비 전문업체 사장이자 현장 기사입니다. 네이버 블로그에 올릴 시공 사례 글을 작성합니다.\n\n';
 
-  prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
-  prompt += '아래는 이 업체 사장님이 직접 쓴 블로그 글에서 추출한 문체 패턴입니다. 이 말투를 최대한 살려서 작성하세요:\n\n';
-  prompt += '1. 문장 끝맺음: "~이죠", "~하죠", "~하더라고요", "~입니다", "~있습니다"를 자연스럽게 섞어 사용\n';
-  prompt += '2. 괄호 안에 본심/부연설명 넣기: "(사실 이 부분이 제일 까다롭죠..)", "(고객님 집이 소중하니까요 ^^)" 식으로\n';
-  prompt += '3. 감정 표현: "ㅎㅎ", "~하더라고요~", "^^" 등 가벼운 이모티콘을 자연스럽게 사용\n';
-  prompt += '4. 전문 용어를 쓰되 바로 다음에 쉬운 설명 추가: "공압검사(배관에 공기를 넣어서 새는 곳을 찾는 방법)"\n';
-  prompt += '5. 솔직한 추천/감탄: "정말 강추입니다!", "이건 꼭 해드려야 하는 부분이에요"\n';
-  prompt += '6. 고객 이야기를 자연스럽게 녹이기: "이번에 방문하신 고객님께서는~", "고객님께서 ~라고 하시더라고요"\n';
-  prompt += '7. 작업 과정을 단계별로 풀어쓰기: 사진 → 설명 → 다음단계 순서\n';
-  prompt += '8. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
-  prompt += '9. "그.런.데." 같은 강조 표현이나 "사실..." 같은 말머리를 가끔 사용\n';
-  prompt += '10. 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+  // 문체 스타일 - 설정에 따라 다르게 적용
+  var stylePreset = settings.stylePreset || '전문+친근';
+
+  if (stylePreset === '커스텀' && (settings.styleGuide || settings.sampleText)) {
+    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
+    if (settings.styleGuide) {
+      prompt += '다음 지시사항에 따라 문체를 작성하세요:\n';
+      prompt += settings.styleGuide + '\n\n';
+    }
+    if (settings.sampleText) {
+      prompt += '아래는 참고할 글 샘플입니다. 이 글의 문체, 말투, 문장 구조를 분석해서 최대한 비슷한 톤으로 작성하세요:\n';
+      prompt += '"""\n' + settings.sampleText.substring(0, 2000) + '\n"""\n\n';
+    }
+    prompt += '추가 규칙:\n';
+    prompt += '- 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
+    prompt += '- 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+  } else if (stylePreset === '전문적') {
+    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
+    prompt += '1. "~입니다", "~되었습니다", "~하였습니다" 체의 격식 있는 문체 사용\n';
+    prompt += '2. 전문 용어를 적극적으로 사용하되 필요시 괄호 안에 간단히 설명\n';
+    prompt += '3. 이모티콘(ㅎㅎ, ^^)은 사용하지 않음\n';
+    prompt += '4. 작업 과정을 객관적이고 체계적으로 서술\n';
+    prompt += '5. 고객 후기나 만족도를 간결하게 언급\n';
+    prompt += '6. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
+    prompt += '7. 신뢰감 있는 전문 업체 이미지를 유지\n';
+    prompt += '8. 절대 AI 특유의 반복적 표현 사용 금지\n\n';
+  } else if (stylePreset === '친근한') {
+    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
+    prompt += '1. "~했어요", "~인데요", "~거든요" 같은 부드러운 존댓말 사용\n';
+    prompt += '2. "^^", "ㅎㅎ", "~요~" 같은 자연스러운 이모티콘 활용\n';
+    prompt += '3. 괄호 안에 본심이나 재미있는 코멘트 넣기\n';
+    prompt += '4. 전문 용어는 쓰되 쉽게 풀어서 설명\n';
+    prompt += '5. 일상 대화하듯이 자연스럽게 작성\n';
+    prompt += '6. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
+    prompt += '7. 고객과의 에피소드를 재미있게 풀어쓰기\n';
+    prompt += '8. 절대 AI 특유의 딱딱한 표현 사용 금지\n\n';
+  } else {
+    // 전문+친근 (기본값)
+    prompt += '=== 반드시 따라야 할 문체 규칙 (가장 중요!) ===\n';
+    prompt += '1. 문장 끝맺음: "~이죠", "~하죠", "~하더라고요", "~입니다"를 자연스럽게 섞어 사용\n';
+    prompt += '2. 괄호 안에 부연설명 넣기: "(사실 이 부분이 제일 까다롭죠..)", "(고객님 집이 소중하니까요 ^^)" 식으로\n';
+    prompt += '3. "ㅎㅎ", "^^" 등 가벼운 이모티콘을 가끔 사용\n';
+    prompt += '4. 전문 용어를 쓰되 바로 다음에 쉬운 설명 추가\n';
+    prompt += '5. 고객 이야기를 자연스럽게 녹이기\n';
+    prompt += '6. 작업 과정을 단계별로 풀어쓰기\n';
+    prompt += '7. 문단은 2~3문장으로 짧게 끊기 (모바일 가독성)\n';
+    prompt += '8. 절대 AI 특유의 "~것이 중요합니다", "~에 대해 알아보겠습니다" 같은 딱딱한 표현 사용 금지!\n\n';
+  }
 
   prompt += '=== 누수설비 전문 지식 (자연스럽게 녹여서 사용) ===\n';
   prompt += '- 누수탐지 방법: 공압검사(질소주입), 가스탐지, 청음탐지, 열화상카메라, 내시경 검사\n';
@@ -1105,7 +1176,10 @@ function loadSettings() {
     bizName: s.bizName || '누수프로',
     bizPhone: s.bizPhone || '',
     bizKakao: s.bizKakao || '',
-    bizFooter: s.bizFooter || '누수수리 전문 누수프로! 24시간 상담 가능합니다.'
+    bizFooter: s.bizFooter || '누수수리 전문 누수프로! 24시간 상담 가능합니다.',
+    stylePreset: s.stylePreset || '전문+친근',
+    styleGuide: s.styleGuide || '',
+    sampleText: s.sampleText || ''
   };
 }
 function saveSettings() {
@@ -1113,7 +1187,10 @@ function saveSettings() {
     bizName: document.getElementById('bizName').value,
     bizPhone: document.getElementById('bizPhone').value,
     bizKakao: document.getElementById('bizKakao').value,
-    bizFooter: document.getElementById('bizFooter').value
+    bizFooter: document.getElementById('bizFooter').value,
+    stylePreset: selectedStylePreset || '전문+친근',
+    styleGuide: document.getElementById('bizStyleGuide').value,
+    sampleText: (document.getElementById('bizSampleText').value || '').substring(0, 2000)
   };
   localStorage.setItem('blogSettings', JSON.stringify(s));
   showToast('✅ 설정이 저장되었습니다');
@@ -1124,6 +1201,38 @@ function initSettings() {
   document.getElementById('bizPhone').value = s.bizPhone;
   document.getElementById('bizKakao').value = s.bizKakao;
   document.getElementById('bizFooter').value = s.bizFooter;
+  document.getElementById('bizStyleGuide').value = s.styleGuide;
+  document.getElementById('bizSampleText').value = s.sampleText;
+  // 스타일 프리셋 복원
+  selectedStylePreset = s.stylePreset || '전문+친근';
+  document.querySelectorAll('#stylePreset .tag').forEach(function(t) {
+    t.classList.toggle('selected', t.dataset.val === selectedStylePreset);
+  });
+  updateStyleUI(selectedStylePreset);
+}
+
+// ===== Style Preset =====
+var selectedStylePreset = '전문+친근';
+var styleDescriptions = {
+  '전문+친근': '<b>전문+친근:</b> "~이죠", "~하더라고요" 같은 자연스러운 존댓말에 괄호로 부연설명을 넣는 스타일. 전문 용어는 쉽게 풀어서 설명.',
+  '전문적': '<b>전문 업체:</b> "~입니다", "~되었습니다" 체의 격식 있는 문체. 신뢰감 있는 업체 이미지. 이모티콘 사용 안 함.',
+  '친근한': '<b>친근 블로거:</b> "~했어요", "~인데요~" 같은 부드러운 말투. ^^, ㅎㅎ 등 자연스러운 이모티콘 활용.',
+  '커스텀': '<b>직접 입력:</b> 아래에 원하는 말투와 참고 글을 직접 입력하세요.'
+};
+
+document.getElementById('stylePreset').addEventListener('click', function(e) {
+  var tag = e.target.closest('.tag');
+  if (!tag) return;
+  document.querySelectorAll('#stylePreset .tag').forEach(function(t) { t.classList.remove('selected'); });
+  tag.classList.add('selected');
+  selectedStylePreset = tag.dataset.val;
+  updateStyleUI(selectedStylePreset);
+});
+
+function updateStyleUI(preset) {
+  document.getElementById('customStyleArea').style.display = preset === '커스텀' ? 'block' : 'none';
+  document.getElementById('presetDescription').innerHTML = styleDescriptions[preset] || '';
+  document.getElementById('presetDescription').style.display = preset === '커스텀' ? 'none' : 'block';
 }
 
 // ===== Export/Clear =====

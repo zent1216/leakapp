@@ -1344,6 +1344,23 @@ function loadSettings() {
     sampleText: s.sampleText || ''
   };
 }
+
+// Firebase에서 설정 불러오기 (로그인 후 자동 실행)
+async function loadSettingsFromFirebase() {
+  if (!fbUser || !fbDb) return;
+  try {
+    var doc = await fbDb.collection('users').doc(fbUser.uid).get();
+    if (doc.exists && doc.data().blogSettings) {
+      var cloudSettings = JSON.parse(doc.data().blogSettings);
+      // 클라우드 설정으로 로컬 업데이트
+      localStorage.setItem('blogSettings', JSON.stringify(cloudSettings));
+      initSettings();
+      console.log('[블로그앱] 클라우드 설정 동기화 완료');
+    }
+  } catch(e) {
+    console.warn('Firebase 설정 불러오기 실패:', e);
+  }
+}
 function saveSettings() {
   var s = {
     bizName: document.getElementById('bizName').value,
@@ -1356,8 +1373,22 @@ function saveSettings() {
     styleGuide: document.getElementById('bizStyleGuide').value,
     sampleText: (document.getElementById('bizSampleText').value || '').substring(0, 2000)
   };
+  // 로컬 저장 (오프라인 폴백)
   localStorage.setItem('blogSettings', JSON.stringify(s));
-  showToast('✅ 설정이 저장되었습니다');
+
+  // Firebase에도 저장 (로그인 상태일 때)
+  if (fbUser && fbDb) {
+    fbDb.collection('users').doc(fbUser.uid).set({
+      blogSettings: JSON.stringify(s)
+    }, { merge: true }).then(function() {
+      showToast('✅ 설정이 저장되었습니다 (클라우드 동기화 완료)');
+    }).catch(function(e) {
+      console.error('Firebase 설정 저장 실패:', e);
+      showToast('✅ 설정 저장됨 (로컬만, 클라우드 동기화 실패)');
+    });
+  } else {
+    showToast('✅ 설정이 저장되었습니다 (로컬 저장 - 로그인하면 클라우드 동기화)');
+  }
 }
 function initSettings() {
   var s = loadSettings();
@@ -1467,6 +1498,7 @@ try {
   fbAuth.onAuthStateChanged(function(user) {
     fbUser = user;
     updateFirebaseStatus();
+    if (user) loadSettingsFromFirebase();
   });
 } catch(e) {
   console.warn('Firebase 초기화 실패:', e);

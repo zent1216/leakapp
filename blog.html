@@ -1493,9 +1493,13 @@ function applyImportedJob() {
   }
 
   // 사진 불러오기 (leakapp 필드: photosBefore, photosAfter)
-  var jobPhotosBefore = (job.photosBefore || []).filter(Boolean);
-  var jobPhotosAfter = (job.photosAfter || []).filter(Boolean);
+  // leakapp은 배열에 base64 문자열 또는 null을 저장
+  var jobPhotosBefore = (job.photosBefore || []).filter(function(p) { return p && typeof p === 'string' && p.length > 50; });
+  var jobPhotosAfter = (job.photosAfter || []).filter(function(p) { return p && typeof p === 'string' && p.length > 50; });
   var photoCount = jobPhotosBefore.length + jobPhotosAfter.length;
+
+  console.log('[블로그앱] 사진 불러오기 - before:', jobPhotosBefore.length, 'after:', jobPhotosAfter.length);
+  if (job.photosBefore) console.log('[블로그앱] photosBefore 원본 타입:', typeof job.photosBefore, '길이:', job.photosBefore.length, '첫번째 항목 타입:', typeof job.photosBefore[0], '첫번째 항목 길이:', (job.photosBefore[0]||'').length);
 
   if (photoCount > 0) {
     beforePhotos.length = 0;
@@ -1503,7 +1507,7 @@ function applyImportedJob() {
     var loaded = 0;
     var totalToLoad = jobPhotosBefore.length + jobPhotosAfter.length;
 
-    function checkDone() {
+    function checkPhotoDone() {
       loaded++;
       if (loaded >= totalToLoad) {
         renderPhotos(document.getElementById('beforeGrid'), beforePhotos, '전');
@@ -1515,16 +1519,18 @@ function applyImportedJob() {
     jobPhotosBefore.forEach(function(dataUrl, i) {
       addWatermark(dataUrl, function(watermarked) {
         beforePhotos.push({ name: 'before_' + (i+1) + '.jpg', data: watermarked });
-        checkDone();
+        checkPhotoDone();
       });
     });
 
     jobPhotosAfter.forEach(function(dataUrl, i) {
       addWatermark(dataUrl, function(watermarked) {
         afterPhotos.push({ name: 'after_' + (i+1) + '.jpg', data: watermarked });
-        checkDone();
+        checkPhotoDone();
       });
     });
+  } else {
+    console.log('[블로그앱] 사진 없음. job 키 목록:', Object.keys(job).join(', '));
   }
 
   closeImportModal();

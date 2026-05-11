@@ -1294,6 +1294,22 @@ function loadPhotosLocal() {
   } catch(e) { console.warn('사진 로컬 로드 실패:', e.message); }
 }
 
+
+// 금액 입력 콤마 자동 포맷
+function formatAmountInput(el) {
+  var pos = el.selectionStart;
+  var oldLen = el.value.length;
+  var raw = el.value.replace(/[^0-9]/g, '');
+  var num = parseInt(raw, 10);
+  if (isNaN(num) || raw === '') { el.value = ''; return; }
+  el.value = num.toLocaleString();
+  var newLen = el.value.length;
+  var newPos = pos + (newLen - oldLen);
+  if (newPos < 0) newPos = 0;
+  try { el.setSelectionRange(newPos, newPos); } catch(e) {}
+}
+function parseAmountStr(v) { return parseInt(String(v).replace(/[^0-9]/g, ''), 10) || 0; }
+
 // Firestore 저장용: 사진 제외한 job 데이터
 function jobsWithoutPhotos() {
   return _jobs.map(function(j) {
@@ -2218,7 +2234,7 @@ function addCostItem(name, amount) {
   div.className = 'cost-item-row';
   div.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:6px;margin-bottom:6px;';
   div.innerHTML = '<input class="form-input cost-item-name" placeholder="항목명 (예: 누수탐지, 배관교체)" value="'+(name||'')+'">'
-    + '<input class="form-input cost-item-amount" type="number" placeholder="0" value="'+(amount||'')+'" oninput="calcTotal()" style="text-align:right;">'
+    + '<input class="form-input cost-item-amount" type="text" inputmode="numeric" placeholder="0" value="'+(amount ? amount.toLocaleString() : '')+'" oninput="formatAmountInput(this);calcTotal()" style="text-align:right;">'
     + '<button class="btn-icon" onclick="this.parentElement.remove();calcTotal()">×</button>';
   list.appendChild(div);
   calcTotal();
@@ -2256,7 +2272,7 @@ function addCommissionRow(name, amount) {
   div.className = 'commission-row';
   div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 36px;gap:6px;margin-bottom:6px;';
   div.innerHTML = '<input class="form-input" placeholder="지급처 (광고업체, 협력업체 등)" value="'+(name||'')+'">'
-    + '<input class="form-input" type="number" placeholder="금액" value="'+(amount||'')+'" oninput="calcNetProfit()" style="text-align:right;">'
+    + '<input class="form-input" type="text" inputmode="numeric" placeholder="금액" value="'+(amount ? amount.toLocaleString() : '')+'" oninput="formatAmountInput(this);calcNetProfit()" style="text-align:right;">'
     + '<button class="btn-icon" onclick="this.parentElement.remove();calcNetProfit()">×</button>';
   list.appendChild(div);
   calcNetProfit();
@@ -2656,7 +2672,7 @@ function toggleDocsMode() {
         var rt = document.getElementById('receipt-to');
         var rad = document.getElementById('receipt-addr');
         var rb = document.getElementById('receipt-body');
-        if (ra) j2._receiptAmount = Number(ra.value) || 0;
+        if (ra) j2._receiptAmount = parseAmountStr(ra.value);
         if (rt) j2._receiptTo = rt.value;
         if (rad) j2._receiptAddr = rad.value;
         if (rb) j2._receiptBody = rb.value;
@@ -2907,7 +2923,7 @@ function renderReceiptEdit(j, el) {
   html += '<div class="form-card">';
   html += '<div class="form-card-title">🧾 영수증 내용</div>';
   html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
-  html += '<input class="form-input" id="receipt-amount" type="number" oninput="calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal) + '"></div>';
+  html += '<input class="form-input" id="receipt-amount" type="text" inputmode="numeric" oninput="formatAmountInput(this);calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal) + '"></div>';
   html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
   html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
@@ -4384,7 +4400,7 @@ function sendAllDocs() {
     + '<div style="font-size:13px;color:var(--text1);margin-bottom:20px;font-weight:500;">' + j.name + ' - 견적서 · 소견서 · 영수증</div>'
     + '<button onclick="doSendAllDocs(\'pdf\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);color:white;font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">📄 PDF 합본으로 보내기</button>'
     + '<button onclick="doSendAllDocs(\'image\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--bg3);color:var(--text1);font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">🖼️ 이미지 (JPG 3장)</button>'
-    + '<button onclick="closeSendAllModal()" style="width:100%;padding:12px;border:none;background:none;color:var(--text2);font-size:13px;cursor:pointer;">취소</button>'
+    + '<button onclick="closeSendAllModal()" style="width:100%;padding:12px;border:none;background:none;color:var(--text1);font-size:14px;font-weight:500;cursor:pointer;">취소</button>'
     + '</div>';
   modal.onclick = function(e) { if (e.target === modal) closeSendAllModal(); };
   document.body.appendChild(modal);
@@ -4540,7 +4556,7 @@ function openMaterialPurchaseForm(id) {
     titleEl.textContent = '📦 자재 수정';
     document.getElementById('mp-date').value = m.date || '';
     document.getElementById('mp-name').value = m.name || '';
-    document.getElementById('mp-amount').value = m.amount || '';
+    document.getElementById('mp-amount').value = m.amount ? m.amount.toLocaleString() : '';
     document.getElementById('mp-vendor').value = m.vendor || '';
     document.getElementById('mp-qty').value = m.qty || '';
     document.getElementById('mp-memo').value = m.memo || '';
@@ -4560,7 +4576,7 @@ function openMaterialPurchaseForm(id) {
 // 자재 구매 저장
 async function saveMaterialPurchase() {
   const name = document.getElementById('mp-name').value.trim();
-  const amount = parseFloat(document.getElementById('mp-amount').value) || 0;
+  const amount = parseAmountStr(document.getElementById('mp-amount').value);
   const date = document.getElementById('mp-date').value;
   if (!name || !amount || !date) { showToast('품목명, 금액, 구매일은 필수입니다'); return; }
 
@@ -4788,8 +4804,8 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">구매일 *</label><input class="form-input" id="mp-date" type="date"></div>
-      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">품목명 *<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openCatalogPicker(function(c){ document.getElementById('mp-name').value=c.name; if(c.price) document.getElementById('mp-amount').value=c.price; })">🗂️ 카탈로그</button></label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
-      <div class="form-group"><label class="form-label">금액 (원) *</label><input class="form-input" id="mp-amount" type="number" placeholder="0"></div>
+      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">품목명 *<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openCatalogPicker(function(c){ document.getElementById('mp-name').value=c.name; if(c.price) document.getElementById('mp-amount').value=c.price.toLocaleString(); })">🗂️ 카탈로그</button></label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
+      <div class="form-group"><label class="form-label">금액 (원) *</label><input class="form-input" id="mp-amount" type="text" inputmode="numeric" placeholder="0" oninput="formatAmountInput(this)"></div>
       <div class="form-group"><label class="form-label">구매처</label><input class="form-input" id="mp-vendor" placeholder="예: 동아자재, 온라인쇼핑"></div>
       <div class="form-group"><label class="form-label">수량</label><input class="form-input" id="mp-qty" placeholder="예: 10개, 2박스"></div>
       <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="mp-memo" placeholder="용도, 현장명 등"></textarea></div>

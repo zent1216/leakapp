@@ -2247,7 +2247,7 @@ function getCostItems() {
     const nameEl = row.querySelector('.cost-item-name');
     const amountEl = row.querySelector('.cost-item-amount');
     const name = nameEl ? nameEl.value.trim() : '';
-    const amount = amountEl ? (parseFloat(amountEl.value) || 0) : 0;
+    const amount = amountEl ? parseAmountStr(amountEl.value) : 0;
     if (name || amount > 0) result.push({name: name, amount: amount});
   });
   return result;
@@ -2284,7 +2284,7 @@ function getCommissions() {
   rows.forEach(function(row) {
     const inputs = row.querySelectorAll('input');
     const name = inputs[0] ? inputs[0].value.trim() : '';
-    const amount = inputs[1] ? (parseFloat(inputs[1].value) || 0) : 0;
+    const amount = inputs[1] ? parseAmountStr(inputs[1].value) : 0;
     if (name || amount > 0) result.push({name: name, amount: amount});
   });
   return result;
@@ -2613,7 +2613,7 @@ function onReceiptAmountChange() {
   const input = document.getElementById('receipt-amount');
   const preview = document.getElementById('receipt-korean-preview');
   if (!input || !preview) return;
-  const amount = parseFloat(input.value) || 0;
+  const amount = parseAmountStr(input.value);
   preview.textContent = '金 ' + numToKorean(amount) + ' 원정';
 }
 
@@ -2694,7 +2694,7 @@ function toggleDocsMode() {
         var rAmt = document.getElementById('receipt-amount');
         var rTo = document.getElementById('receipt-to');
         var rBody = document.getElementById('receipt-body');
-        if (rAmt) j2._receiptAmount = parseFloat(rAmt.value) || 0;
+        if (rAmt) j2._receiptAmount = parseAmountStr(rAmt.value);
         if (rTo) j2._receiptTo = rTo.value;
         var rAddr = document.getElementById('receipt-addr');
         if (rAddr) j2._receiptAddr = rAddr.value;

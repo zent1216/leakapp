@@ -4381,7 +4381,7 @@ function sendAllDocs() {
   modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   modal.innerHTML = '<div style="background:var(--bg1);border-radius:16px;padding:24px;width:85%;max-width:320px;text-align:center;">'
     + '<div style="font-size:16px;font-weight:700;margin-bottom:6px;">📤 문서 모아보내기</div>'
-    + '<div style="font-size:12px;color:var(--text2);margin-bottom:20px;">' + j.name + ' - 견적서 · 소견서 · 영수증</div>'
+    + '<div style="font-size:13px;color:var(--text1);margin-bottom:20px;font-weight:500;">' + j.name + ' - 견적서 · 소견서 · 영수증</div>'
     + '<button onclick="doSendAllDocs(\'pdf\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);color:white;font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">📄 PDF 합본으로 보내기</button>'
     + '<button onclick="doSendAllDocs(\'image\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--bg3);color:var(--text1);font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">🖼️ 이미지 (JPG 3장)</button>'
     + '<button onclick="closeSendAllModal()" style="width:100%;padding:12px;border:none;background:none;color:var(--text2);font-size:13px;cursor:pointer;">취소</button>'

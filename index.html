@@ -2874,7 +2874,7 @@ function makeOpinionHTML(j, biz, today, co, ce) {
   return ''
     + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
     + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
-    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:10px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
     + '<div style="font-size:10px;color:#555;" contenteditable="'+ce+'">'+today+'</div></div>'
     + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
     + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
@@ -2913,7 +2913,7 @@ function renderReceiptEdit(j, el) {
   html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
   html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">본문</label>';
-  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.') + '</textarea></div>';
+  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.') + '</textarea></div>';
   html += '</div>';
   el.innerHTML = html;
 }
@@ -2946,7 +2946,7 @@ function renderDocPreview() {
     // 영수증
     var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
     var rK = numToKorean(rA); var rT = j._receiptTo || j.name || ''; var rAd = j._receiptAddr || '';
-    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
+    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.';
     rB = rB.replace(/\n/g, '<br>');
     var rH = '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:sans-serif;display:flex;justify-content:center;">'
       + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
@@ -4372,9 +4372,33 @@ async function shareJobPhotos(jobId) {
 
 
 // 문서 모아보내기 (견적서+소견서+영수증)
-async function sendAllDocs() {
+function sendAllDocs() {
   var j = getSelJob();
   if (!j) { showToast('먼저 작업을 선택해주세요'); return; }
+  // 선택 모달
+  var modal = document.createElement('div');
+  modal.id = 'send-all-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = '<div style="background:var(--bg1);border-radius:16px;padding:24px;width:85%;max-width:320px;text-align:center;">'
+    + '<div style="font-size:16px;font-weight:700;margin-bottom:6px;">📤 문서 모아보내기</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:20px;">' + j.name + ' - 견적서 · 소견서 · 영수증</div>'
+    + '<button onclick="doSendAllDocs(\'pdf\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);color:white;font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">📄 PDF 합본으로 보내기</button>'
+    + '<button onclick="doSendAllDocs(\'image\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--bg3);color:var(--text1);font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">🖼️ 이미지 (JPG 3장)</button>'
+    + '<button onclick="closeSendAllModal()" style="width:100%;padding:12px;border:none;background:none;color:var(--text2);font-size:13px;cursor:pointer;">취소</button>'
+    + '</div>';
+  modal.onclick = function(e) { if (e.target === modal) closeSendAllModal(); };
+  document.body.appendChild(modal);
+}
+
+function closeSendAllModal() {
+  var m = document.getElementById('send-all-modal');
+  if (m) m.remove();
+}
+
+async function doSendAllDocs(mode) {
+  closeSendAllModal();
+  var j = getSelJob();
+  if (!j) return;
   var biz = _biz;
   var today = new Date().toLocaleDateString('ko-KR');
   var co = biz.name || '업체명';
@@ -4383,29 +4407,29 @@ async function sendAllDocs() {
 
   showToast('문서 생성 중...');
 
-  // 임시 컨테이너 생성
+  // 임시 컨테이너
   var wrap = document.createElement('div');
   wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
   document.body.appendChild(wrap);
 
-  // 견적서 HTML
+  // 견적서
   var estDiv = document.createElement('div');
   estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
   estDiv.innerHTML = makeEstimateHTML(j, biz, today, co, insTotal, extraCost, 'false');
   wrap.appendChild(estDiv);
 
-  // 소견서 HTML
+  // 소견서
   var opDiv = document.createElement('div');
   opDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
   opDiv.innerHTML = makeOpinionHTML(j, biz, today, co, 'false');
   wrap.appendChild(opDiv);
 
-  // 영수증 HTML
+  // 영수증
   var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
   var rK = numToKorean(rA);
   var rT = j._receiptTo || j.name || '';
   var rAd = j._receiptAddr || '';
-  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
+  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.';
   rB = rB.replace(/\n/g, '<br>');
   var rcDiv = document.createElement('div');
   rcDiv.style.cssText = 'width:794px;min-height:1123px;background:#e8f0f8;padding:36px 32px;font-family:sans-serif;display:flex;justify-content:center;';
@@ -4423,46 +4447,78 @@ async function sendAllDocs() {
     + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div>';
   wrap.appendChild(rcDiv);
 
-  // html2canvas로 각각 이미지화
   try {
     await new Promise(function(r){ setTimeout(r, 300); });
     var names = ['견적서', '소견서', '영수증'];
     var divs = [estDiv, opDiv, rcDiv];
-    var files = [];
-    for (var i = 0; i < divs.length; i++) {
-      var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
-      var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/jpeg', 0.92); });
-      files.push(new File([blob], j.name + '_' + names[i] + '.jpg', {type: 'image/jpeg'}));
-    }
-    document.body.removeChild(wrap);
 
-    // Web Share API
-    if (navigator.share && navigator.canShare && navigator.canShare({files: files})) {
-      await navigator.share({
-        title: j.name + ' 문서',
-        text: j.name + ' / ' + (j.date||'') + ' - 견적서, 소견서, 영수증',
-        files: files
-      });
+    if (mode === 'pdf') {
+      // PDF 합본
+      var pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+      for (var i = 0; i < divs.length; i++) {
+        var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
+        var imgData = canvas.toDataURL('image/jpeg', 0.92);
+        var pW = pdf.internal.pageSize.getWidth();
+        var pH = pdf.internal.pageSize.getHeight();
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, pW, pH);
+      }
+      document.body.removeChild(wrap);
+      var pdfBlob = pdf.output('blob');
+      var pdfFile = new File([pdfBlob], j.name + '_문서합본.pdf', {type: 'application/pdf'});
+
+      if (navigator.share && navigator.canShare && navigator.canShare({files: [pdfFile]})) {
+        await navigator.share({
+          title: j.name + ' 문서',
+          text: j.name + ' - 견적서, 소견서, 영수증 합본',
+          files: [pdfFile]
+        });
+      } else {
+        // 미지원시 다운로드
+        var url = URL.createObjectURL(pdfBlob);
+        var a = document.createElement('a');
+        a.href = url; a.download = j.name + '_문서합본.pdf';
+        a.click(); URL.revokeObjectURL(url);
+        showToast('PDF 다운로드 완료');
+      }
+
     } else {
-      // 미지원 시 새 탭
-      var w = window.open('', '_blank');
-      if (w) {
-        var h = '<html><head><title>' + j.name + ' 문서</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' 문서 모음</h2>';
-        for (var k = 0; k < files.length; k++) {
-          h += '<p style="color:#aaa;font-family:sans-serif;margin:16px 0 4px;">' + names[k] + '</p>';
-          h += '<img src="' + URL.createObjectURL(files[k]) + '" style="width:100%;max-width:600px;border-radius:8px;display:block;">';
+      // 이미지 모드
+      var files = [];
+      for (var i = 0; i < divs.length; i++) {
+        var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
+        var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/jpeg', 0.92); });
+        files.push(new File([blob], j.name + '_' + names[i] + '.jpg', {type: 'image/jpeg'}));
+      }
+      document.body.removeChild(wrap);
+
+      if (navigator.share && navigator.canShare && navigator.canShare({files: files})) {
+        await navigator.share({
+          title: j.name + ' 문서',
+          text: j.name + ' - 견적서, 소견서, 영수증',
+          files: files
+        });
+      } else {
+        var w = window.open('', '_blank');
+        if (w) {
+          var h = '<html><head><title>' + j.name + ' 문서</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' 문서 모음</h2>';
+          for (var k = 0; k < files.length; k++) {
+            h += '<p style="color:#aaa;font-family:sans-serif;margin:16px 0 4px;">' + names[k] + '</p>';
+            h += '<img src="' + URL.createObjectURL(files[k]) + '" style="width:100%;max-width:600px;border-radius:8px;display:block;">';
+          }
+          h += '</body></html>';
+          w.document.write(h);
+          w.document.close();
         }
-        h += '</body></html>';
-        w.document.write(h);
-        w.document.close();
       }
     }
   } catch(e) {
-    document.body.removeChild(wrap);
+    if (wrap.parentNode) document.body.removeChild(wrap);
     console.error('문서 모아보내기 실패:', e);
-    showToast('문서 생성 실패');
+    showToast('문서 생성 실패: ' + e.message);
   }
 }
+
 
 // Firestore에 자재 저장
 async function saveMaterials() {

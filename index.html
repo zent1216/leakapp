@@ -649,17 +649,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:24px;font-weight:900;">＋</div>
         <div><div class="menu-card-title">새 작업</div><div class="menu-card-sub">현장 기록 등록</div></div>
       </button>
-      <button class="menu-card" onclick="goPage('page-docs','estimate')">
-        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📑</div>
-        <div><div class="menu-card-title">견적서</div><div class="menu-card-sub">A4 · PDF 출력</div></div>
-      </button>
-      <button class="menu-card" onclick="goPage('page-docs','opinion')">
-        <div class="menu-card-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:22px;">📄</div>
-        <div><div class="menu-card-title">소견서</div><div class="menu-card-sub">기술 소견 작성</div></div>
-      </button>
-      <button class="menu-card" onclick="goPage('page-docs','insurance')">
-        <div class="menu-card-icon" style="background:rgba(168,85,247,0.2);color:#a855f7;font-size:22px;">🛡️</div>
-        <div><div class="menu-card-title">보험서류</div><div class="menu-card-sub">보험사 제출용</div></div>
+      <button class="menu-card" onclick="goPage('page-docs')">
+        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📋</div>
+        <div><div class="menu-card-title">문서</div><div class="menu-card-sub">견적서 · 소견서 · 영수증</div></div>
       </button>
       <button class="menu-card wide" onclick="goPage('page-stats')">
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:22px;">📊</div>
@@ -811,12 +803,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title" id="docs-title">문서 <span>생성</span></div>
-    <button class="topbar-action" id="docs-mode-btn" onclick="toggleDocsMode()">👁️ 미리보기</button>
+    <div style="display:flex;gap:6px;">
+      <button class="topbar-action" id="docs-send-all-btn" onclick="sendAllDocs()" style="background:var(--bg3);color:var(--text1);font-size:11px;padding:4px 8px;">📤 모아보내기</button>
+      <button class="topbar-action" id="docs-mode-btn" onclick="toggleDocsMode()">👁️ 미리보기</button>
+    </div>
   </div>
   <div class="doc-tabs">
     <button class="doc-tab" id="tab-estimate" onclick="setDocType('estimate')">📋 견적서</button>
     <button class="doc-tab" id="tab-opinion" onclick="setDocType('opinion')">📝 소견서</button>
-    <button class="doc-tab" id="tab-insurance" onclick="setDocType('insurance')">🏛️ 보험서류</button>
+    <button class="doc-tab" id="tab-receipt" onclick="setDocType('receipt')">🧾 영수증</button>
   </div>
   <div class="doc-job-select">
     <select class="form-select" id="doc-job-sel" onchange="onDocJobChange()">
@@ -1120,6 +1115,7 @@ function showPage(id) {
 function goPage(id, extra) {
   const cur = document.querySelector('.page.active');
   if (cur) _pageHistory.push(cur.id);
+  history.pushState({page: id}, '', '');
   showPage(id);
   if (id === 'page-calendar') renderCalendar();
   else if (id === 'page-stats') renderStats();
@@ -1147,6 +1143,24 @@ function goBack() {
   if (prev) showPage(prev);
   else showPage('page-main');
 }
+
+// 브라우저 뒤로가기 버튼 → 앱 내 뒤로가기
+window.addEventListener('popstate', function(e) {
+  if (_pageHistory.length > 0) {
+    var prev = _pageHistory.pop();
+    showPage(prev);
+  } else {
+    var activePage = document.querySelector('.page.active');
+    if (activePage && activePage.id !== 'page-main' && activePage.id !== 'page-login') {
+      showPage('page-main');
+    } else {
+      history.pushState({page: 'main'}, '', '');
+    }
+  }
+});
+
+// 초기 상태 설정
+history.replaceState({page: 'init'}, '', '');
 
 // ════════════════════════════════════════
 //  유틸
@@ -1204,11 +1218,11 @@ async function loadUserData(uid) {
       try {
         const parsedMats = d.materials ? JSON.parse(d.materials) : [];
         _materials = Array.isArray(parsedMats) ? parsedMats : [];
+      } catch { _materials = []; }
       try {
         var parsedCat = d.catalog ? JSON.parse(d.catalog) : [];
         _catalog = Array.isArray(parsedCat) ? parsedCat : [];
       } catch { _catalog = []; }
-      } catch { _materials = []; }
       // 폴백: 클라우드에 사진 없으면 localStorage에서 복원
       _jobs.forEach(function(j) {
         if ((!j.photosBefore || !j.photosBefore.length) && (!j.photosAfter || !j.photosAfter.length)) {
@@ -1776,6 +1790,7 @@ function showDetail(id) {
 
   // 사진 (전체 표시)
   if (bPh.length || aPh.length) {
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\\\'' + j.id + '\\\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
     if (bPh.length) {
       html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 전 (' + bPh.length + '장)</div>';
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';
@@ -2516,14 +2531,14 @@ function initDocs(type) {
 function setDocType(type) {
   _curDocType = type;
   // 탭 스타일
-  ['estimate','opinion','insurance'].forEach(t => {
+  ['estimate','opinion','receipt'].forEach(t => {
     const b = document.getElementById('tab-' + t);
     if (!b) return;
     if (t === type) { b.style.background='var(--accent)'; b.style.color='white'; b.style.border='none'; }
     else { b.style.background='var(--bg3)'; b.style.color='var(--text2)'; b.style.border='1px solid var(--border)'; }
   });
   // 타이틀
-  const titles = {estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  const titles = {estimate:'견적서',opinion:'소견서',receipt:'영수증'};
   const titleEl = document.getElementById('docs-title');
   if (titleEl) titleEl.innerHTML = (titles[type]||type) + ' <span>생성</span>';
   // 공유버튼: 편집모드면 숨기기, 미리보기면 타입에 맞게 표시
@@ -2532,13 +2547,8 @@ function setDocType(type) {
     document.getElementById('share-insurance').style.display = 'none';
     renderDocEdit();
   } else {
-    if (type === 'insurance') {
-      document.getElementById('share-normal').style.display = 'none';
-      document.getElementById('share-insurance').style.display = 'block';
-    } else {
-      document.getElementById('share-normal').style.display = 'block';
-      document.getElementById('share-insurance').style.display = 'none';
-    }
+    document.getElementById('share-normal').style.display = 'block';
+    document.getElementById('share-insurance').style.display = 'none';
     renderDocPreview();
   }
 }
@@ -2639,7 +2649,19 @@ function toggleDocsMode() {
       document.getElementById('share-insurance').style.display = 'none';
     }
     // 편집 내용 미리보기에 반영
-    if (_curDocType === 'insurance') {
+    if (_curDocType === 'receipt') {
+      var j2 = getSelJob();
+      if (j2) {
+        var ra = document.getElementById('receipt-amount');
+        var rt = document.getElementById('receipt-to');
+        var rad = document.getElementById('receipt-addr');
+        var rb = document.getElementById('receipt-body');
+        if (ra) j2._receiptAmount = Number(ra.value) || 0;
+        if (rt) j2._receiptTo = rt.value;
+        if (rad) j2._receiptAddr = rad.value;
+        if (rb) j2._receiptBody = rb.value;
+      }
+    } else if (_curDocType === 'insurance') {
       var j2 = getSelJob();
       if (j2) {
         var ic = document.getElementById('ins-company');
@@ -2713,7 +2735,7 @@ function renderDocEdit() {
       + makeOpinionHTML(j, biz, today, co, ce)
       + '</div></div>';
   } else {
-    renderInsuranceEdit(j, el);
+    renderReceiptEdit(j, el);
   }
 }
 
@@ -2879,76 +2901,21 @@ function makeOpinionHTML(j, biz, today, co, ce) {
 }
 
 
-function renderInsuranceEdit(j, el) {
-  var bPh = (j.photosBefore||[]).filter(Boolean);
-  var aPh = (j.photosAfter||[]).filter(Boolean);
-  var mkPh = function(arr, label) {
-    if (!arr.length) return '<div style="grid-column:1/-1;padding:12px;text-align:center;color:#aaa;font-size:11px;border:1px dashed #c8d8f0;border-radius:4px;">현장관리에서 사진을 등록하면 자동으로 불러옵니다</div>';
-    return arr.map(function(p,i){
-      return '<div><img src="'+p+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;"><div style="font-size:9px;color:#888;text-align:center;margin-top:2px;">'+label+(i+1)+'</div></div>';
-    }).join('');
-  };
-
+function renderReceiptEdit(j, el) {
+  var insTotal = jobTotal(j);
   var html = '';
-
-  // 보험 정보 입력 - 삭제됨 (불필요)
-
-  // 현장 사진
   html += '<div class="form-card">';
-  html += '<div class="form-card-title">📸 현장 사진 (현장관리에서 자동 연동)</div>';
-  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 전</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'+mkPh(bPh,'전')+'</div>';
-  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 후</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+mkPh(aPh,'후')+'</div>';
+  html += '<div class="form-card-title">🧾 영수증 내용</div>';
+  html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
+  html += '<input class="form-input" id="receipt-amount" type="number" oninput="calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal) + '"></div>';
+  html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
+  html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
+  html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">본문</label>';
+  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.') + '</textarea></div>';
   html += '</div>';
-
-  // 영수증 내용 편집 (수정 가능하게)
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">🧾 영수증 내용 (수정 가능)</div>';
-  html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">보험서류 영수증 페이지에 표시되는 내용입니다. 기본값은 견적서 합계 금액입니다.</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">영수증 금액</label>'
-    + '<input class="form-input" id="receipt-amount" type="number" placeholder="800000" oninput="onReceiptAmountChange()" value="'+(j._receiptAmount !== undefined ? j._receiptAmount : jobTotal(j))+'">'
-    + '<div id="receipt-korean-preview" style="margin-top:6px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-sm);font-size:14px;font-weight:600;color:var(--accent);">'
-    + '金 ' + numToKorean(j._receiptAmount !== undefined ? j._receiptAmount : jobTotal(j)) + ' 원정</div>'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">수령인 (귀하) - 고객명</label>'
-    + '<input class="form-input" id="receipt-to" placeholder="고객명" value="'+(j._receiptTo || j.name || '')+'">'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">주소 (선택 - 영수증에 주소 표시)</label>'
-    + '<input class="form-input" id="receipt-addr" placeholder="주소 입력 시 영수증에 표시" value="'+(j._receiptAddr || '')+'">'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">영수증 본문</label>'
-    + '<textarea class="form-textarea" id="receipt-body" rows="2" placeholder="상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수 합니다.">'
-    + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수 합니다.')
-    + '</textarea>'
-    + '</div>';
-  html += '<div style="font-size:11px;color:var(--text2);padding:8px 12px;background:rgba(168,85,247,0.08);border-radius:var(--r-sm);">💡 업체명, 사업자번호, 전화번호, 성명, 도장은 사업자정보에서 자동으로 불러옵니다</div>';
-  html += '</div>';
-
-  // 영수증 사진 첨부 (별도)
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">📎 영수증 사진 첨부 (선택)</div>';
-  html += '<div id="ins-receipt-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;"></div>';
-  html += '<button onclick="openReceiptInput()" class="btn btn-secondary btn-sm" style="width:100%;">📎 영수증 사진 추가</button>';
-  html += '<input type="file" id="ins-receipt-input" accept="image/*" multiple style="display:none" onchange="handleInsReceipt(event)">';
-  html += '</div>';
-
-  // 체크리스트
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">✅ 첨부서류 확인</div>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📋 견적서</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📝 소견서</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📸 현장사진</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🧾 영수증</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🏢 사업자등록증</label>';
-  html += '</div>';
-
   el.innerHTML = html;
-  renderInsReceiptList();
 }
 
 
@@ -2976,86 +2943,25 @@ function renderDocPreview() {
       + makeOpinionHTML(j, biz, today, co, ce)
       + '</div></div>';
   } else {
-    // 보험서류 - 견적서, 소견서, 현장사진, 영수증 (신청서 제거)
-    var bPh=(j.photosBefore||[]).filter(Boolean);
-    var aPh=(j.photosAfter||[]).filter(Boolean);
-
-    // === 1페이지: 견적서 ===
-    var page1 = '<div class="a4-preview"><div class="a4-preview-page">' + makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) + '</div></div>';
-
-    // === 2페이지: 소견서 ===
-    var page2 = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">2페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div class="a4-preview-page">' + makeOpinionHTML(j, biz, today, co, ce) + '</div></div>';
-
-    // === 3페이지: 현장사진 (전체) ===
-    var photoPage = '';
-    if (bPh.length > 0 || aPh.length > 0) {
-      photoPage = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 현장사진</span><div class="ins-page-divider-line"></div></div>'
-        + '<div class="a4-preview"><div style="background:white;padding:40px 48px;">'
-        + '<div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:16px;">현 장 사 진</div>'
-        + '<div style="font-size:12px;color:#555;margin-bottom:16px;">고객: <b>' + j.name + '</b> | 작업일: <b>' + (j.date||'-') + '</b> | 주소: ' + (j.addr||'-') + '</div>';
-
-      if (bPh.length > 0) {
-        photoPage += '<div style="font-size:14px;font-weight:700;color:#2c5f9e;margin:12px 0 8px;padding-left:10px;border-left:4px solid #2c5f9e;">조치 전</div>';
-        photoPage += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">';
-        bPh.forEach(function(p, i) {
-          photoPage += '<div style="text-align:center;"><img src="' + p + '" style="width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:10px;color:#666;margin:4px 0;">전' + (i+1) + '</p></div>';
-        });
-        photoPage += '</div>';
-      }
-
-      if (aPh.length > 0) {
-        photoPage += '<div style="font-size:14px;font-weight:700;color:#2c5f9e;margin:12px 0 8px;padding-left:10px;border-left:4px solid #2c5f9e;">조치 후</div>';
-        photoPage += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-        aPh.forEach(function(p, i) {
-          photoPage += '<div style="text-align:center;"><img src="' + p + '" style="width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:10px;color:#666;margin:4px 0;">후' + (i+1) + '</p></div>';
-        });
-        photoPage += '</div>';
-      }
-      photoPage += '</div></div>';
-    }
-
-    // === 4페이지: 영수증 (공식 양식) ===
-    var receiptAmount = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
-    var koreanAmount = numToKorean(receiptAmount);
-    var receiptTo = j._receiptTo || j.name || '';
-    var receiptAddr = j._receiptAddr || '';
-    var receiptBody = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
-    receiptBody = receiptBody.replace(/\n/g, '<br>');
-    var receiptHtml = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 영수증</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;display:flex;justify-content:center;">'
+    // 영수증
+    var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
+    var rK = numToKorean(rA); var rT = j._receiptTo || j.name || ''; var rAd = j._receiptAddr || '';
+    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
+    rB = rB.replace(/\n/g, '<br>');
+    var rH = '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:sans-serif;display:flex;justify-content:center;">'
       + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
       + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:16px;margin-bottom:50px;color:#333;">영 수 증</div>'
-      + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;">'
-      + '<span contenteditable="' + ce + '" style="font-weight:600;letter-spacing:6px;">' + receiptTo + '</span>'
-      + '<span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span>'
-      + '</div>'
-      + (receiptAddr ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;" contenteditable="' + ce + '">주소: ' + receiptAddr + '</div>' : '')
+      + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;"><span style="font-weight:600;letter-spacing:6px;">' + rT + '</span><span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span></div>'
+      + (rAd ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;">주소: ' + rAd + '</div>' : '')
       + '<div style="border-bottom:1px solid #aaa;margin-bottom:30px;"></div>'
-      + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;">'
-      + '<span style="font-weight:700;margin-right:16px;">金</span>'
-      + '<span style="font-weight:700;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
-      + '</div>'
-      + '<div style="text-align:right;margin-bottom:40px;font-size:21px;color:#333;padding-right:20px;">'
-      + '<span style="margin-right:12px;">&#8361;</span>'
-      + '<span style="font-weight:600;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
-      + '</div>'
-      + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;" contenteditable="' + ce + '">'
-      + receiptBody
-      + '</div>'
+      + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;"><span style="font-weight:700;margin-right:16px;">金</span><span style="font-weight:700;">' + rK + ' 원정</span></div>'
+      + '<div style="text-align:right;margin-bottom:40px;font-size:21px;color:#333;padding-right:20px;">₩ <span style="font-weight:600;">' + rA.toLocaleString() + '</span></div>'
+      + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
       + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
-      + '<div>영수인:&nbsp;&nbsp;주소: <span contenteditable="' + ce + '">' + (biz.addr||'-') + '</span></div>'
-      + '<div style="padding-left:58px;">사업자번호: <span contenteditable="' + ce + '">' + (biz.reg||'-') + '</span></div>'
-      + '<div style="padding-left:58px;">전화번호: <span contenteditable="' + ce + '">' + (biz.tel||'-') + '</span></div>'
-      + '<div style="display:flex;align-items:center;padding-left:58px;">성명: <span contenteditable="' + ce + '" style="margin-left:4px;">' + (biz.ceo||'-') + '</span>'
-      + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : '<span style="color:#999;margin-left:10px;">(인)</span>')
-      + '</div>'
-      + '</div>'
-      + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
-      + '</div>'
-      + '</div></div>';
-
-    el.innerHTML = page1 + page2 + photoPage + receiptHtml;
+      + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
+      + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+      + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div></div></div>';
+    el.innerHTML = rH;
   }
   setTimeout(scaleA4, 100);
 }
@@ -4301,6 +4207,14 @@ async function uploadPhotoToStorage(base64Data, jobId, type, index) {
 async function uploadJobPhotos(job) {
   if (!job || !job.id) return job;
   var changed = false;
+  var totalNew = 0;
+  var uploaded = 0;
+  (job.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  (job.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  if (totalNew === 0) return job;
+
+  await acquireWakeLock();
+  showUploadProgress(0, totalNew, '사진 업로드 준비 중...');
 
   // before 사진
   if (job.photosBefore && job.photosBefore.length > 0) {
@@ -4308,7 +4222,8 @@ async function uploadJobPhotos(job) {
     for (var i = 0; i < job.photosBefore.length; i++) {
       var ph = job.photosBefore[i];
       if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosBefore.length + ')');
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
         var url = await uploadPhotoToStorage(ph, job.id, 'before', i);
         newBefore.push(url || ph);
         if (url) changed = true;
@@ -4325,7 +4240,8 @@ async function uploadJobPhotos(job) {
     for (var i = 0; i < job.photosAfter.length; i++) {
       var ph = job.photosAfter[i];
       if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosAfter.length + ')');
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
         var url = await uploadPhotoToStorage(ph, job.id, 'after', i);
         newAfter.push(url || ph);
         if (url) changed = true;
@@ -4336,6 +4252,8 @@ async function uploadJobPhotos(job) {
     job.photosAfter = newAfter.filter(Boolean);
   }
 
+  hideUploadProgress();
+  releaseWakeLock();
   return job;
 }
 
@@ -4380,6 +4298,169 @@ async function migratePhotosToStorage() {
   if (count > 0) {
     await saveJobs(true);
     showToast('사진 마이그레이션 완료! (' + total + '장) ✓');
+  }
+}
+
+
+// ════════════════════════════════════════
+//  업로드 프로그레스 바 + 화면 잠금
+// ════════════════════════════════════════
+var _wakeLock = null;
+
+function showUploadProgress(current, total, text) {
+  var bar = document.getElementById('upload-progress-bar');
+  if (!bar) return;
+  bar.style.display = 'block';
+  var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('upload-progress-text').textContent = text || '사진 업로드 중...';
+  document.getElementById('upload-progress-pct').textContent = pct + '%';
+  document.getElementById('upload-progress-fill').style.width = pct + '%';
+}
+
+function hideUploadProgress() {
+  var bar = document.getElementById('upload-progress-bar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) { console.log('WakeLock not available'); }
+}
+
+function releaseWakeLock() {
+  if (_wakeLock) {
+    _wakeLock.release().catch(function(){});
+    _wakeLock = null;
+  }
+}
+
+
+async function shareJobPhotos(jobId) {
+  var j = _jobs.find(function(x){ return x.id === jobId; });
+  if (!j) return;
+  var ap = [];
+  (j.photosBefore||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
+  (j.photosAfter||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
+  if (!ap.length) { showToast('공유할 사진이 없습니다'); return; }
+  if (navigator.share && navigator.canShare) {
+    showToast('사진 준비 중...');
+    try {
+      var files = [];
+      for (var i = 0; i < ap.length; i++) {
+        var r = await fetch(ap[i]);
+        var b = await r.blob();
+        files.push(new File([b], (j.name||'photo') + '_' + (i+1) + '.jpg', {type: 'image/jpeg'}));
+      }
+      if (navigator.canShare({files: files})) {
+        await navigator.share({title: j.name + ' 현장사진', text: j.name + ' ' + ap.length + '장', files: files});
+        return;
+      }
+    } catch(e) { if (e.name !== 'AbortError') console.log(e); return; }
+  }
+  var w = window.open('', '_blank');
+  if (w) {
+    var h = '<html><head><title>' + j.name + '</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' (' + ap.length + '장)</h2>';
+    ap.forEach(function(p) { h += '<img src="' + p + '" style="width:100%;max-width:600px;margin:8px 0;border-radius:8px;display:block">'; });
+    h += '</body></html>';
+    w.document.write(h);
+    w.document.close();
+  }
+}
+
+
+// 문서 모아보내기 (견적서+소견서+영수증)
+async function sendAllDocs() {
+  var j = getSelJob();
+  if (!j) { showToast('먼저 작업을 선택해주세요'); return; }
+  var biz = _biz;
+  var today = new Date().toLocaleDateString('ko-KR');
+  var co = biz.name || '업체명';
+  var insTotal = jobTotal(j);
+  var extraCost = (j.extraSpots||0)*200000;
+
+  showToast('문서 생성 중...');
+
+  // 임시 컨테이너 생성
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
+  document.body.appendChild(wrap);
+
+  // 견적서 HTML
+  var estDiv = document.createElement('div');
+  estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
+  estDiv.innerHTML = makeEstimateHTML(j, biz, today, co, insTotal, extraCost, 'false');
+  wrap.appendChild(estDiv);
+
+  // 소견서 HTML
+  var opDiv = document.createElement('div');
+  opDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
+  opDiv.innerHTML = makeOpinionHTML(j, biz, today, co, 'false');
+  wrap.appendChild(opDiv);
+
+  // 영수증 HTML
+  var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
+  var rK = numToKorean(rA);
+  var rT = j._receiptTo || j.name || '';
+  var rAd = j._receiptAddr || '';
+  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
+  rB = rB.replace(/\n/g, '<br>');
+  var rcDiv = document.createElement('div');
+  rcDiv.style.cssText = 'width:794px;min-height:1123px;background:#e8f0f8;padding:36px 32px;font-family:sans-serif;display:flex;justify-content:center;';
+  rcDiv.innerHTML = '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
+    + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:16px;margin-bottom:50px;color:#333;">영 수 증</div>'
+    + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;"><span style="font-weight:600;letter-spacing:6px;">' + rT + '</span><span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span></div>'
+    + (rAd ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;">주소: ' + rAd + '</div>' : '')
+    + '<div style="border-bottom:1px solid #aaa;margin-bottom:30px;"></div>'
+    + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;"><span style="font-weight:700;margin-right:16px;">金</span><span style="font-weight:700;">' + rK + ' 원정</span></div>'
+    + '<div style="text-align:right;margin-bottom:40px;font-size:21px;color:#333;padding-right:20px;">₩ <span style="font-weight:600;">' + rA.toLocaleString() + '</span></div>'
+    + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
+    + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
+    + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
+    + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+    + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div>';
+  wrap.appendChild(rcDiv);
+
+  // html2canvas로 각각 이미지화
+  try {
+    await new Promise(function(r){ setTimeout(r, 300); });
+    var names = ['견적서', '소견서', '영수증'];
+    var divs = [estDiv, opDiv, rcDiv];
+    var files = [];
+    for (var i = 0; i < divs.length; i++) {
+      var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
+      var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/jpeg', 0.92); });
+      files.push(new File([blob], j.name + '_' + names[i] + '.jpg', {type: 'image/jpeg'}));
+    }
+    document.body.removeChild(wrap);
+
+    // Web Share API
+    if (navigator.share && navigator.canShare && navigator.canShare({files: files})) {
+      await navigator.share({
+        title: j.name + ' 문서',
+        text: j.name + ' / ' + (j.date||'') + ' - 견적서, 소견서, 영수증',
+        files: files
+      });
+    } else {
+      // 미지원 시 새 탭
+      var w = window.open('', '_blank');
+      if (w) {
+        var h = '<html><head><title>' + j.name + ' 문서</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' 문서 모음</h2>';
+        for (var k = 0; k < files.length; k++) {
+          h += '<p style="color:#aaa;font-family:sans-serif;margin:16px 0 4px;">' + names[k] + '</p>';
+          h += '<img src="' + URL.createObjectURL(files[k]) + '" style="width:100%;max-width:600px;border-radius:8px;display:block;">';
+        }
+        h += '</body></html>';
+        w.document.write(h);
+        w.document.close();
+      }
+    }
+  } catch(e) {
+    document.body.removeChild(wrap);
+    console.error('문서 모아보내기 실패:', e);
+    showToast('문서 생성 실패');
   }
 }
 
@@ -4744,6 +4825,18 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
       <div id="search-results"></div>
     </div>
+  </div>
+</div>
+
+
+<!-- 업로드 프로그레스 바 -->
+<div id="upload-progress-bar" style="display:none;position:fixed;bottom:56px;left:0;right:0;z-index:9999;background:var(--bg2);padding:8px 16px;border-top:1px solid var(--border);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <span id="upload-progress-text" style="font-size:12px;color:var(--text1);">사진 업로드 중...</span>
+    <span id="upload-progress-pct" style="font-size:12px;font-weight:600;color:var(--accent);">0%</span>
+  </div>
+  <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
+    <div id="upload-progress-fill" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.3s ease;"></div>
   </div>
 </div>
 

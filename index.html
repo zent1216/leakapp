@@ -649,17 +649,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:24px;font-weight:900;">＋</div>
         <div><div class="menu-card-title">새 작업</div><div class="menu-card-sub">현장 기록 등록</div></div>
       </button>
-      <button class="menu-card" onclick="goPage('page-docs','estimate')">
-        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📑</div>
-        <div><div class="menu-card-title">견적서</div><div class="menu-card-sub">A4 · PDF 출력</div></div>
-      </button>
-      <button class="menu-card" onclick="goPage('page-docs','opinion')">
-        <div class="menu-card-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:22px;">📄</div>
-        <div><div class="menu-card-title">소견서</div><div class="menu-card-sub">기술 소견 작성</div></div>
-      </button>
-      <button class="menu-card" onclick="goPage('page-docs','insurance')">
-        <div class="menu-card-icon" style="background:rgba(168,85,247,0.2);color:#a855f7;font-size:22px;">🛡️</div>
-        <div><div class="menu-card-title">보험서류</div><div class="menu-card-sub">보험사 제출용</div></div>
+      <button class="menu-card" onclick="goPage('page-docs')">
+        <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📋</div>
+        <div><div class="menu-card-title">문서</div><div class="menu-card-sub">견적서 · 소견서 · 영수증</div></div>
       </button>
       <button class="menu-card wide" onclick="goPage('page-stats')">
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:22px;">📊</div>
@@ -816,7 +808,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="doc-tabs">
     <button class="doc-tab" id="tab-estimate" onclick="setDocType('estimate')">📋 견적서</button>
     <button class="doc-tab" id="tab-opinion" onclick="setDocType('opinion')">📝 소견서</button>
-    <button class="doc-tab" id="tab-insurance" onclick="setDocType('insurance')">🏛️ 보험서류</button>
+    <button class="doc-tab" id="tab-receipt" onclick="setDocType('receipt')">🧾 영수증</button>
   </div>
   <div class="doc-job-select">
     <select class="form-select" id="doc-job-sel" onchange="onDocJobChange()">
@@ -1120,6 +1112,7 @@ function showPage(id) {
 function goPage(id, extra) {
   const cur = document.querySelector('.page.active');
   if (cur) _pageHistory.push(cur.id);
+  history.pushState({page: id}, '', '');
   showPage(id);
   if (id === 'page-calendar') renderCalendar();
   else if (id === 'page-stats') renderStats();
@@ -1147,6 +1140,24 @@ function goBack() {
   if (prev) showPage(prev);
   else showPage('page-main');
 }
+
+// 브라우저 뒤로가기 버튼 → 앱 내 뒤로가기
+window.addEventListener('popstate', function(e) {
+  if (_pageHistory.length > 0) {
+    var prev = _pageHistory.pop();
+    showPage(prev);
+  } else {
+    var activePage = document.querySelector('.page.active');
+    if (activePage && activePage.id !== 'page-main' && activePage.id !== 'page-login') {
+      showPage('page-main');
+    } else {
+      history.pushState({page: 'main'}, '', '');
+    }
+  }
+});
+
+// 초기 상태 설정
+history.replaceState({page: 'init'}, '', '');
 
 // ════════════════════════════════════════
 //  유틸
@@ -1776,6 +1787,7 @@ function showDetail(id) {
 
   // 사진 (전체 표시)
   if (bPh.length || aPh.length) {
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\\\'' + j.id + '\\\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
     if (bPh.length) {
       html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 전 (' + bPh.length + '장)</div>';
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';
@@ -2516,14 +2528,14 @@ function initDocs(type) {
 function setDocType(type) {
   _curDocType = type;
   // 탭 스타일
-  ['estimate','opinion','insurance'].forEach(t => {
+  ['estimate','opinion','receipt'].forEach(t => {
     const b = document.getElementById('tab-' + t);
     if (!b) return;
     if (t === type) { b.style.background='var(--accent)'; b.style.color='white'; b.style.border='none'; }
     else { b.style.background='var(--bg3)'; b.style.color='var(--text2)'; b.style.border='1px solid var(--border)'; }
   });
   // 타이틀
-  const titles = {estimate:'견적서',opinion:'소견서',insurance:'보험서류'};
+  const titles = {estimate:'견적서',opinion:'소견서',receipt:'영수증'};
   const titleEl = document.getElementById('docs-title');
   if (titleEl) titleEl.innerHTML = (titles[type]||type) + ' <span>생성</span>';
   // 공유버튼: 편집모드면 숨기기, 미리보기면 타입에 맞게 표시
@@ -2532,13 +2544,8 @@ function setDocType(type) {
     document.getElementById('share-insurance').style.display = 'none';
     renderDocEdit();
   } else {
-    if (type === 'insurance') {
-      document.getElementById('share-normal').style.display = 'none';
-      document.getElementById('share-insurance').style.display = 'block';
-    } else {
-      document.getElementById('share-normal').style.display = 'block';
-      document.getElementById('share-insurance').style.display = 'none';
-    }
+    document.getElementById('share-normal').style.display = 'block';
+    document.getElementById('share-insurance').style.display = 'none';
     renderDocPreview();
   }
 }
@@ -2639,7 +2646,19 @@ function toggleDocsMode() {
       document.getElementById('share-insurance').style.display = 'none';
     }
     // 편집 내용 미리보기에 반영
-    if (_curDocType === 'insurance') {
+    if (_curDocType === 'receipt') {
+      var j2 = getSelJob();
+      if (j2) {
+        var ra = document.getElementById('receipt-amount');
+        var rt = document.getElementById('receipt-to');
+        var rad = document.getElementById('receipt-addr');
+        var rb = document.getElementById('receipt-body');
+        if (ra) j2._receiptAmount = Number(ra.value) || 0;
+        if (rt) j2._receiptTo = rt.value;
+        if (rad) j2._receiptAddr = rad.value;
+        if (rb) j2._receiptBody = rb.value;
+      }
+    } else if (_curDocType === 'insurance') {
       var j2 = getSelJob();
       if (j2) {
         var ic = document.getElementById('ins-company');
@@ -2713,7 +2732,7 @@ function renderDocEdit() {
       + makeOpinionHTML(j, biz, today, co, ce)
       + '</div></div>';
   } else {
-    renderInsuranceEdit(j, el);
+    renderReceiptEdit(j, el);
   }
 }
 
@@ -2879,76 +2898,21 @@ function makeOpinionHTML(j, biz, today, co, ce) {
 }
 
 
-function renderInsuranceEdit(j, el) {
-  var bPh = (j.photosBefore||[]).filter(Boolean);
-  var aPh = (j.photosAfter||[]).filter(Boolean);
-  var mkPh = function(arr, label) {
-    if (!arr.length) return '<div style="grid-column:1/-1;padding:12px;text-align:center;color:#aaa;font-size:11px;border:1px dashed #c8d8f0;border-radius:4px;">현장관리에서 사진을 등록하면 자동으로 불러옵니다</div>';
-    return arr.map(function(p,i){
-      return '<div><img src="'+p+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;"><div style="font-size:9px;color:#888;text-align:center;margin-top:2px;">'+label+(i+1)+'</div></div>';
-    }).join('');
-  };
-
+function renderReceiptEdit(j, el) {
+  var insTotal = jobTotal(j);
   var html = '';
-
-  // 보험 정보 입력 - 삭제됨 (불필요)
-
-  // 현장 사진
   html += '<div class="form-card">';
-  html += '<div class="form-card-title">📸 현장 사진 (현장관리에서 자동 연동)</div>';
-  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 전</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'+mkPh(bPh,'전')+'</div>';
-  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">조치 후</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+mkPh(aPh,'후')+'</div>';
+  html += '<div class="form-card-title">🧾 영수증 내용</div>';
+  html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
+  html += '<input class="form-input" id="receipt-amount" type="number" oninput="calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal) + '"></div>';
+  html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
+  html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
+  html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">본문</label>';
+  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.') + '</textarea></div>';
   html += '</div>';
-
-  // 영수증 내용 편집 (수정 가능하게)
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">🧾 영수증 내용 (수정 가능)</div>';
-  html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">보험서류 영수증 페이지에 표시되는 내용입니다. 기본값은 견적서 합계 금액입니다.</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">영수증 금액</label>'
-    + '<input class="form-input" id="receipt-amount" type="number" placeholder="800000" oninput="onReceiptAmountChange()" value="'+(j._receiptAmount !== undefined ? j._receiptAmount : jobTotal(j))+'">'
-    + '<div id="receipt-korean-preview" style="margin-top:6px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-sm);font-size:14px;font-weight:600;color:var(--accent);">'
-    + '金 ' + numToKorean(j._receiptAmount !== undefined ? j._receiptAmount : jobTotal(j)) + ' 원정</div>'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">수령인 (귀하) - 고객명</label>'
-    + '<input class="form-input" id="receipt-to" placeholder="고객명" value="'+(j._receiptTo || j.name || '')+'">'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">주소 (선택 - 영수증에 주소 표시)</label>'
-    + '<input class="form-input" id="receipt-addr" placeholder="주소 입력 시 영수증에 표시" value="'+(j._receiptAddr || '')+'">'
-    + '</div>';
-  html += '<div class="form-group">'
-    + '<label class="form-label">영수증 본문</label>'
-    + '<textarea class="form-textarea" id="receipt-body" rows="2" placeholder="상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수 합니다.">'
-    + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수 합니다.')
-    + '</textarea>'
-    + '</div>';
-  html += '<div style="font-size:11px;color:var(--text2);padding:8px 12px;background:rgba(168,85,247,0.08);border-radius:var(--r-sm);">💡 업체명, 사업자번호, 전화번호, 성명, 도장은 사업자정보에서 자동으로 불러옵니다</div>';
-  html += '</div>';
-
-  // 영수증 사진 첨부 (별도)
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">📎 영수증 사진 첨부 (선택)</div>';
-  html += '<div id="ins-receipt-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;"></div>';
-  html += '<button onclick="openReceiptInput()" class="btn btn-secondary btn-sm" style="width:100%;">📎 영수증 사진 추가</button>';
-  html += '<input type="file" id="ins-receipt-input" accept="image/*" multiple style="display:none" onchange="handleInsReceipt(event)">';
-  html += '</div>';
-
-  // 체크리스트
-  html += '<div class="form-card">';
-  html += '<div class="form-card-title">✅ 첨부서류 확인</div>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📋 견적서</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📝 소견서</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 📸 현장사진</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🧾 영수증</label>';
-  html += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);"> 🏢 사업자등록증</label>';
-  html += '</div>';
-
   el.innerHTML = html;
-  renderInsReceiptList();
 }
 
 
@@ -2976,86 +2940,25 @@ function renderDocPreview() {
       + makeOpinionHTML(j, biz, today, co, ce)
       + '</div></div>';
   } else {
-    // 보험서류 - 견적서, 소견서, 현장사진, 영수증 (신청서 제거)
-    var bPh=(j.photosBefore||[]).filter(Boolean);
-    var aPh=(j.photosAfter||[]).filter(Boolean);
-
-    // === 1페이지: 견적서 ===
-    var page1 = '<div class="a4-preview"><div class="a4-preview-page">' + makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) + '</div></div>';
-
-    // === 2페이지: 소견서 ===
-    var page2 = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">2페이지 — 소견서</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div class="a4-preview-page">' + makeOpinionHTML(j, biz, today, co, ce) + '</div></div>';
-
-    // === 3페이지: 현장사진 (전체) ===
-    var photoPage = '';
-    if (bPh.length > 0 || aPh.length > 0) {
-      photoPage = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">3페이지 — 현장사진</span><div class="ins-page-divider-line"></div></div>'
-        + '<div class="a4-preview"><div style="background:white;padding:40px 48px;">'
-        + '<div style="font-size:16px;font-weight:700;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:8px;margin-bottom:16px;">현 장 사 진</div>'
-        + '<div style="font-size:12px;color:#555;margin-bottom:16px;">고객: <b>' + j.name + '</b> | 작업일: <b>' + (j.date||'-') + '</b> | 주소: ' + (j.addr||'-') + '</div>';
-
-      if (bPh.length > 0) {
-        photoPage += '<div style="font-size:14px;font-weight:700;color:#2c5f9e;margin:12px 0 8px;padding-left:10px;border-left:4px solid #2c5f9e;">조치 전</div>';
-        photoPage += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">';
-        bPh.forEach(function(p, i) {
-          photoPage += '<div style="text-align:center;"><img src="' + p + '" style="width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:10px;color:#666;margin:4px 0;">전' + (i+1) + '</p></div>';
-        });
-        photoPage += '</div>';
-      }
-
-      if (aPh.length > 0) {
-        photoPage += '<div style="font-size:14px;font-weight:700;color:#2c5f9e;margin:12px 0 8px;padding-left:10px;border-left:4px solid #2c5f9e;">조치 후</div>';
-        photoPage += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-        aPh.forEach(function(p, i) {
-          photoPage += '<div style="text-align:center;"><img src="' + p + '" style="width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid #e0e8f0;border-radius:4px;"><p style="font-size:10px;color:#666;margin:4px 0;">후' + (i+1) + '</p></div>';
-        });
-        photoPage += '</div>';
-      }
-      photoPage += '</div></div>';
-    }
-
-    // === 4페이지: 영수증 (공식 양식) ===
-    var receiptAmount = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
-    var koreanAmount = numToKorean(receiptAmount);
-    var receiptTo = j._receiptTo || j.name || '';
-    var receiptAddr = j._receiptAddr || '';
-    var receiptBody = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
-    receiptBody = receiptBody.replace(/\n/g, '<br>');
-    var receiptHtml = '<div class="ins-page-divider"><div class="ins-page-divider-line"></div><span class="ins-page-num">4페이지 — 영수증</span><div class="ins-page-divider-line"></div></div>'
-      + '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:\'Nanum Gothic\',\'Malgun Gothic\',sans-serif;display:flex;justify-content:center;">'
+    // 영수증
+    var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
+    var rK = numToKorean(rA); var rT = j._receiptTo || j.name || ''; var rAd = j._receiptAddr || '';
+    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n정히 영수 합니다.';
+    rB = rB.replace(/\n/g, '<br>');
+    var rH = '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:sans-serif;display:flex;justify-content:center;">'
       + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
       + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:16px;margin-bottom:50px;color:#333;">영 수 증</div>'
-      + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;">'
-      + '<span contenteditable="' + ce + '" style="font-weight:600;letter-spacing:6px;">' + receiptTo + '</span>'
-      + '<span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span>'
-      + '</div>'
-      + (receiptAddr ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;" contenteditable="' + ce + '">주소: ' + receiptAddr + '</div>' : '')
+      + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;"><span style="font-weight:600;letter-spacing:6px;">' + rT + '</span><span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span></div>'
+      + (rAd ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;">주소: ' + rAd + '</div>' : '')
       + '<div style="border-bottom:1px solid #aaa;margin-bottom:30px;"></div>'
-      + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;">'
-      + '<span style="font-weight:700;margin-right:16px;">金</span>'
-      + '<span style="font-weight:700;" contenteditable="' + ce + '">' + koreanAmount + ' 원정</span>'
-      + '</div>'
-      + '<div style="text-align:right;margin-bottom:40px;font-size:21px;color:#333;padding-right:20px;">'
-      + '<span style="margin-right:12px;">&#8361;</span>'
-      + '<span style="font-weight:600;" contenteditable="' + ce + '">' + receiptAmount.toLocaleString() + '</span>'
-      + '</div>'
-      + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;" contenteditable="' + ce + '">'
-      + receiptBody
-      + '</div>'
+      + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;"><span style="font-weight:700;margin-right:16px;">金</span><span style="font-weight:700;">' + rK + ' 원정</span></div>'
+      + '<div style="text-align:right;margin-bottom:40px;font-size:21px;color:#333;padding-right:20px;">₩ <span style="font-weight:600;">' + rA.toLocaleString() + '</span></div>'
+      + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
       + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
-      + '<div>영수인:&nbsp;&nbsp;주소: <span contenteditable="' + ce + '">' + (biz.addr||'-') + '</span></div>'
-      + '<div style="padding-left:58px;">사업자번호: <span contenteditable="' + ce + '">' + (biz.reg||'-') + '</span></div>'
-      + '<div style="padding-left:58px;">전화번호: <span contenteditable="' + ce + '">' + (biz.tel||'-') + '</span></div>'
-      + '<div style="display:flex;align-items:center;padding-left:58px;">성명: <span contenteditable="' + ce + '" style="margin-left:4px;">' + (biz.ceo||'-') + '</span>'
-      + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : '<span style="color:#999;margin-left:10px;">(인)</span>')
-      + '</div>'
-      + '</div>'
-      + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: <span contenteditable="' + ce + '">' + today + '</span></div>'
-      + '</div>'
-      + '</div></div>';
-
-    el.innerHTML = page1 + page2 + photoPage + receiptHtml;
+      + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
+      + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+      + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div></div></div>';
+    el.innerHTML = rH;
   }
   setTimeout(scaleA4, 100);
 }
@@ -3755,997 +3658,4 @@ function exportBackup() {
     const copy = Object.assign({}, j);
     const photos = localStorage.getItem('photos_' + j.id);
     if (photos) {
-      const p = JSON.parse(photos);
-      copy.photosBefore = p.before || [];
-      copy.photosAfter = p.after || [];
-    }
-    return copy;
-  });
-  const backup = {
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    uid: _uid,
-    jobs: jobsWithPhotos,
-    biz: Object.assign({}, _biz),
-    materials: _materials || []
-  };
-  const json = JSON.stringify(backup, null, 2);
-  const blob = new Blob([json], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const date = new Date().toISOString().slice(0,10);
-  a.href = url;
-  a.download = '누수설비_백업_' + date + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('백업 파일이 저장됐습니다 ✓');
-  const st = document.getElementById('backup-status');
-  if (st) {
-    st.style.display = 'block';
-    st.style.background = 'var(--green-bg)';
-    st.style.color = 'var(--green)';
-    st.style.border = '1px solid rgba(62,207,142,0.3)';
-    st.textContent = '✅ 백업 완료: 작업 ' + _jobs.length + '건 저장됨 (' + date + ')';
-  }
-}
-
-function importBackup(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async function(ev) {
-    try {
-      const backup = JSON.parse(ev.target.result);
-      // 유효성 검사
-      if (!backup.version || !Array.isArray(backup.jobs)) {
-        throw new Error('유효하지 않은 백업 파일입니다');
-      }
-      const jobCount = backup.jobs.length;
-      if (!confirm('백업 파일에서 작업 ' + jobCount + '건을 불러올게요.\n현재 데이터(' + _jobs.length + '건)는 이 데이터로 교체됩니다.\n계속하시겠습니까?')) {
-        e.target.value = '';
-        return;
-      }
-      // 데이터 복원
-      _jobs = backup.jobs;
-      if (backup.materials) _materials = backup.materials;
-      if (backup.biz) {
-        // biz 이미지 필드는 유지하고 나머지만 덮어씌움
-        const keepImg = {
-          signatureImg: _biz.signatureImg,
-          stampImg: _biz.stampImg,
-          regImg: _biz.regImg
-        };
-        _biz = Object.assign({}, backup.biz, {
-          signatureImg: backup.biz.signatureImg || keepImg.signatureImg,
-          stampImg: backup.biz.stampImg || keepImg.stampImg,
-          regImg: backup.biz.regImg || keepImg.regImg
-        });
-      }
-      // localStorage에 사진 저장
-      savePhotosLocal();
-      // Firebase에 강제 저장 (백업 복원이므로 force=true)
-      await saveJobs(true);
-      await saveBizData();
-      updateMainStats();
-      loadBizForm();
-      showToast('✅ 백업 복원 완료! 작업 ' + jobCount + '건');
-      const st = document.getElementById('backup-status');
-      if (st) {
-        st.style.display = 'block';
-        st.style.background = 'var(--green-bg)';
-        st.style.color = 'var(--green)';
-        st.style.border = '1px solid rgba(62,207,142,0.3)';
-        st.textContent = '✅ 복원 완료: 작업 ' + jobCount + '건 불러옴';
-      }
-    } catch(err) {
-      showToast('복원 실패: ' + err.message);
-      const st = document.getElementById('backup-status');
-      if (st) {
-        st.style.display = 'block';
-        st.style.background = 'var(--red-bg)';
-        st.style.color = 'var(--red)';
-        st.style.border = '1px solid rgba(239,68,68,0.3)';
-        st.textContent = '❌ 복원 실패: ' + err.message;
-      }
-    }
-    e.target.value = '';
-  };
-  reader.readAsText(file);
-}
-
-
-// ══════════════════════════════════════════
-//  자동 주기 백업 (브라우저 localStorage에 7일치)
-// ══════════════════════════════════════════
-function autoBackupToLocal() {
-  if (!_uid || !_jobs) return;
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const key = 'auto_backup_' + today;
-    // 오늘 이미 백업했으면 스킵 (앱 자주 열어도 한 번만)
-    if (localStorage.getItem(key)) return;
-
-    const snapshot = {
-      date: today,
-      timestamp: new Date().toISOString(),
-      uid: _uid,
-      jobCount: _jobs.length,
-      jobs: _jobs,
-      biz: _biz,
-      clients: _clients || []
-    };
-    localStorage.setItem(key, JSON.stringify(snapshot));
-
-    // 7일 넘은 자동백업은 삭제
-    const allKeys = Object.keys(localStorage);
-    allKeys.forEach(function(k) {
-      if (k.startsWith('auto_backup_')) {
-        const date = k.replace('auto_backup_', '');
-        const diff = (new Date(today) - new Date(date)) / (1000 * 60 * 60 * 24);
-        if (diff > 7) {
-          localStorage.removeItem(k);
-        }
-      }
-    });
-    console.log('자동 백업 저장됨:', today, '작업', _jobs.length, '건');
-  } catch(e) {
-    console.warn('자동 백업 실패:', e.message);
-  }
-}
-
-// 자동 백업 목록 가져오기
-function getAutoBackups() {
-  const result = [];
-  const allKeys = Object.keys(localStorage);
-  allKeys.forEach(function(k) {
-    if (k.startsWith('auto_backup_')) {
-      try {
-        const snap = JSON.parse(localStorage.getItem(k));
-        result.push({
-          date: snap.date,
-          timestamp: snap.timestamp,
-          jobCount: snap.jobCount || 0,
-          key: k
-        });
-      } catch(e) {}
-    }
-  });
-  result.sort(function(a, b){ return b.date.localeCompare(a.date); });
-  return result;
-}
-
-// 자동 백업 복원 모달 열기
-function openAutoBackupModal() {
-  const backups = getAutoBackups();
-  const modal = document.getElementById('auto-backup-modal');
-  const body = document.getElementById('auto-backup-list');
-  if (!modal || !body) return;
-
-  if (backups.length === 0) {
-    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">자동 백업 내역이 없습니다</div></div>';
-  } else {
-    body.innerHTML = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">브라우저에 매일 자동 저장된 백업입니다 (최근 7일)</div>'
-      + backups.map(function(b) {
-        const time = new Date(b.timestamp).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
-        return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">'
-          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-          + '<div><span style="font-size:15px;font-weight:700;">📅 ' + b.date + '</span>'
-          + '<span style="font-size:11px;color:var(--text2);margin-left:8px;">' + time + '</span></div>'
-          + '<span style="font-size:12px;color:var(--accent);">' + b.jobCount + '건</span></div>'
-          + '<div class="btn-group" style="margin-top:8px;">'
-          + '<button class="btn btn-secondary btn-sm" onclick="downloadAutoBackup(\'' + b.key + '\')">📥 다운로드</button>'
-          + '<button class="btn btn-primary btn-sm" style="flex:2;" onclick="restoreAutoBackup(\'' + b.key + '\')">🔄 이 시점으로 복원</button>'
-          + '</div></div>';
-      }).join('');
-  }
-  modal.classList.add('open');
-}
-
-// 자동 백업 파일 다운로드
-function downloadAutoBackup(key) {
-  try {
-    const snap = JSON.parse(localStorage.getItem(key));
-    const backup = {
-      version: 2,
-      exportedAt: snap.timestamp,
-      uid: snap.uid,
-      jobs: snap.jobs,
-      biz: snap.biz,
-      clients: snap.clients || []
-    };
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '누수설비_자동백업_' + snap.date + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('백업 다운로드 완료 ✓');
-  } catch(e) { showToast('다운로드 실패: ' + e.message); }
-}
-
-// 자동 백업 복원
-async function restoreAutoBackup(key) {
-  try {
-    const snap = JSON.parse(localStorage.getItem(key));
-    if (!confirm('⚠️ ' + snap.date + ' 시점으로 복원합니다.\n\n현재 데이터(' + _jobs.length + '건)가 이 시점 데이터(' + snap.jobCount + '건)로 교체됩니다.\n\n계속하시겠습니까?')) {
-      return;
-    }
-    _jobs = snap.jobs || [];
-    _biz = snap.biz || _biz;
-    _clients = snap.clients || _clients || [];
-    const ok = await saveJobs(true);
-    await saveBizData();
-    if (typeof saveClients === 'function') await saveClients();
-    updateMainStats();
-    if (typeof loadBizForm === 'function') loadBizForm();
-    if (ok) {
-      showToast('✅ ' + snap.date + ' 시점으로 복원됨 (' + snap.jobCount + '건)');
-      closeModal('auto-backup-modal');
-    }
-  } catch(e) { showToast('복원 실패: ' + e.message); }
-}
-
-
-// ══════════════════════════════════════════
-//  자재 관리 (회계)
-// ══════════════════════════════════════════
-let _editingMaterialId = null;
-
-function getNextMaterialId() {
-  return _materials.length ? Math.max.apply(null, _materials.map(function(m){return m.id||0;})) + 1 : 1;
-}
-
-
-// ════════════════════════════════════════
-//  자재 카탈로그
-// ════════════════════════════════════════
-var _catalog = [];
-var _editingCatalogId = null;
-var _catalogPhotoData = null;
-var _catalogPickerCallback = null;
-
-function getNextCatalogId() {
-  if (!_catalog.length) return 1;
-  return Math.max.apply(null, _catalog.map(function(c){ return c.id||0; })) + 1;
-}
-
-async function saveCatalog() {
-  if (!_uid) return;
-  try {
-    await db.collection('users').doc(_uid).set({catalog: JSON.stringify(_catalog)}, {merge: true});
-  } catch(e) { console.error('catalog save err', e); }
-}
-
-function handleCatalogPhoto(e) {
-  var file = e.target.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(ev) {
-    var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var maxS = 300, w = img.width, h = img.height;
-      if (w > maxS || h > maxS) { if (w > h) { h = h*maxS/w; w = maxS; } else { w = w*maxS/h; h = maxS; } }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      _catalogPhotoData = canvas.toDataURL('image/jpeg', 0.7);
-      document.getElementById('catalog-photo-preview').innerHTML = '<img src="'+_catalogPhotoData+'" style="width:100%;height:100%;object-fit:cover;">';
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-function openCatalogForm(id) {
-  _editingCatalogId = id || null; _catalogPhotoData = null;
-  var t = document.getElementById('catalog-form-title'), d = document.getElementById('cat-delete-btn'), p = document.getElementById('catalog-photo-preview');
-  if (id) {
-    var c = _catalog.find(function(x){return x.id===id;}); if(!c) return;
-    t.textContent = '자재 수정';
-    document.getElementById('cat-name').value = c.name||'';
-    document.getElementById('cat-spec').value = c.spec||'';
-    document.getElementById('cat-price').value = c.price||'';
-    document.getElementById('cat-category').value = c.category||'';
-    document.getElementById('cat-memo').value = c.memo||'';
-    renderPriceHistoryRows(c.priceHistory);
-    if(c.photo){_catalogPhotoData=c.photo; p.innerHTML='<img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;">';}
-    else p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
-    if(d) d.style.display='block';
-  } else {
-    t.textContent = '자재 등록';
-    ['cat-name','cat-spec','cat-category','cat-memo'].forEach(function(f){var el=document.getElementById(f);if(el)el.value='';});
-    renderPriceHistoryRows(null);
-    p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
-    if(d) d.style.display='none';
-  }
-  document.getElementById('catalog-form-modal').classList.add('open');
-}
-
-async function saveCatalogItem() {
-  var nm = document.getElementById('cat-name').value.trim();
-  if(!nm){showToast('자재명은 필수입니다');return;}
-  var ex = _editingCatalogId?(_catalog.find(function(c){return c.id===_editingCatalogId;})||{}):{};
-  var item = {id:_editingCatalogId||getNextCatalogId(), name:nm, spec:document.getElementById('cat-spec').value.trim(), priceHistory:getPriceHistory(), price:getCatalogCurrentPrice({priceHistory:getPriceHistory()}), category:document.getElementById('cat-category').value.trim(), memo:document.getElementById('cat-memo').value.trim(), photo:_catalogPhotoData||ex.photo||null};
-  if(_editingCatalogId){_catalog=_catalog.map(function(c){return c.id===_editingCatalogId?item:c;});showToast('자재 수정됨');}
-  else{_catalog.push(item);showToast('자재 등록됨');}
-  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog();
-}
-
-async function deleteCatalogItem() {
-  if(!_editingCatalogId) return;
-  if(!confirm('이 자재를 삭제하시겠습니까?')) return;
-  _catalog=_catalog.filter(function(c){return c.id!==_editingCatalogId;});
-  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog(); showToast('삭제됨');
-}
-
-function renderCatalog() {
-  var list=document.getElementById('catalog-list'); if(!list) return;
-  var kw=(document.getElementById('catalog-search')||{}).value||''; kw=kw.trim().toLowerCase();
-  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0||(c.category||'').toLowerCase().indexOf(kw)>=0;});
-  if(!f.length){list.innerHTML='<div class="empty-state"><div class="empty-icon">🗂️</div><div class="empty-text">'+(kw?'검색 결과가 없습니다':'등록된 자재가 없습니다')+'</div></div>';return;}
-  var cats={}; f.forEach(function(c){var cat=c.category||'미분류';if(!cats[cat])cats[cat]=[];cats[cat].push(c);});
-  var html='';
-  Object.keys(cats).sort().forEach(function(cat){
-    html+='<div style="font-size:12px;font-weight:600;color:var(--accent);padding:10px 0 6px;border-bottom:1px solid var(--border);">'+cat+' ('+cats[cat].length+')</div>';
-    cats[cat].forEach(function(c){
-      html+='<div class="month-job-row" onclick="openCatalogForm('+c.id+')" style="cursor:pointer;align-items:center;">';
-      html+=c.photo?'<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;margin-right:10px;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:44px;height:44px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;font-size:20px;">📦</div>';
-      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
-      var curP=getCatalogCurrentPrice(c); if(curP) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;white-space:nowrap;">'+curP.toLocaleString()+'원</div>';
-      html+='</div>';
-    });
-  });
-  list.innerHTML=html;
-}
-
-function openCatalogPicker(callback) {
-  _catalogPickerCallback=callback;
-  var s=document.getElementById('catalog-picker-search'); if(s)s.value='';
-  renderCatalogPicker();
-  document.getElementById('catalog-picker-modal').classList.add('open');
-}
-
-function renderCatalogPicker() {
-  var list=document.getElementById('catalog-picker-list'); if(!list) return;
-  var kw=(document.getElementById('catalog-picker-search')||{}).value||''; kw=kw.trim().toLowerCase();
-  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0;});
-  if(!f.length){list.innerHTML='<div style="text-align:center;padding:30px;color:var(--text2);">'+(kw?'검색 결과 없음':'등록된 자재가 없습니다')+'</div>';return;}
-  var html='';
-  f.forEach(function(c){
-    html+='<div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;" onclick="pickCatalogItem('+c.id+')">';
-    html+=c.photo?'<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:40px;height:40px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">📦</div>';
-    html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+(getCatalogCurrentPrice(c)?' · '+getCatalogCurrentPrice(c).toLocaleString()+'원':'')+'</div></div></div>';
-  });
-  list.innerHTML=html;
-}
-
-function pickCatalogItem(id) {
-  var c=_catalog.find(function(x){return x.id===id;}); if(!c) return;
-  closeModal('catalog-picker-modal');
-  if(_catalogPickerCallback) _catalogPickerCallback(c);
-}
-
-
-// 단가 이력 행 추가
-function addPriceHistoryRow(month, price) {
-  var container = document.getElementById('cat-price-history');
-  if (!container) return;
-  var div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;align-items:center;';
-  div.innerHTML = '<input type="month" class="form-input cat-ph-month" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (month||'') + '" placeholder="시작월">'
-    + '<input type="number" class="form-input cat-ph-price" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (price||'') + '" placeholder="단가(원)">'
-    + '<button class="btn-icon" onclick="this.parentElement.remove()" style="flex-shrink:0;">×</button>';
-  container.appendChild(div);
-}
-
-// 이력 데이터 수집
-function getPriceHistory() {
-  var rows = document.querySelectorAll('#cat-price-history > div');
-  var history = [];
-  rows.forEach(function(row) {
-    var m = row.querySelector('.cat-ph-month');
-    var p = row.querySelector('.cat-ph-price');
-    if (m && p && m.value && p.value) {
-      history.push({month: m.value, price: parseFloat(p.value)||0});
-    }
-  });
-  history.sort(function(a,b){ return a.month.localeCompare(b.month); });
-  return history;
-}
-
-// 이력에서 특정 날짜의 단가 조회
-function getCatalogPriceAt(catalogItem, dateStr) {
-  var ph = catalogItem.priceHistory || [];
-  if (!ph.length) return catalogItem.price || 0;
-  var ym = (dateStr||'').slice(0,7); // "2026-04"
-  var matched = 0;
-  ph.forEach(function(h) {
-    if (h.month <= ym) matched = h.price;
-  });
-  return matched || (ph.length ? ph[0].price : 0);
-}
-
-// 현재 단가 (최신 이력 기준)
-function getCatalogCurrentPrice(catalogItem) {
-  var ph = catalogItem.priceHistory || [];
-  if (!ph.length) return catalogItem.price || 0;
-  return ph[ph.length - 1].price || 0;
-}
-
-// 이력 렌더링
-function renderPriceHistoryRows(priceHistory) {
-  var container = document.getElementById('cat-price-history');
-  if (!container) return;
-  container.innerHTML = '';
-  if (!priceHistory || !priceHistory.length) {
-    addPriceHistoryRow('', '');
-    return;
-  }
-  priceHistory.forEach(function(h) {
-    addPriceHistoryRow(h.month, h.price);
-  });
-}
-
-
-// ════════════════════════════════════════
-//  작업 검색
-// ════════════════════════════════════════
-function openSearchModal() {
-  document.getElementById('search-keyword').value = '';
-  document.getElementById('search-date-from').value = '';
-  document.getElementById('search-date-to').value = '';
-  document.getElementById('search-results').innerHTML = '';
-  document.getElementById('search-result-count').textContent = '';
-  document.getElementById('search-modal').classList.add('open');
-  setTimeout(function(){ document.getElementById('search-keyword').focus(); }, 300);
-}
-
-function setSearchRange(range) {
-  var now = new Date();
-  var from = '', to = now.toISOString().slice(0,10);
-  if (range === 'today') {
-    from = to;
-  } else if (range === 'week') {
-    var d = new Date(now); d.setDate(d.getDate() - d.getDay());
-    from = d.toISOString().slice(0,10);
-  } else if (range === 'month') {
-    from = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
-  } else if (range === '3month') {
-    var d2 = new Date(now); d2.setMonth(d2.getMonth() - 3);
-    from = d2.toISOString().slice(0,10);
-  } else if (range === 'year') {
-    from = now.getFullYear() + '-01-01';
-  } else {
-    from = ''; to = '';
-  }
-  document.getElementById('search-date-from').value = from;
-  document.getElementById('search-date-to').value = to;
-  doJobSearch();
-}
-
-function doJobSearch() {
-  var kw = (document.getElementById('search-keyword').value||'').trim().toLowerCase();
-  var dateFrom = document.getElementById('search-date-from').value;
-  var dateTo = document.getElementById('search-date-to').value;
-  var results = _jobs.filter(function(j) {
-    if (dateFrom && (j.date||'') < dateFrom) return false;
-    if (dateTo && (j.date||'') > dateTo) return false;
-    if (!kw) return true;
-    var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo].filter(Boolean).join(' ').toLowerCase();
-    return searchable.indexOf(kw) >= 0;
-  });
-  results.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  var countEl = document.getElementById('search-result-count');
-  var listEl = document.getElementById('search-results');
-  if (!kw && !dateFrom && !dateTo) {
-    countEl.textContent = '';
-    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색어를 입력하거나 날짜를 선택하세요</div>';
-    return;
-  }
-  countEl.textContent = '검색 결과: ' + results.length + '건';
-  if (!results.length) {
-    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색 결과가 없습니다</div>';
-    return;
-  }
-  var html = '';
-  results.forEach(function(j) {
-    var statusColor = j.status==='done'?'var(--green)':j.status==='cancel'?'var(--red)':'var(--orange)';
-    var statusText = j.status==='done'?'완료':j.status==='cancel'?'취소':'진행중';
-    var totalAmt = 0;
-    if (j.costItems && j.costItems.length) { j.costItems.forEach(function(c){ totalAmt += (c.amount||0); }); }
-    else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
-    html += '<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
-    html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + '</div>';
-    html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
-    html += '</div>';
-    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + '</div>';
-    html += '<div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
-    if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
-    html += '</div>';
-  });
-  listEl.innerHTML = html;
-}
-
-
-// ════════════════════════════════════════
-//  Firebase Storage 사진 관리
-// ════════════════════════════════════════
-
-// Base64 → Storage 업로드, URL 반환
-async function uploadPhotoToStorage(base64Data, jobId, type, index) {
-  if (!_uid || !base64Data) return null;
-  // 이미 URL이면 그대로 반환
-  if (base64Data.startsWith('http')) return base64Data;
-  try {
-    var path = 'photos/' + _uid + '/' + jobId + '/' + type + '_' + index + '_' + Date.now() + '.jpg';
-    var ref = storage.ref(path);
-    // base64 데이터 추출
-    var base64Only = base64Data.split(',')[1] || base64Data;
-    var byteChars = atob(base64Only);
-    var byteArr = new Uint8Array(byteChars.length);
-    for (var i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-    var blob = new Blob([byteArr], {type: 'image/jpeg'});
-    await ref.put(blob);
-    var url = await ref.getDownloadURL();
-    return url;
-  } catch(e) {
-    console.error('사진 업로드 실패:', e);
-    return null;
-  }
-}
-
-// 작업의 모든 사진을 Storage에 업로드하고 URL로 교체
-async function uploadJobPhotos(job) {
-  if (!job || !job.id) return job;
-  var changed = false;
-
-  // before 사진
-  if (job.photosBefore && job.photosBefore.length > 0) {
-    var newBefore = [];
-    for (var i = 0; i < job.photosBefore.length; i++) {
-      var ph = job.photosBefore[i];
-      if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosBefore.length + ')');
-        var url = await uploadPhotoToStorage(ph, job.id, 'before', i);
-        newBefore.push(url || ph);
-        if (url) changed = true;
-      } else {
-        newBefore.push(ph);
-      }
-    }
-    job.photosBefore = newBefore.filter(Boolean);
-  }
-
-  // after 사진
-  if (job.photosAfter && job.photosAfter.length > 0) {
-    var newAfter = [];
-    for (var i = 0; i < job.photosAfter.length; i++) {
-      var ph = job.photosAfter[i];
-      if (ph && !ph.startsWith('http')) {
-        showToast('사진 업로드 중... (' + (i+1) + '/' + job.photosAfter.length + ')');
-        var url = await uploadPhotoToStorage(ph, job.id, 'after', i);
-        newAfter.push(url || ph);
-        if (url) changed = true;
-      } else {
-        newAfter.push(ph);
-      }
-    }
-    job.photosAfter = newAfter.filter(Boolean);
-  }
-
-  return job;
-}
-
-// Storage에서 작업 사진 폴더 삭제
-async function deleteJobPhotos(jobId) {
-  if (!_uid || !jobId) return;
-  try {
-    var listRef = storage.ref('photos/' + _uid + '/' + jobId);
-    var list = await listRef.listAll();
-    var promises = list.items.map(function(item) { return item.delete(); });
-    await Promise.all(promises);
-  } catch(e) {
-    console.log('사진 삭제 참고:', e.message);
-  }
-}
-
-// 기존 작업들의 Base64 사진을 일괄 마이그레이션
-async function migratePhotosToStorage() {
-  if (!_uid || !_jobs.length) return;
-  var count = 0;
-  var total = 0;
-  _jobs.forEach(function(j) {
-    (j.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) total++; });
-    (j.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) total++; });
-  });
-  if (total === 0) return;
-  showToast('기존 사진 ' + total + '장 마이그레이션 시작...');
-  for (var i = 0; i < _jobs.length; i++) {
-    var j = _jobs[i];
-    var had = false;
-    (j.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) had = true; });
-    (j.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) had = true; });
-    if (had) {
-      _jobs[i] = await uploadJobPhotos(j);
-      count++;
-      if (count % 3 === 0) {
-        await saveJobs(true);
-        showToast('마이그레이션 진행 중... (' + count + '건)');
-      }
-    }
-  }
-  if (count > 0) {
-    await saveJobs(true);
-    showToast('사진 마이그레이션 완료! (' + total + '장) ✓');
-  }
-}
-
-// Firestore에 자재 저장
-async function saveMaterials() {
-  if (!_uid) return;
-  try {
-    await db.collection('users').doc(_uid).set({materials: JSON.stringify(_materials)}, {merge: true});
-  } catch(e) { console.error('saveMaterials:', e); }
-}
-
-// 자재 구매 등록 폼 열기
-function openMaterialPurchaseForm(id) {
-  _editingMaterialId = id || null;
-  const titleEl = document.getElementById('mat-form-title');
-  const delBtn = document.getElementById('mp-delete-btn');
-
-  if (id) {
-    const m = _materials.find(function(x){ return x.id === id; });
-    if (!m) return;
-    titleEl.textContent = '📦 자재 수정';
-    document.getElementById('mp-date').value = m.date || '';
-    document.getElementById('mp-name').value = m.name || '';
-    document.getElementById('mp-amount').value = m.amount || '';
-    document.getElementById('mp-vendor').value = m.vendor || '';
-    document.getElementById('mp-qty').value = m.qty || '';
-    document.getElementById('mp-memo').value = m.memo || '';
-    if (delBtn) delBtn.style.display = 'block';
-  } else {
-    titleEl.textContent = '📦 자재 구매 등록';
-    document.getElementById('mp-date').value = new Date().toISOString().slice(0,10);
-    ['mp-name','mp-amount','mp-vendor','mp-qty','mp-memo'].forEach(function(f){
-      var el = document.getElementById(f);
-      if (el) el.value = '';
-    });
-    if (delBtn) delBtn.style.display = 'none';
-  }
-  document.getElementById('material-purchase-modal').classList.add('open');
-}
-
-// 자재 구매 저장
-async function saveMaterialPurchase() {
-  const name = document.getElementById('mp-name').value.trim();
-  const amount = parseFloat(document.getElementById('mp-amount').value) || 0;
-  const date = document.getElementById('mp-date').value;
-  if (!name || !amount || !date) { showToast('품목명, 금액, 구매일은 필수입니다'); return; }
-
-  const item = {
-    id: _editingMaterialId || getNextMaterialId(),
-    date: date,
-    name: name,
-    amount: amount,
-    vendor: document.getElementById('mp-vendor').value.trim(),
-    qty: document.getElementById('mp-qty').value.trim(),
-    memo: document.getElementById('mp-memo').value.trim()
-  };
-
-  if (_editingMaterialId) {
-    _materials = _materials.map(function(m){ return m.id === _editingMaterialId ? item : m; });
-    showToast('자재 수정됨 ✓');
-  } else {
-    _materials.push(item);
-    showToast('자재 등록됨 ✓');
-  }
-  await saveMaterials();
-  closeModal('material-purchase-modal');
-  renderMaterialList();
-  updateMainStats();
-}
-
-// 자재 삭제
-async function deleteMaterialPurchase() {
-  if (!_editingMaterialId) return;
-  if (!confirm('이 자재 구매 내역을 삭제하시겠습니까?')) return;
-  _materials = _materials.filter(function(m){ return m.id !== _editingMaterialId; });
-  await saveMaterials();
-  closeModal('material-purchase-modal');
-  renderMaterialList();
-  updateMainStats();
-  showToast('삭제됨');
-}
-
-// 자재 목록 렌더링
-function renderMaterialList() {
-  const list = document.getElementById('material-purchase-list');
-  if (!list) return;
-
-  const now = new Date();
-  const yearPrefix = String(now.getFullYear());
-  const totalCost = _materials.reduce(function(s,m){ return s + (m.amount||0); }, 0);
-  const yearCost = _materials.filter(function(m){ return (m.date||'').startsWith(yearPrefix); }).reduce(function(s,m){ return s + (m.amount||0); }, 0);
-
-  // 상단 통계 업데이트
-  var e1 = document.getElementById('mat-total-cost');
-  var e2 = document.getElementById('mat-year-cost');
-  var e3 = document.getElementById('mat-count');
-  if (e1) e1.textContent = fmtShort(totalCost);
-  if (e2) e2.textContent = fmtShort(yearCost);
-  if (e3) e3.textContent = _materials.length;
-
-  if (!_materials.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">등록된 자재 구매 내역이 없습니다</div></div>';
-    return;
-  }
-
-  // 날짜 내림차순 정렬
-  var sorted = _materials.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-
-  // 월별 그룹
-  var months = {};
-  sorted.forEach(function(m) {
-    var ym = (m.date||'').slice(0,7);
-    if (!months[ym]) months[ym] = [];
-    months[ym].push(m);
-  });
-
-  var html = '';
-  Object.keys(months).sort().reverse().forEach(function(ym) {
-    var items = months[ym];
-    var monthTotal = items.reduce(function(s,m){ return s + (m.amount||0); }, 0);
-    var label = ym.replace('-','년 ') + '월';
-    html += '<div class="month-row">';
-    html += '<div class="month-header"><span class="month-name">' + label + ' (' + items.length + '건)</span><span class="month-total" style="color:var(--red);">-' + fmtMoney(monthTotal) + '</span></div>';
-    html += '<div class="month-jobs">';
-    items.forEach(function(m) {
-      html += '<div class="month-job-row" onclick="openMaterialPurchaseForm(' + m.id + ')" style="cursor:pointer;">';
-      html += '<div style="flex:1;">';
-      html += '<div style="font-size:13px;font-weight:600;">' + (m.name||'-') + '</div>';
-      html += '<div style="font-size:11px;color:var(--text2);">' + (m.date||'') + (m.vendor ? ' · ' + m.vendor : '') + (m.qty ? ' · ' + m.qty : '') + '</div>';
-      html += '</div>';
-      html += '<div style="font-size:14px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(m.amount||0) + '</div>';
-      html += '</div>';
-    });
-    html += '</div></div>';
-  });
-
-  list.innerHTML = html;
-}
-
-
-document.addEventListener('click', function(e) {
-  const box = document.getElementById('client-suggestions');
-  const input = document.getElementById('f-client-company');
-  if (box && input && e.target !== input && !box.contains(e.target)) {
-    box.style.display = 'none';
-  }
-});
-document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('as-date').value = new Date().toISOString().slice(0,10);
-  addMaterialRow();
-  renderPhotoSlots();
-  addCostItem('', '');
-  // 비용 항목은 동적으로 생성되므로 oninput 속성으로 처리
-  window.addEventListener('resize', function() {
-    scaleDocPage();
-    scaleA4();
-  });
-});
-</script>
-
-<!-- 서명 패드 모달 -->
-<div class="modal-overlay" id="sig-pad-modal" onclick="handleOverlayClick(event,'sig-pad-modal')">
-  <div class="modal-sheet" style="max-height:70vh;">
-    <div class="modal-header">
-      <div class="modal-title">✍️ 서명 작성</div>
-      <button class="modal-close" onclick="closeModal('sig-pad-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">아래 흰색 영역에 손가락으로 서명해주세요</div>
-      <div style="border-radius:var(--r-sm);overflow:hidden;border:2px solid var(--border2);background:white;">
-        <canvas id="sig-canvas" style="display:block;touch-action:none;cursor:crosshair;" width="400" height="180"></canvas>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-secondary" style="flex:1;" onclick="clearSigPad()">🗑️ 지우기</button>
-        <button class="btn btn-primary" style="flex:2;" onclick="saveSigPad()">✅ 서명 저장</button>
-      </div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-        <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">또는 이미지 업로드</div>
-        <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="document.getElementById('sig-input').click()">📁 파일에서 업로드</button>
-        <input type="file" id="sig-input" accept="image/*" style="display:none" onchange="handleSigUpload(event)">
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- 의뢰처 선택/관리 모달 -->
-<div class="modal-overlay" id="client-picker-modal" onclick="handleOverlayClick(event,'client-picker-modal')">
-  <div class="modal-sheet" style="max-height:80vh;">
-    <div class="modal-header">
-      <div class="modal-title">📋 의뢰처 선택</div>
-      <button class="modal-close" onclick="closeModal('client-picker-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">저장된 의뢰처를 선택하거나 새로 추가할 수 있어요</div>
-      <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openClientForm(null)">+ 새 의뢰처 추가</button>
-      <div id="client-list"></div>
-    </div>
-  </div>
-</div>
-
-<!-- 의뢰처 작성/수정 모달 -->
-<div class="modal-overlay" id="client-form-modal" onclick="handleOverlayClick(event,'client-form-modal')">
-  <div class="modal-sheet" style="max-height:85vh;">
-    <div class="modal-header">
-      <div class="modal-title" id="client-form-title">의뢰처 정보</div>
-      <button class="modal-close" onclick="closeModal('client-form-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">업체명 *</label><input class="form-input" id="cf-name" placeholder="예: OO중개, OO관리단"></div>
-      <div class="form-group"><label class="form-label">담당자</label><input class="form-input" id="cf-contact" placeholder="담당자명"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000"></div>
-      <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
-      <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
-      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cf-memo" placeholder="결제 조건, 특이사항 등"></textarea></div>
-      <div class="btn-group">
-        <button class="btn btn-danger" id="cf-delete-btn" onclick="deleteClient()" style="display:none;">🗑️ 삭제</button>
-        <button class="btn btn-primary" onclick="saveClient()" style="flex:2;">💾 저장</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- 자동 백업 목록 모달 -->
-<div class="modal-overlay" id="auto-backup-modal" onclick="handleOverlayClick(event,'auto-backup-modal')">
-  <div class="modal-sheet" style="max-height:80vh;">
-    <div class="modal-header">
-      <div class="modal-title">📅 자동 백업 내역</div>
-      <button class="modal-close" onclick="closeModal('auto-backup-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div id="auto-backup-list"></div>
-    </div>
-  </div>
-</div>
-
-
-<!-- 하단 고정 탭 네비게이션 -->
-<div class="bottom-tab-nav" id="bottom-tab-nav">
-  <button class="tab-btn active" onclick="goPage('page-main')" data-page="page-main">
-    <span class="tab-icon">📅</span><span class="tab-label">오늘</span>
-  </button>
-  <button class="tab-btn" onclick="goPage('page-calendar')" data-page="page-calendar">
-    <span class="tab-icon">🔧</span><span class="tab-label">현장</span>
-  </button>
-  <button class="tab-btn" onclick="goPage('page-field')" data-page="page-field">
-    <span class="tab-icon">➕</span><span class="tab-label">등록</span>
-  </button>
-  <button class="tab-btn" onclick="goPage('page-contacts')" data-page="page-contacts">
-    <span class="tab-icon">👥</span><span class="tab-label">고객</span>
-  </button>
-  <button class="tab-btn" onclick="goPage('page-docs')" data-page="page-docs">
-    <span class="tab-icon">📄</span><span class="tab-label">문서</span>
-  </button>
-  <button class="tab-btn" onclick="goPage('page-biz')" data-page="page-biz">
-    <span class="tab-icon">⚙️</span><span class="tab-label">사업자</span>
-  </button>
-</div>
-
-
-<!-- 자재 구매 등록/수정 모달 -->
-<div class="modal-overlay" id="material-purchase-modal" onclick="handleOverlayClick(event,'material-purchase-modal')">
-  <div class="modal-sheet">
-    <div class="modal-header">
-      <div class="modal-title" id="mat-form-title">📦 자재 구매 등록</div>
-      <button class="modal-close" onclick="closeModal('material-purchase-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">구매일 *</label><input class="form-input" id="mp-date" type="date"></div>
-      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">품목명 *<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openCatalogPicker(function(c){ document.getElementById('mp-name').value=c.name; if(c.price) document.getElementById('mp-amount').value=c.price; })">🗂️ 카탈로그</button></label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
-      <div class="form-group"><label class="form-label">금액 (원) *</label><input class="form-input" id="mp-amount" type="number" placeholder="0"></div>
-      <div class="form-group"><label class="form-label">구매처</label><input class="form-input" id="mp-vendor" placeholder="예: 동아자재, 온라인쇼핑"></div>
-      <div class="form-group"><label class="form-label">수량</label><input class="form-input" id="mp-qty" placeholder="예: 10개, 2박스"></div>
-      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="mp-memo" placeholder="용도, 현장명 등"></textarea></div>
-      <div class="btn-group">
-        <button class="btn btn-danger" id="mp-delete-btn" onclick="deleteMaterialPurchase()" style="display:none;">🗑️</button>
-        <button class="btn btn-primary" onclick="saveMaterialPurchase()" style="flex:2;">💾 저장</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- 자재 카탈로그 등록/수정 모달 -->
-<div class="modal-overlay" id="catalog-form-modal" onclick="handleOverlayClick(event,'catalog-form-modal')">
-  <div class="modal-sheet">
-    <div class="modal-header">
-      <div class="modal-title" id="catalog-form-title">🗂️ 자재 등록</div>
-      <button class="modal-close" onclick="closeModal('catalog-form-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">사진</label>
-        <div id="catalog-photo-preview" style="width:100px;height:100px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;margin-bottom:6px;" onclick="document.getElementById('catalog-photo-input').click()">
-          <span id="catalog-photo-placeholder" style="font-size:32px;color:var(--text2);">📷</span>
-        </div>
-        <input type="file" id="catalog-photo-input" accept="image/*" style="display:none" onchange="handleCatalogPhoto(event)">
-      </div>
-      <div class="form-group"><label class="form-label">자재명 *</label><input class="form-input" id="cat-name" placeholder="예: PVC 파이프 20mm"></div>
-      <div class="form-group"><label class="form-label">규격/사양</label><input class="form-input" id="cat-spec" placeholder="예: 20mm × 3m, 백색"></div>
-      <div class="form-group">
-        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">단가 이력<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="addPriceHistoryRow()">+ 단가 추가</button></label>
-        <div id="cat-price-history" style="margin-top:4px;"></div>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px;">시작월 기준으로 해당 기간의 단가가 적용됩니다</div>
-      </div>
-      <div class="form-group"><label class="form-label">카테고리</label><input class="form-input" id="cat-category" placeholder="예: 배관, 부속, 공구, 실링"></div>
-      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cat-memo" rows="2" placeholder="구매처, 특이사항 등"></textarea></div>
-      <div class="btn-group">
-        <button class="btn btn-danger" id="cat-delete-btn" onclick="deleteCatalogItem()" style="display:none;">🗑️</button>
-        <button class="btn btn-primary" onclick="saveCatalogItem()" style="flex:2;">💾 저장</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 자재 카탈로그 선택 모달 (새작업/구매등록에서 사용) -->
-<div class="modal-overlay" id="catalog-picker-modal" onclick="handleOverlayClick(event,'catalog-picker-modal')">
-  <div class="modal-sheet">
-    <div class="modal-header">
-      <div class="modal-title">🗂️ 자재 선택</div>
-      <button class="modal-close" onclick="closeModal('catalog-picker-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <input class="form-input" id="catalog-picker-search" placeholder="자재명 검색..." oninput="renderCatalogPicker()" style="margin-bottom:10px;">
-      <div id="catalog-picker-list" style="max-height:400px;overflow-y:auto;"></div>
-    </div>
-  </div>
-</div>
-
-
-<!-- 작업 검색 모달 -->
-<div class="modal-overlay" id="search-modal" onclick="handleOverlayClick(event,'search-modal')">
-  <div class="modal-sheet" style="max-height:90vh;">
-    <div class="modal-header">
-      <div class="modal-title">🔍 작업 검색</div>
-      <button class="modal-close" onclick="closeModal('search-modal')">✕</button>
-    </div>
-    <div class="modal-body" style="overflow-y:auto;">
-      <div class="form-group">
-        <input class="form-input" id="search-keyword" placeholder="고객명, 주소, 전화번호, 의뢰처..." oninput="doJobSearch()" style="font-size:15px;padding:12px;">
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;">
-        <div class="form-group" style="flex:1;margin:0;">
-          <label class="form-label" style="font-size:11px;">시작일</label>
-          <input class="form-input" id="search-date-from" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
-        </div>
-        <div class="form-group" style="flex:1;margin:0;">
-          <label class="form-label" style="font-size:11px;">종료일</label>
-          <input class="form-input" id="search-date-to" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="search-quick-btns">
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('today')">오늘</button>
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('week')">이번주</button>
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('month')">이번달</button>
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('3month')">최근3개월</button>
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('year')">올해</button>
-        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('all')">전체</button>
-      </div>
-      <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
-      <div id="search-results"></div>
-    </div>
-  </div>
-</div>
-
-</body>
-</html>
+      const p = JSON.parse(

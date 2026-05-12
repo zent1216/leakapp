@@ -495,9 +495,12 @@ body { padding-bottom: 70px; }
 
     <!-- Step 0: 기본 정보 -->
     <div id="step0" class="step-content">
-      <div class="section-title">
-        <div class="icon">📋</div>
-        작업 기본 정보
+      <div class="section-title" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="icon">📋</div>
+          작업 기본 정보
+        </div>
+        <button onclick="resetForm()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:white;color:var(--text-sub);font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔄 새 글 작성</button>
       </div>
 
       <!-- Firebase Import -->
@@ -691,8 +694,9 @@ body { padding-bottom: 70px; }
             </div>
           </div>
 
-          <button class="btn btn-secondary" style="margin-top:10px;" onclick="downloadAllPhotos()" id="resultDownloadBtn">📥 사진 다운로드</button>
+          <button class="btn btn-secondary" style="margin-top:10px;" onclick="downloadAllPhotos()">📥 사진 다운로드</button>
           <button class="btn btn-secondary" style="margin-top:10px;" onclick="savePost()">💾 저장하기</button>
+          <button class="btn btn-outline" style="margin-top:10px;border-color:#FCA5A5;color:#EF4444;" onclick="deleteCurrentPost()" id="deleteCurrentBtn">🗑️ 이 글 삭제</button>
         </div>
       </div>
     </div>
@@ -1096,39 +1100,186 @@ function generatePrompt() {
   }, 300);
 }
 
-// ===== Photo Download =====
-function downloadPhoto(dataUrl, filename) {
-  var a = document.createElement('a');
-  a.href = dataUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+// ===== Reset & Delete =====
+var currentViewingPostIdx = -1;
+
+function resetForm() {
+  if (!confirm('입력한 내용이 모두 초기화됩니다. 계속할까요?')) return;
+  // 폼 초기화
+  document.querySelectorAll('.tag.selected').forEach(function(t) { t.classList.remove('selected'); });
+  selectedTags = { workType: '', placeType: '', causeType: '', toneType: '전문+친근' };
+  document.querySelectorAll('#toneType .tag').forEach(function(t) {
+    t.classList.toggle('selected', t.dataset.val === '전문+친근');
+  });
+  document.getElementById('location').value = '';
+  document.getElementById('leakSpot').value = '';
+  document.getElementById('workMemo').value = '';
+  document.getElementById('episodeMemo').value = '';
+  document.getElementById('toolsMemo').value = '';
+  beforePhotos.length = 0;
+  afterPhotos.length = 0;
+  document.getElementById('beforeGrid').innerHTML = '';
+  document.getElementById('afterGrid').innerHTML = '';
+  document.getElementById('promptArea').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+  currentDocNumber = '';
+  currentViewingPostIdx = -1;
+  document.getElementById('docNumberBadge').style.display = 'none';
+  goStep(0);
+  showToast('🔄 초기화되었습니다');
 }
 
-function downloadAllPhotos() {
+function deleteCurrentPost() {
+  if (currentViewingPostIdx < 0) {
+    showToast('저장된 글이 아닙니다');
+    return;
+  }
+  var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+  var post = saved[currentViewingPostIdx];
+  if (!post) return;
+  var label = post.docNumber ? post.docNumber + ' ' : '';
+  if (!confirm(label + '"' + (post.title || '').substring(0, 20) + '..." 글을 삭제할까요?')) return;
+  saved.splice(currentViewingPostIdx, 1);
+  localStorage.setItem('blogPosts', JSON.stringify(saved));
+  currentViewingPostIdx = -1;
+  renderSavedList();
+  resetForm();
+  showToast('🗑️ 삭제되었습니다');
+}
+
+// ===== Photo Download (ZIP) =====
+function addWatermarkAndGetBlob(imgSrc) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // 워터마크
+      var settings = loadSettings();
+      var wmText = settings.bizName || '누수프로';
+      var fontSize = Math.max(Math.round(img.width * 0.04), 20);
+      ctx.font = 'bold ' + fontSize + 'px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      var textWidth = ctx.measureText(wmText).width;
+      var padding = fontSize * 0.8;
+      var x = img.width - padding;
+      var y = img.height - padding;
+      var boxPadH = fontSize * 0.4;
+      var boxPadV = fontSize * 0.3;
+      // 배경 박스
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      var bx = x - textWidth - boxPadH;
+      var by = y - fontSize - boxPadV;
+      var bw = textWidth + boxPadH * 2;
+      var bh = fontSize + boxPadV * 2;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, fontSize * 0.15);
+      ctx.fill();
+      // 텍스트
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillText(wmText, x, y);
+
+      canvas.toBlob(function(blob) {
+        resolve(blob);
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror = function() {
+      // CORS 실패 시 — fetch로 재시도
+      fetch(imgSrc).then(function(r) { return r.blob(); }).then(function(blob) {
+        // blob을 objectURL로 변환 후 다시 시도
+        var url = URL.createObjectURL(blob);
+        var img2 = new Image();
+        img2.onload = function() {
+          var canvas = document.createElement('canvas');
+          var ctx = canvas.getContext('2d');
+          canvas.width = img2.width;
+          canvas.height = img2.height;
+          ctx.drawImage(img2, 0, 0);
+          var settings = loadSettings();
+          var wmText = settings.bizName || '누수프로';
+          var fontSize = Math.max(Math.round(img2.width * 0.04), 20);
+          ctx.font = 'bold ' + fontSize + 'px sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'bottom';
+          var textWidth = ctx.measureText(wmText).width;
+          var padding = fontSize * 0.8;
+          var x2 = img2.width - padding;
+          var y2 = img2.height - padding;
+          var boxPadH = fontSize * 0.4;
+          var boxPadV = fontSize * 0.3;
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(x2 - textWidth - boxPadH, y2 - fontSize - boxPadV, textWidth + boxPadH*2, fontSize + boxPadV*2);
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.fillText(wmText, x2, y2);
+          canvas.toBlob(function(b) {
+            URL.revokeObjectURL(url);
+            resolve(b);
+          }, 'image/jpeg', 0.9);
+        };
+        img2.onerror = function() {
+          // 최종 실패 — 원본 blob 그대로
+          URL.revokeObjectURL(url);
+          resolve(blob);
+        };
+        img2.src = url;
+      }).catch(function() {
+        // fetch도 실패 — null 반환
+        resolve(null);
+      });
+    };
+    img.src = imgSrc;
+  });
+}
+
+async function downloadAllPhotos() {
   if (beforePhotos.length === 0 && afterPhotos.length === 0) {
     showToast('다운로드할 사진이 없습니다');
     return;
   }
 
+  showToast('📦 ZIP 파일 생성 중...');
   var docNum = currentDocNumber || generateDocNumber();
-  var delay = 0;
-  beforePhotos.forEach(function(photo, i) {
-    setTimeout(function() {
-      downloadPhoto(photo.data, docNum + '_작업전_사진' + (i + 1) + '.jpg');
-    }, delay);
-    delay += 500;
-  });
-  afterPhotos.forEach(function(photo, i) {
-    setTimeout(function() {
-      downloadPhoto(photo.data, docNum + '_작업후_사진' + (i + 1) + '.jpg');
-    }, delay);
-    delay += 500;
-  });
 
+  // JSZip 로드
+  if (typeof JSZip === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    document.head.appendChild(script);
+    await new Promise(function(resolve) { script.onload = resolve; });
+  }
+
+  var zip = new JSZip();
   var total = beforePhotos.length + afterPhotos.length;
-  showToast('📥 ' + docNum + ' 사진 ' + total + '장 다운로드 중...');
+  var done = 0;
+
+  for (var i = 0; i < beforePhotos.length; i++) {
+    var blob = await addWatermarkAndGetBlob(beforePhotos[i].data);
+    if (blob) zip.file(docNum + '_작업전_사진' + (i+1) + '.jpg', blob);
+    done++;
+    showToast('📦 처리 중... ' + done + '/' + total);
+  }
+  for (var j = 0; j < afterPhotos.length; j++) {
+    var blob2 = await addWatermarkAndGetBlob(afterPhotos[j].data);
+    if (blob2) zip.file(docNum + '_작업후_사진' + (j+1) + '.jpg', blob2);
+    done++;
+    showToast('📦 처리 중... ' + done + '/' + total);
+  }
+
+  var content = await zip.generateAsync({ type: 'blob' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = docNum + '_사진모음.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showToast('✅ ' + docNum + '_사진모음.zip 다운로드 완료!');
 }
 
 function copyPromptText() {
@@ -1208,7 +1359,7 @@ function renderSavedList() {
     item.style.position = 'relative';
     item.innerHTML = '<div class="history-thumb">' + (post.thumb ? '<img src="' + post.thumb + '">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:20px;">📄</div>') + '</div>' +
       '<div class="history-info"><h4>' + docBadge + post.title + '</h4><p>' + post.date + ' · ' + (post.workType || '') + ' · ' + (post.location || '') + '</p></div>' +
-      '<button class="history-delete" data-idx="' + idx + '" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;background:rgba(239,68,68,0.1);color:#EF4444;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>';
+      '<button class="history-delete" data-idx="' + idx + '" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);width:32px;height:32px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#EF4444;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑️</button>';
     item.querySelector('.history-info').onclick = function() { viewSavedPost(idx); };
     item.querySelector('.history-delete').onclick = function(e) {
       e.stopPropagation();
@@ -1233,6 +1384,8 @@ function viewSavedPost(idx) {
   var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
   var post = saved[idx];
   if (!post) return;
+
+  currentViewingPostIdx = idx;
 
   // 문서번호 복원
   currentDocNumber = post.docNumber || '';

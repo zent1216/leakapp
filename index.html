@@ -2923,7 +2923,7 @@ function renderReceiptEdit(j, el) {
   html += '<div class="form-card">';
   html += '<div class="form-card-title">🧾 영수증 내용</div>';
   html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
-  html += '<input class="form-input" id="receipt-amount" type="text" inputmode="numeric" oninput="formatAmountInput(this);calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal) + '"></div>';
+  html += '<input class="form-input" id="receipt-amount" type="text" inputmode="numeric" oninput="formatAmountInput(this);calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal).toLocaleString() + '"></div>';
   html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
   html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';

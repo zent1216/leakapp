@@ -914,6 +914,17 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 </div>
 
 
+
+<!-- ════════════ 의뢰처 관리 ════════════ -->
+<div class="page" id="page-companies">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">←</button>
+    <div class="topbar-title">의뢰처 <span>관리</span></div>
+    <button class="topbar-action" onclick="openClientForm(null)">+ 추가</button>
+  </div>
+  <div class="page-body" id="companies-body"></div>
+</div>
+
 <!-- ════════════ 자재 관리 (회계) ════════════ -->
 <div class="page" id="page-materials">
   <div class="topbar">
@@ -1121,6 +1132,7 @@ function goPage(id, extra) {
   if (id === 'page-calendar') renderCalendar();
   else if (id === 'page-stats') renderStats();
   else if (id === 'page-materials') renderMaterialList();
+  else if (id === 'page-companies') renderCompaniesPage();
   else if (id === 'page-contacts') renderContacts();
   else if (id === 'page-catalog') renderCatalog();
   else if (id === 'page-biz') loadBizForm();
@@ -1335,6 +1347,47 @@ async function shareBizReg() {
   } catch(e) {
     if (e.name !== 'AbortError') { console.log(e); showToast('공유 실패'); }
   }
+}
+
+
+// 의뢰처 관리 페이지 렌더
+function renderCompaniesPage() {
+  var body = document.getElementById('companies-body');
+  if (!body) return;
+  if (!_clients.length) {
+    body.innerHTML = '<div class="empty-state" style="padding-top:60px;"><div class="empty-icon">🏢</div><div class="empty-text">등록된 의뢰처가 없습니다</div><div class="empty-sub">+ 추가 버튼으로 의뢰처를 등록하세요</div></div>';
+    return;
+  }
+  var sorted = _clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var html = '<div style="padding:4px 0;">';
+  sorted.forEach(function(cl) {
+    var jobCount = _jobs.filter(function(j){ return j.clientCompany === cl.name; }).length;
+    html += '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-bottom:8px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    html += '<span style="font-size:15px;font-weight:700;">' + (cl.name||'') + '</span>';
+    html += '<div style="display:flex;gap:8px;">';
+    html += '<button class="btn-icon" onclick="openClientForm(' + cl.id + ')" style="font-size:14px;">✏️</button>';
+    html += '<button class="btn-icon" onclick="deleteClientFromPage(' + cl.id + ')" style="font-size:14px;color:var(--danger);">🗑️</button>';
+    html += '</div></div>';
+    if (cl.contact) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">👤 ' + cl.contact + '</div>';
+    if (cl.phone) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📞 <a href="tel:' + cl.phone + '" style="color:var(--accent);text-decoration:none;">' + cl.phone + '</a></div>';
+    if (cl.addr) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📍 ' + cl.addr + '</div>';
+    if (cl.commissionRate) html += '<div style="font-size:13px;color:var(--purple);margin-bottom:2px;">💰 수수료 ' + cl.commissionRate + '%</div>';
+    if (jobCount > 0) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;">작업 ' + jobCount + '건</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function deleteClientFromPage(id) {
+  var cl = _clients.find(function(x){ return x.id === id; });
+  if (!cl) return;
+  if (!confirm('"' + cl.name + '" 의뢰처를 삭제하시겠습니까?')) return;
+  _clients = _clients.filter(function(x){ return x.id !== id; });
+  saveClients();
+  renderCompaniesPage();
+  showToast('의뢰처가 삭제됐습니다');
 }
 
 // Firestore 저장용: 사진 제외한 job 데이터
@@ -2155,9 +2208,11 @@ async function saveClient() {
   if (_editingClientId) {
     _clients = _clients.map(function(c){ return c.id === _editingClientId ? client : c; });
     showToast('의뢰처가 수정됐습니다 ✓');
+  renderCompaniesPage();
   } else {
     _clients.push(client);
     showToast('의뢰처가 추가됐습니다 ✓');
+  renderCompaniesPage();
   }
   await saveClients();
   closeModal('client-form-modal');
@@ -4813,7 +4868,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <button class="tab-btn" onclick="goPage('page-contacts')" data-page="page-contacts">
     <span class="tab-icon">👥</span><span class="tab-label">고객</span>
   </button>
-  <button class="tab-btn" onclick="openCompanyModal()" data-page="page-company">
+  <button class="tab-btn" onclick="goPage('page-companies')" data-page="page-companies">
     <span class="tab-icon">🏢</span><span class="tab-label">의뢰처</span>
   </button>
   <button class="tab-btn" onclick="goPage('page-docs')" data-page="page-docs">

@@ -1018,7 +1018,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">🏢 사업자등록증 사본</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">보험청구 서류에 자동 첨부됩니다</div>
+      
       <div id="bizreg-preview" style="display:none;position:relative;margin-bottom:8px;">
         <img id="bizreg-img" style="width:100%;border-radius:var(--r-sm);border:1px solid var(--border);">
         <button onclick="removeBizReg()" class="remove-btn" style="width:26px;height:26px;top:6px;right:6px;font-size:16px;">×</button>
@@ -3011,7 +3011,7 @@ function renderReceiptEdit(j, el) {
   html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
   html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">본문</label>';
-  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.') + '</textarea></div>';
+  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.') + '</textarea></div>';
   html += '</div>';
   el.innerHTML = html;
 }
@@ -3044,7 +3044,7 @@ function renderDocPreview() {
     // 영수증
     var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
     var rK = numToKorean(rA); var rT = j._receiptTo || j.name || ''; var rAd = j._receiptAddr || '';
-    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.';
+    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.';
     rB = rB.replace(/\n/g, '<br>');
     var rH = '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:sans-serif;display:flex;justify-content:center;">'
       + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
@@ -4527,7 +4527,7 @@ async function doSendAllDocs(mode) {
   var rK = numToKorean(rA);
   var rT = j._receiptTo || j.name || '';
   var rAd = j._receiptAddr || '';
-  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로\n영수합니다.';
+  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.';
   rB = rB.replace(/\n/g, '<br>');
   var rcDiv = document.createElement('div');
   rcDiv.style.cssText = 'width:794px;min-height:1123px;background:#e8f0f8;padding:36px 32px;font-family:sans-serif;display:flex;justify-content:center;';

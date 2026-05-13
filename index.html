@@ -653,6 +653,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">📋</div>
         <div><div class="menu-card-title">문서</div><div class="menu-card-sub">견적서 · 소견서 · 영수증</div></div>
       </button>
+      <button class="menu-card" onclick="goPage('page-quick-est')">
+        <div class="menu-card-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:22px;">⚡</div>
+        <div><div class="menu-card-title">간편 견적</div><div class="menu-card-sub">견적서만 빠르게 작성</div></div>
+      </button>
       <button class="menu-card wide" onclick="goPage('page-stats')">
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:22px;">📊</div>
         <div class="menu-card-info"><div class="menu-card-title">실적관리</div><div class="menu-card-sub">월별 매출 · 건수 · 통계</div></div>
@@ -667,6 +671,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
+      <button class="bottom-btn" onclick="goPage('page-quick-est-list')">⚡ 간편견적 목록</button>
     </div>
   </div>
 </div>
@@ -925,6 +930,66 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="page-body" id="companies-body"></div>
 </div>
 
+
+<!-- ════════════ 간편 견적 ════════════ -->
+<div class="page" id="page-quick-est">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">←</button>
+    <div class="topbar-title">간편 <span>견적</span></div>
+    <button class="topbar-action" onclick="resetQuickEst()">초기화</button>
+  </div>
+  <div class="page-body">
+    <div style="font-size:12px;color:var(--accent);text-align:center;margin-bottom:12px;">⚡ 수입에 반영되지 않는 견적서만 작성합니다</div>
+
+    <div class="form-card">
+      <div class="form-card-title">👤 고객 정보</div>
+      <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="qe-name" placeholder="홍길동"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="qe-phone" placeholder="010-0000-0000" type="tel"></div>
+      <div class="form-group">
+        <label class="form-label">주소</label>
+        <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
+          <input class="form-input" id="qe-addr" placeholder="주소 검색" readonly onclick="openQeAddr()" style="cursor:pointer;">
+          <button class="btn btn-secondary btn-sm" onclick="openQeAddr()" style="padding:0;">🔍 검색</button>
+        </div>
+        <input class="form-input" id="qe-addr-detail" placeholder="상세주소" style="margin-top:6px;">
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">💰 견적 항목</div>
+      <div id="qe-items">
+        <div class="cost-row" style="display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;">
+          <input class="form-input" placeholder="항목명">
+          <input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" oninput="formatAmountInput(this);calcQeTotal()">
+          <button class="btn-icon" onclick="this.closest('.cost-row').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button>
+        </div>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:6px;" onclick="addQeItem()">+ 항목 추가</button>
+      <div style="text-align:right;margin-top:10px;font-size:15px;font-weight:700;">합계: <span id="qe-total" style="color:var(--accent);">0원</span></div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">📝 비고</div>
+      <textarea class="form-textarea" id="qe-note" rows="2" placeholder="추가 안내사항 (선택)"></textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+      <button class="btn btn-secondary" onclick="previewQe()" style="padding:14px;">👁️ 미리보기</button>
+      <button class="btn btn-primary" onclick="saveAndSendQe()" style="padding:14px;">💾 저장 및 보내기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ 간편 견적 목록 ════════════ -->
+<div class="page" id="page-quick-est-list">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">←</button>
+    <div class="topbar-title">간편견적 <span>목록</span></div>
+    <button class="topbar-action" onclick="goPage('page-quick-est')">+ 새 견적</button>
+  </div>
+  <div class="page-body" id="qe-list-body"></div>
+</div>
+
 <!-- ════════════ 자재 관리 (회계) ════════════ -->
 <div class="page" id="page-materials">
   <div class="topbar">
@@ -1132,6 +1197,8 @@ function goPage(id, extra) {
   if (id === 'page-calendar') renderCalendar();
   else if (id === 'page-stats') renderStats();
   else if (id === 'page-materials') renderMaterialList();
+  else if (id === 'page-quick-est') { if (!_editingQeId) resetQuickEst(); }
+  else if (id === 'page-quick-est-list') renderQeList();
   else if (id === 'page-companies') renderCompaniesPage();
   else if (id === 'page-contacts') renderContacts();
   else if (id === 'page-catalog') renderCatalog();
@@ -1236,6 +1303,10 @@ async function loadUserData(uid) {
         var parsedCat = d.catalog ? JSON.parse(d.catalog) : [];
         _catalog = Array.isArray(parsedCat) ? parsedCat : [];
       } catch { _catalog = []; }
+      try {
+        var parsedQe = d.quickEstimates ? JSON.parse(d.quickEstimates) : [];
+        _quickEstimates = Array.isArray(parsedQe) ? parsedQe : [];
+      } catch { _quickEstimates = []; }
       // 폴백: 클라우드에 사진 없으면 localStorage에서 복원
       _jobs.forEach(function(j) {
         if ((!j.photosBefore || !j.photosBefore.length) && (!j.photosAfter || !j.photosAfter.length)) {
@@ -1388,6 +1459,288 @@ function deleteClientFromPage(id) {
   saveClients();
   renderCompaniesPage();
   showToast('의뢰처가 삭제됐습니다');
+}
+
+
+// ════════════════════════════════════════
+//  간편 견적 모드
+// ════════════════════════════════════════
+var _quickEstimates = [];
+
+function addQeItem() {
+  var c = document.getElementById('qe-items');
+  var row = document.createElement('div');
+  row.className = 'cost-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;';
+  row.innerHTML = '<input class="form-input" placeholder="항목명"><input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" oninput="formatAmountInput(this);calcQeTotal()"><button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button>';
+  c.appendChild(row);
+}
+
+function calcQeTotal() {
+  var rows = document.querySelectorAll('#qe-items .cost-row');
+  var total = 0;
+  rows.forEach(function(r) {
+    var inp = r.querySelectorAll('input');
+    if (inp[1]) total += parseAmountStr(inp[1].value);
+  });
+  var el = document.getElementById('qe-total');
+  if (el) el.textContent = total.toLocaleString() + '원';
+}
+
+function resetQuickEst() {
+  document.getElementById('qe-name').value = '';
+  document.getElementById('qe-phone').value = '';
+  document.getElementById('qe-addr').value = '';
+  document.getElementById('qe-addr-detail').value = '';
+  document.getElementById('qe-note').value = '';
+  var items = document.getElementById('qe-items');
+  items.innerHTML = '<div class="cost-row" style="display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;"><input class="form-input" placeholder="항목명"><input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" oninput="formatAmountInput(this);calcQeTotal()"><button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button></div>';
+  calcQeTotal();
+  _editingQeId = null;
+}
+
+var _editingQeId = null;
+
+function openQeAddr() {
+  new daum.Postcode({oncomplete:function(d){document.getElementById('qe-addr').value=d.address;document.getElementById('qe-addr-detail').focus();}}).open();
+}
+
+function getQeData() {
+  var name = document.getElementById('qe-name').value.trim();
+  if (!name) { showToast('고객명을 입력해주세요'); return null; }
+  var rows = document.querySelectorAll('#qe-items .cost-row');
+  var items = [];
+  rows.forEach(function(r) {
+    var inp = r.querySelectorAll('input');
+    var n = inp[0] ? inp[0].value.trim() : '';
+    var a = inp[1] ? parseAmountStr(inp[1].value) : 0;
+    if (n || a) items.push({name:n, amount:a});
+  });
+  if (!items.length) { showToast('항목을 하나 이상 입력해주세요'); return null; }
+  return {
+    name: name,
+    phone: document.getElementById('qe-phone').value.trim(),
+    addr: document.getElementById('qe-addr').value.trim(),
+    addrDetail: document.getElementById('qe-addr-detail').value.trim(),
+    note: document.getElementById('qe-note').value.trim(),
+    items: items,
+    total: items.reduce(function(s,i){return s+i.amount;},0),
+    date: new Date().toISOString().slice(0,10),
+    createdAt: new Date().toISOString()
+  };
+}
+
+function makeQeEstimateHTML(data) {
+  var biz = _biz;
+  var co = biz.name || '업체명';
+  var today = new Date().toLocaleDateString('ko-KR');
+  var html = '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
+    + '<div><div style="font-size:15px;font-weight:700;color:#1a3a6e;">'+co+'</div>'
+    + '<div style="font-size:10px;color:#555;margin-top:2px;">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:10px;color:#555;">발행일: '+today+'</div></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:20px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">견 적 서</div></div>'
+    + '<div style="display:grid;grid-template-columns:80px 1fr;gap:4px 12px;font-size:12px;margin-bottom:16px;">'
+    + '<span style="font-weight:600;">수 신</span><span>'+data.name+' 귀하</span>';
+  if (data.addr) html += '<span style="font-weight:600;">현장주소</span><span>'+data.addr+(data.addrDetail?' '+data.addrDetail:'')+'</span>';
+  if (data.phone) html += '<span style="font-weight:600;">연 락 처</span><span>'+data.phone+'</span>';
+  html += '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;">'
+    + '<thead><tr style="background:#eef2f7;"><th style="border:1px solid #ccc;padding:6px;text-align:center;width:40px;">No</th>'
+    + '<th style="border:1px solid #ccc;padding:6px;text-align:center;">항목</th>'
+    + '<th style="border:1px solid #ccc;padding:6px;text-align:right;width:100px;">금액</th></tr></thead><tbody>';
+  data.items.forEach(function(it, i) {
+    html += '<tr><td style="border:1px solid #ccc;padding:6px;text-align:center;">'+(i+1)+'</td>'
+      + '<td style="border:1px solid #ccc;padding:6px;">'+it.name+'</td>'
+      + '<td style="border:1px solid #ccc;padding:6px;text-align:right;">'+it.amount.toLocaleString()+'</td></tr>';
+  });
+  html += '<tr style="background:#eef2f7;font-weight:700;"><td style="border:1px solid #ccc;padding:6px;text-align:center;" colspan="2">합 계</td>'
+    + '<td style="border:1px solid #ccc;padding:6px;text-align:right;">'+data.total.toLocaleString()+'</td></tr></tbody></table>';
+  if (data.note) html += '<div style="font-size:11px;color:#555;margin-bottom:12px;">※ '+data.note+'</div>';
+  html += '<div style="font-size:11px;color:#777;line-height:1.6;">위 금액은 부가세 포함 금액이며, 현장 상황에 따라 변동될 수 있습니다.</div>';
+  html += '<div style="text-align:right;margin-top:30px;font-size:12px;"><div style="font-weight:600;">'+co+'</div><div style="color:#555;">대표 '+(biz.ceo||'-')+'</div>';
+  if (biz.stampImg) html += '<img src="'+biz.stampImg+'" style="width:50px;height:50px;object-fit:contain;margin-top:4px;">';
+  html += '</div>';
+  return html;
+}
+
+function previewQe() {
+  var data = getQeData();
+  if (!data) return;
+  var w = window.open('','_blank');
+  if (w) {
+    var h = '<html><head><title>견적서 - '+data.name+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:20px;font-family:sans-serif;background:#f0f0f0;}div.a4{background:white;max-width:794px;margin:0 auto;padding:50px 40px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}</style></head><body><div class="a4">';
+    h += makeQeEstimateHTML(data);
+    h += '</div></body></html>';
+    w.document.write(h);
+    w.document.close();
+  }
+}
+
+async function saveAndSendQe() {
+  var data = getQeData();
+  if (!data) return;
+  if (_editingQeId) {
+    data.id = _editingQeId;
+    var idx = _quickEstimates.findIndex(function(q){return q.id===_editingQeId;});
+    if (idx>=0) _quickEstimates[idx] = data;
+  } else {
+    data.id = Date.now();
+    _quickEstimates.push(data);
+  }
+  await saveQuickEstimates();
+  showToast('간편 견적 저장됨');
+
+  // 보내기
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
+  document.body.appendChild(wrap);
+  var div = document.createElement('div');
+  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px;font-family:sans-serif;';
+  div.innerHTML = makeQeEstimateHTML(data);
+  wrap.appendChild(div);
+  try {
+    await new Promise(function(r){setTimeout(r,300);});
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    document.body.removeChild(wrap);
+    var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
+    var file = new File([blob], data.name+'_견적서.jpg', {type:'image/jpeg'});
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({title:data.name+' 견적서', files:[file]});
+    } else {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href=url; a.download=data.name+'_견적서.jpg';
+      a.click(); URL.revokeObjectURL(url);
+      showToast('견적서 이미지 다운로드 완료');
+    }
+  } catch(e) {
+    if (wrap.parentNode) document.body.removeChild(wrap);
+    if (e.name!=='AbortError') { console.error(e); showToast('보내기 실패'); }
+  }
+  _editingQeId = null;
+}
+
+async function saveQuickEstimates() {
+  if (!_uid) return;
+  try { await db.collection('users').doc(_uid).set({quickEstimates:JSON.stringify(_quickEstimates)},{merge:true}); }
+  catch(e) { console.error('qe save err',e); }
+}
+
+function renderQeList() {
+  var body = document.getElementById('qe-list-body');
+  if (!body) return;
+  if (!_quickEstimates.length) {
+    body.innerHTML = '<div class="empty-state" style="padding-top:60px;"><div class="empty-icon">⚡</div><div class="empty-text">간편 견적이 없습니다</div><div class="empty-sub">홈에서 간편 견적을 작성해보세요</div></div>';
+    return;
+  }
+  var sorted = _quickEstimates.slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
+  var html = '<div style="padding:4px 0;">';
+  sorted.forEach(function(q) {
+    html += '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-bottom:8px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    html += '<span style="font-size:15px;font-weight:700;">'+q.name+'</span>';
+    html += '<span style="font-size:13px;color:var(--accent);font-weight:600;">'+q.total.toLocaleString()+'원</span>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+(q.date||'')+' · '+(q.addr||'주소 없음')+'</div>';
+    html += '<div style="font-size:12px;color:var(--text3);margin-bottom:10px;">항목: '+q.items.map(function(i){return i.name;}).join(', ')+'</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="editQe('+q.id+')" style="font-size:11px;padding:4px 10px;">✏️ 수정</button>';
+    html += '<button class="btn btn-secondary btn-sm" onclick="resendQe('+q.id+')" style="font-size:11px;padding:4px 10px;">📤 보내기</button>';
+    html += '<button class="btn btn-primary btn-sm" onclick="convertQeToJob('+q.id+')" style="font-size:11px;padding:4px 10px;">🔄 새 작업으로</button>';
+    html += '<button class="btn btn-secondary btn-sm" onclick="deleteQe('+q.id+')" style="font-size:11px;padding:4px 10px;color:var(--red);">🗑️</button>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function editQe(id) {
+  var q = _quickEstimates.find(function(x){return x.id===id;});
+  if (!q) return;
+  _editingQeId = id;
+  goPage('page-quick-est');
+  setTimeout(function() {
+    document.getElementById('qe-name').value = q.name||'';
+    document.getElementById('qe-phone').value = q.phone||'';
+    document.getElementById('qe-addr').value = q.addr||'';
+    document.getElementById('qe-addr-detail').value = q.addrDetail||'';
+    document.getElementById('qe-note').value = q.note||'';
+    var container = document.getElementById('qe-items');
+    container.innerHTML = '';
+    q.items.forEach(function(it) {
+      var row = document.createElement('div');
+      row.className = 'cost-row';
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;';
+      row.innerHTML = '<input class="form-input" placeholder="항목명" value="'+it.name+'"><input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" value="'+it.amount.toLocaleString()+'" oninput="formatAmountInput(this);calcQeTotal()"><button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button>';
+      container.appendChild(row);
+    });
+    calcQeTotal();
+  }, 100);
+}
+
+async function resendQe(id) {
+  var q = _quickEstimates.find(function(x){return x.id===id;});
+  if (!q) return;
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
+  document.body.appendChild(wrap);
+  var div = document.createElement('div');
+  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px;font-family:sans-serif;';
+  div.innerHTML = makeQeEstimateHTML(q);
+  wrap.appendChild(div);
+  try {
+    await new Promise(function(r){setTimeout(r,300);});
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    document.body.removeChild(wrap);
+    var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
+    var file = new File([blob], q.name+'_견적서.jpg', {type:'image/jpeg'});
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({title:q.name+' 견적서', files:[file]});
+    } else {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href=url; a.download=q.name+'_견적서.jpg';
+      a.click(); URL.revokeObjectURL(url);
+      showToast('다운로드 완료');
+    }
+  } catch(e) { if (wrap.parentNode) document.body.removeChild(wrap); }
+}
+
+function convertQeToJob(id) {
+  var q = _quickEstimates.find(function(x){return x.id===id;});
+  if (!q) return;
+  if (!confirm(q.name+' 견적을 새 작업으로 전환하시겠습니까?')) return;
+  goPage('page-field');
+  setTimeout(function() {
+    document.getElementById('f-name').value = q.name||'';
+    document.getElementById('f-phone').value = q.phone||'';
+    document.getElementById('f-addr').value = q.addr||'';
+    document.getElementById('f-addr-detail').value = q.addrDetail||'';
+    // 비용 항목 채우기
+    var costBody = document.getElementById('cost-items-body');
+    if (costBody) {
+      costBody.innerHTML = '';
+      q.items.forEach(function(it) {
+        var row = document.createElement('div');
+        row.className = 'cost-row';
+        row.style.cssText = 'display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;';
+        row.innerHTML = '<input class="form-input" placeholder="항목명" value="'+it.name+'">'
+          + '<input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" value="'+it.amount.toLocaleString()+'" oninput="formatAmountInput(this);calcTotal()">'
+          + '<button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcTotal();" style="color:var(--red);font-size:16px;">✕</button>';
+        costBody.appendChild(row);
+      });
+      calcTotal();
+    }
+    showToast('견적 데이터가 새 작업으로 복사됐습니다');
+  }, 200);
+}
+
+async function deleteQe(id) {
+  var q = _quickEstimates.find(function(x){return x.id===id;});
+  if (!q) return;
+  if (!confirm('"'+q.name+'" 견적을 삭제하시겠습니까?')) return;
+  _quickEstimates = _quickEstimates.filter(function(x){return x.id!==id;});
+  await saveQuickEstimates();
+  renderQeList();
+  showToast('삭제됨');
 }
 
 // Firestore 저장용: 사진 제외한 job 데이터

@@ -1582,12 +1582,19 @@ function previewQe() {
   if (!data) return;
   var modal = document.createElement('div');
   modal.id = 'qe-preview-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;';
   modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  var scaler = document.createElement('div');
+  var screenW = window.innerWidth - 24;
+  var a4W = 794;
+  var scale = screenW < a4W ? screenW / a4W : 1;
+  scaler.style.cssText = 'width:794px;transform-origin:top left;transform:scale('+scale+');margin:0 auto;';
+  if (scale < 1) scaler.style.marginBottom = '-' + Math.round(1123*(1-scale)) + 'px';
   var content = document.createElement('div');
-  content.style.cssText = 'background:white;max-width:700px;margin:0 auto;padding:40px 30px;border-radius:8px;font-family:sans-serif;color:#333;position:relative;';
-  content.innerHTML = '<button onclick="document.getElementById(\'qe-preview-modal\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' + makeQeEstimateHTML(data);
-  modal.appendChild(content);
+  content.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px 80px;font-family:sans-serif;color:#333;box-sizing:border-box;position:relative;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  content.innerHTML = '<button onclick="document.getElementById(\'qe-preview-modal\').remove()" style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,0.1);border:none;font-size:20px;cursor:pointer;color:#666;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button>' + makeQeEstimateHTML(data);
+  scaler.appendChild(content);
+  modal.appendChild(scaler);
   document.body.appendChild(modal);
 }
 
@@ -1610,13 +1617,12 @@ async function saveAndSendQe() {
   wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
   document.body.appendChild(wrap);
   var div = document.createElement('div');
-  div.style.cssText = 'width:794px;background:white;padding:50px 40px;font-family:sans-serif;color:#333;';
+  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px 80px;font-family:sans-serif;color:#333;box-sizing:border-box;';
   div.innerHTML = makeQeEstimateHTML(data);
   wrap.appendChild(div);
   try {
     await new Promise(function(r){setTimeout(r,500);});
-    var divH = div.offsetHeight;
-    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff', width:794, height:Math.max(divH, 600)});
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
     document.body.removeChild(wrap);
     var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
     var file = new File([blob], data.name+'_견적서.jpg', {type:'image/jpeg'});
@@ -1700,13 +1706,12 @@ async function resendQe(id) {
   wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
   document.body.appendChild(wrap);
   var div = document.createElement('div');
-  div.style.cssText = 'width:794px;background:white;padding:50px 40px;font-family:sans-serif;color:#333;';
+  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px 80px;font-family:sans-serif;color:#333;box-sizing:border-box;';
   div.innerHTML = makeQeEstimateHTML(q);
   wrap.appendChild(div);
   try {
     await new Promise(function(r){setTimeout(r,500);});
-    var divH2 = div.offsetHeight;
-    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff', width:794, height:Math.max(divH2, 600)});
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
     document.body.removeChild(wrap);
     var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
     var file = new File([blob], q.name+'_견적서.jpg', {type:'image/jpeg'});

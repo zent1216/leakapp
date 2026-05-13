@@ -655,11 +655,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       </button>
       <button class="menu-card" onclick="goPage('page-quick-est')">
         <div class="menu-card-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:22px;">⚡</div>
-        <div><div class="menu-card-title">간편 견적</div><div class="menu-card-sub">견적서만 빠르게 작성</div></div>
+        <div><div class="menu-card-title">간편 견적</div><div class="menu-card-sub">견적서만 빠르게</div></div>
       </button>
-      <button class="menu-card wide" onclick="goPage('page-stats')">
+      <button class="menu-card" onclick="goPage('page-stats')">
         <div class="menu-card-icon" style="background:rgba(79,142,247,0.2);color:#4f8ef7;font-size:22px;">📊</div>
-        <div class="menu-card-info"><div class="menu-card-title">실적관리</div><div class="menu-card-sub">월별 매출 · 건수 · 통계</div></div>
+        <div><div class="menu-card-title">실적관리</div><div class="menu-card-sub">매출 · 건수 · 통계</div></div>
       </button>
       <button class="menu-card wide" onclick="goPage('page-calendar')">
         <div class="menu-card-icon" style="background:rgba(62,207,142,0.2);color:#3ecf8e;font-size:22px;">🔧</div>
@@ -671,7 +671,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
-      <button class="bottom-btn" onclick="goPage('page-quick-est-list')">⚡ 간편견적 목록</button>
+      
     </div>
   </div>
 </div>
@@ -936,7 +936,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title">간편 <span>견적</span></div>
-    <button class="topbar-action" onclick="resetQuickEst()">초기화</button>
+    <div style="display:flex;gap:6px;">
+      <button class="topbar-action" onclick="goPage('page-quick-est-list')" style="font-size:11px;padding:4px 8px;">📋 목록</button>
+      <button class="topbar-action" onclick="resetQuickEst()">초기화</button>
+    </div>
   </div>
   <div class="page-body">
     <div style="font-size:12px;color:var(--accent);text-align:center;margin-bottom:12px;">⚡ 수입에 반영되지 않는 견적서만 작성합니다</div>
@@ -1502,7 +1505,18 @@ function resetQuickEst() {
 var _editingQeId = null;
 
 function openQeAddr() {
-  new daum.Postcode({oncomplete:function(d){document.getElementById('qe-addr').value=d.address;document.getElementById('qe-addr-detail').focus();}}).open();
+  new daum.Postcode({
+    oncomplete: function(d) {
+      var el = document.getElementById('qe-addr');
+      el.value = d.address;
+      el.removeAttribute('readonly');
+      setTimeout(function() {
+        el.setAttribute('readonly','');
+        document.getElementById('qe-addr-detail').focus();
+      }, 100);
+    },
+    popupName: 'qeAddrPopup'
+  }).open();
 }
 
 function getQeData() {
@@ -1566,14 +1580,15 @@ function makeQeEstimateHTML(data) {
 function previewQe() {
   var data = getQeData();
   if (!data) return;
-  var w = window.open('','_blank');
-  if (w) {
-    var h = '<html><head><title>견적서 - '+data.name+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:20px;font-family:sans-serif;background:#f0f0f0;}div.a4{background:white;max-width:794px;margin:0 auto;padding:50px 40px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}</style></head><body><div class="a4">';
-    h += makeQeEstimateHTML(data);
-    h += '</div></body></html>';
-    w.document.write(h);
-    w.document.close();
-  }
+  var modal = document.createElement('div');
+  modal.id = 'qe-preview-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;';
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  var content = document.createElement('div');
+  content.style.cssText = 'background:white;max-width:700px;margin:0 auto;padding:40px 30px;border-radius:8px;font-family:sans-serif;color:#333;position:relative;';
+  content.innerHTML = '<button onclick="document.getElementById(\'qe-preview-modal\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' + makeQeEstimateHTML(data);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
 }
 
 async function saveAndSendQe() {
@@ -1595,12 +1610,13 @@ async function saveAndSendQe() {
   wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
   document.body.appendChild(wrap);
   var div = document.createElement('div');
-  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px;font-family:sans-serif;';
+  div.style.cssText = 'width:794px;background:white;padding:50px 40px;font-family:sans-serif;color:#333;';
   div.innerHTML = makeQeEstimateHTML(data);
   wrap.appendChild(div);
   try {
-    await new Promise(function(r){setTimeout(r,300);});
-    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    await new Promise(function(r){setTimeout(r,500);});
+    var divH = div.offsetHeight;
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff', width:794, height:Math.max(divH, 600)});
     document.body.removeChild(wrap);
     var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
     var file = new File([blob], data.name+'_견적서.jpg', {type:'image/jpeg'});
@@ -1684,12 +1700,13 @@ async function resendQe(id) {
   wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
   document.body.appendChild(wrap);
   var div = document.createElement('div');
-  div.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px;font-family:sans-serif;';
+  div.style.cssText = 'width:794px;background:white;padding:50px 40px;font-family:sans-serif;color:#333;';
   div.innerHTML = makeQeEstimateHTML(q);
   wrap.appendChild(div);
   try {
-    await new Promise(function(r){setTimeout(r,300);});
-    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    await new Promise(function(r){setTimeout(r,500);});
+    var divH2 = div.offsetHeight;
+    var canvas = await html2canvas(div, {scale:2, useCORS:true, backgroundColor:'#ffffff', width:794, height:Math.max(divH2, 600)});
     document.body.removeChild(wrap);
     var blob = await new Promise(function(res){canvas.toBlob(res,'image/jpeg',0.92);});
     var file = new File([blob], q.name+'_견적서.jpg', {type:'image/jpeg'});

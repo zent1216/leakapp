@@ -1148,93 +1148,85 @@ function deleteCurrentPost() {
 }
 
 // ===== Photo Download (ZIP) =====
-function addWatermarkAndGetBlob(imgSrc) {
+function fetchAsBlob(url) {
+  return fetch(url, { mode: 'cors' })
+    .then(function(r) { return r.blob(); })
+    .catch(function() {
+      // CORS 실패 시 no-cors로 재시도 (opaque response)
+      return fetch(url, { mode: 'no-cors' }).then(function(r) { return r.blob(); });
+    })
+    .catch(function() { return null; });
+}
+
+function dataUrlToBlob(dataUrl) {
+  var parts = dataUrl.split(',');
+  var mime = parts[0].match(/:(.*?);/)[1];
+  var bytes = atob(parts[1]);
+  var arr = new Uint8Array(bytes.length);
+  for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+function tryWatermark(blob) {
   return new Promise(function(resolve) {
+    var url = URL.createObjectURL(blob);
     var img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var ctx = canvas.getContext('2d');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
+      try {
+        var canvas = document.createElement('canvas');
+        var ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
 
-      // 워터마크
-      var settings = loadSettings();
-      var wmText = settings.bizName || '누수프로';
-      var fontSize = Math.max(Math.round(img.width * 0.04), 20);
-      ctx.font = 'bold ' + fontSize + 'px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-      var textWidth = ctx.measureText(wmText).width;
-      var padding = fontSize * 0.8;
-      var x = img.width - padding;
-      var y = img.height - padding;
-      var boxPadH = fontSize * 0.4;
-      var boxPadV = fontSize * 0.3;
-      // 배경 박스
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      var bx = x - textWidth - boxPadH;
-      var by = y - fontSize - boxPadV;
-      var bw = textWidth + boxPadH * 2;
-      var bh = fontSize + boxPadV * 2;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bw, bh, fontSize * 0.15);
-      ctx.fill();
-      // 텍스트
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.fillText(wmText, x, y);
+        var settings = loadSettings();
+        var wmText = settings.bizName || '누수프로';
+        var fontSize = Math.max(Math.round(img.width * 0.04), 20);
+        ctx.font = 'bold ' + fontSize + 'px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        var tw = ctx.measureText(wmText).width;
+        var pad = fontSize * 0.8;
+        var x = img.width - pad;
+        var y = img.height - pad;
+        var bph = fontSize * 0.4;
+        var bpv = fontSize * 0.3;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x - tw - bph, y - fontSize - bpv, tw + bph * 2, fontSize + bpv * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillText(wmText, x, y);
 
-      canvas.toBlob(function(blob) {
-        resolve(blob);
-      }, 'image/jpeg', 0.9);
+        canvas.toBlob(function(wmBlob) {
+          URL.revokeObjectURL(url);
+          resolve(wmBlob || blob);
+        }, 'image/jpeg', 0.9);
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        resolve(blob); // 워터마크 실패 시 원본
+      }
     };
     img.onerror = function() {
-      // CORS 실패 시 — fetch로 재시도
-      fetch(imgSrc).then(function(r) { return r.blob(); }).then(function(blob) {
-        // blob을 objectURL로 변환 후 다시 시도
-        var url = URL.createObjectURL(blob);
-        var img2 = new Image();
-        img2.onload = function() {
-          var canvas = document.createElement('canvas');
-          var ctx = canvas.getContext('2d');
-          canvas.width = img2.width;
-          canvas.height = img2.height;
-          ctx.drawImage(img2, 0, 0);
-          var settings = loadSettings();
-          var wmText = settings.bizName || '누수프로';
-          var fontSize = Math.max(Math.round(img2.width * 0.04), 20);
-          ctx.font = 'bold ' + fontSize + 'px sans-serif';
-          ctx.textAlign = 'right';
-          ctx.textBaseline = 'bottom';
-          var textWidth = ctx.measureText(wmText).width;
-          var padding = fontSize * 0.8;
-          var x2 = img2.width - padding;
-          var y2 = img2.height - padding;
-          var boxPadH = fontSize * 0.4;
-          var boxPadV = fontSize * 0.3;
-          ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(x2 - textWidth - boxPadH, y2 - fontSize - boxPadV, textWidth + boxPadH*2, fontSize + boxPadV*2);
-          ctx.fillStyle = 'rgba(255,255,255,0.95)';
-          ctx.fillText(wmText, x2, y2);
-          canvas.toBlob(function(b) {
-            URL.revokeObjectURL(url);
-            resolve(b);
-          }, 'image/jpeg', 0.9);
-        };
-        img2.onerror = function() {
-          // 최종 실패 — 원본 blob 그대로
-          URL.revokeObjectURL(url);
-          resolve(blob);
-        };
-        img2.src = url;
-      }).catch(function() {
-        // fetch도 실패 — null 반환
-        resolve(null);
-      });
+      URL.revokeObjectURL(url);
+      resolve(blob); // 로드 실패 시 원본
     };
-    img.src = imgSrc;
+    img.src = url;
   });
+}
+
+async function getPhotoBlob(photoData) {
+  var blob;
+  if (photoData.startsWith('data:')) {
+    // base64 데이터 — 직접 변환
+    blob = dataUrlToBlob(photoData);
+  } else {
+    // URL — fetch
+    blob = await fetchAsBlob(photoData);
+  }
+  if (!blob || blob.size === 0) return null;
+
+  // 워터마크 시도
+  var result = await tryWatermark(blob);
+  return result;
 }
 
 async function downloadAllPhotos() {
@@ -1257,18 +1249,30 @@ async function downloadAllPhotos() {
   var zip = new JSZip();
   var total = beforePhotos.length + afterPhotos.length;
   var done = 0;
+  var added = 0;
 
   for (var i = 0; i < beforePhotos.length; i++) {
-    var blob = await addWatermarkAndGetBlob(beforePhotos[i].data);
-    if (blob) zip.file(docNum + '_작업전_사진' + (i+1) + '.jpg', blob);
+    var blob = await getPhotoBlob(beforePhotos[i].data);
+    if (blob && blob.size > 0) {
+      zip.file(docNum + '_작업전_사진' + (i + 1) + '.jpg', blob);
+      added++;
+    }
     done++;
     showToast('📦 처리 중... ' + done + '/' + total);
   }
   for (var j = 0; j < afterPhotos.length; j++) {
-    var blob2 = await addWatermarkAndGetBlob(afterPhotos[j].data);
-    if (blob2) zip.file(docNum + '_작업후_사진' + (j+1) + '.jpg', blob2);
+    var blob2 = await getPhotoBlob(afterPhotos[j].data);
+    if (blob2 && blob2.size > 0) {
+      zip.file(docNum + '_작업후_사진' + (j + 1) + '.jpg', blob2);
+      added++;
+    }
     done++;
     showToast('📦 처리 중... ' + done + '/' + total);
+  }
+
+  if (added === 0) {
+    showToast('⚠️ 사진을 가져올 수 없습니다. 직접 업로드한 사진만 다운로드 가능해요.');
+    return;
   }
 
   var content = await zip.generateAsync({ type: 'blob' });
@@ -1279,7 +1283,7 @@ async function downloadAllPhotos() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
-  showToast('✅ ' + docNum + '_사진모음.zip 다운로드 완료!');
+  showToast('✅ ' + docNum + '_사진모음.zip (' + added + '장) 다운로드 완료!');
 }
 
 function copyPromptText() {

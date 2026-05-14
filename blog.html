@@ -1078,9 +1078,11 @@ function generatePrompt() {
   prompt += '=== 규칙 ===\n';
   prompt += '- 제목: "[' + location + '] ' + placeType + ' ' + workType + '" SEO 키워드 포함\n';
   prompt += '- 본문 800~1200자, 사진위치 "[작업 전 사진 1]" 형태로 표시\n';
-  prompt += '- 연락처: ' + (settings.bizPhone || '문의 전화') + (settings.bizKakao ? ' / 카카오톡: ' + settings.bizKakao : '') + '\n';
+  prompt += '- 연락처: ' + (settings.bizPhone || '문의 전화') + '\n';
+  if (settings.bizKakao) prompt += '- 카카오톡 상담: ' + settings.bizKakao + '\n';
   prompt += '- 하단 문구: ' + settings.bizFooter + '\n';
-  prompt += '- AI 딱딱체 금지, 현장 기사가 직접 쓴 것처럼 생생하게\n\n';
+  prompt += '- AI 딱딱체 금지, 현장 기사가 직접 쓴 것처럼 생생하게\n';
+  prompt += '- 중요: 마크다운 문법 사용 금지! 링크는 [텍스트](URL) 형식이 아닌 URL 텍스트 그대로 작성. 볼드(**), 헤더(#) 등 마크다운 서식 절대 사용하지 마세요. 네이버 블로그에 붙여넣기용이라 순수 텍스트로만 작성하세요.\n\n';
   prompt += '응답 형식:\n제목: (제목)\n---\n(본문 전체)';
 
   // 프롬프트 표시
@@ -1367,6 +1369,23 @@ function savePost() {
   localStorage.setItem('blogPosts', JSON.stringify(saved));
   currentDocNumber = postData.docNumber;
   renderSavedList();
+
+  // Firebase에도 동기화 (로그인 상태일 때)
+  if (fbUser && fbDb) {
+    // 사진 데이터는 용량이 크므로 제외하고 저장
+    var cloudSaved = saved.map(function(p) {
+      var copy = Object.assign({}, p);
+      delete copy.photosBefore;
+      delete copy.photosAfter;
+      delete copy.thumb;
+      return copy;
+    });
+    fbDb.collection('users').doc(fbUser.uid).set({
+      blogPosts: JSON.stringify(cloudSaved)
+    }, { merge: true }).catch(function(e) {
+      console.warn('블로그 목록 클라우드 동기화 실패:', e);
+    });
+  }
 }
 
 function renderSavedList() {
@@ -1403,6 +1422,22 @@ function deleteSavedPost(idx) {
   localStorage.setItem('blogPosts', JSON.stringify(saved));
   renderSavedList();
   showToast('🗑️ 삭제되었습니다');
+
+  // Firebase 동기화
+  if (fbUser && fbDb) {
+    var cloudSaved = saved.map(function(p) {
+      var copy = Object.assign({}, p);
+      delete copy.photosBefore;
+      delete copy.photosAfter;
+      delete copy.thumb;
+      return copy;
+    });
+    fbDb.collection('users').doc(fbUser.uid).set({
+      blogPosts: JSON.stringify(cloudSaved)
+    }, { merge: true }).catch(function(e) {
+      console.warn('블로그 목록 클라우드 동기화 실패:', e);
+    });
+  }
 }
 
 function viewSavedPost(idx) {
@@ -1457,15 +1492,43 @@ async function loadSettingsFromFirebase() {
   if (!fbUser || !fbDb) return;
   try {
     var doc = await fbDb.collection('users').doc(fbUser.uid).get();
-    if (doc.exists && doc.data().blogSettings) {
-      var cloudSettings = JSON.parse(doc.data().blogSettings);
-      // 클라우드 설정으로 로컬 업데이트
-      localStorage.setItem('blogSettings', JSON.stringify(cloudSettings));
-      initSettings();
-      console.log('[블로그앱] 클라우드 설정 동기화 완료');
+    if (doc.exists) {
+      // 설정 동기화
+      if (doc.data().blogSettings) {
+        var cloudSettings = JSON.parse(doc.data().blogSettings);
+        localStorage.setItem('blogSettings', JSON.stringify(cloudSettings));
+        initSettings();
+      }
+      // 저장 목록 동기화 (로컬에 없을 때만 클라우드에서 가져옴)
+      if (doc.data().blogPosts) {
+        var localPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+        var cloudPosts = JSON.parse(doc.data().blogPosts);
+        if (localPosts.length === 0 && cloudPosts.length > 0) {
+          localStorage.setItem('blogPosts', JSON.stringify(cloudPosts));
+          renderSavedList();
+          showToast('☁️ 클라우드에서 저장 목록 ' + cloudPosts.length + '건 불러옴');
+        } else if (localPosts.length > 0 && cloudPosts.length > 0) {
+          // 양쪽 다 있으면 — 로컬에 없는 클라우드 글만 추가 (문서번호 기준)
+          var localDocNums = {};
+          localPosts.forEach(function(p) { if (p.docNumber) localDocNums[p.docNumber] = true; });
+          var added = 0;
+          cloudPosts.forEach(function(cp) {
+            if (cp.docNumber && !localDocNums[cp.docNumber]) {
+              localPosts.push(cp);
+              added++;
+            }
+          });
+          if (added > 0) {
+            localStorage.setItem('blogPosts', JSON.stringify(localPosts));
+            renderSavedList();
+            showToast('☁️ 클라우드에서 ' + added + '건 추가 동기화');
+          }
+        }
+      }
+      console.log('[블로그앱] 클라우드 동기화 완료');
     }
   } catch(e) {
-    console.warn('Firebase 설정 불러오기 실패:', e);
+    console.warn('Firebase 동기화 실패:', e);
   }
 }
 function saveSettings() {

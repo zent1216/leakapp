@@ -1326,12 +1326,11 @@ function savePost() {
   var body = document.getElementById('resultBody').innerText;
   if (!title || !body) { showToast('생성된 글이 없습니다'); return; }
 
-  var docNum = currentDocNumber || generateDocNumber();
   var saved = JSON.parse(localStorage.getItem('blogPosts') || '[]');
   var thumb = beforePhotos.length > 0 ? beforePhotos[0].data : '';
-  saved.unshift({
+  var postData = {
     id: Date.now(),
-    docNumber: docNum,
+    docNumber: currentDocNumber || generateDocNumber(),
     title: title,
     body: body,
     thumb: thumb,
@@ -1340,12 +1339,34 @@ function savePost() {
     workType: selectedTags.workType,
     location: document.getElementById('location').value,
     date: new Date().toLocaleDateString('ko-KR')
-  });
+  };
+
+  // 이미 저장된 글인지 확인 (같은 문서번호 또는 저장 목록에서 열었던 글)
+  var existingIdx = -1;
+  if (currentViewingPostIdx >= 0) {
+    existingIdx = currentViewingPostIdx;
+  } else if (currentDocNumber) {
+    for (var i = 0; i < saved.length; i++) {
+      if (saved[i].docNumber === currentDocNumber) {
+        existingIdx = i;
+        break;
+      }
+    }
+  }
+
+  if (existingIdx >= 0) {
+    if (!confirm(postData.docNumber + ' 글이 이미 있습니다. 덮어쓸까요?')) return;
+    postData.id = saved[existingIdx].id; // 기존 ID 유지
+    saved[existingIdx] = postData;
+    showToast('✅ ' + postData.docNumber + ' 업데이트 완료');
+  } else {
+    saved.unshift(postData);
+    showToast('✅ ' + postData.docNumber + ' 저장되었습니다');
+  }
+
   localStorage.setItem('blogPosts', JSON.stringify(saved));
-  showToast('✅ ' + docNum + ' 저장되었습니다');
+  currentDocNumber = postData.docNumber;
   renderSavedList();
-  // 다음 글을 위해 문서번호 초기화
-  currentDocNumber = '';
 }
 
 function renderSavedList() {

@@ -1236,7 +1236,7 @@ async function downloadAllPhotos() {
   }
 
   showToast('📦 ZIP 파일 생성 중...');
-  var docNum = currentDocNumber || generateDocNumber();
+  var docNum = currentDocNumber || 'BLOG';
 
   // JSZip 로드
   if (typeof JSZip === 'undefined') {

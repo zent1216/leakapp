@@ -960,6 +960,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         </div>
         <input class="form-input" id="qe-addr-detail" placeholder="상세주소" style="margin-top:6px;">
       </div>
+      <div class="form-group"><label class="form-label">누수위치</label><input class="form-input" id="qe-location" placeholder="예: 거실쪽 화장실, 주방 싱크대 하부"></div>
+      <div class="form-group"><label class="form-label">누수상태</label><input class="form-input" id="qe-leak-status" placeholder="예: 천장 물얼룩, 배관 접합부 누수"></div>
     </div>
 
     <div class="form-card">
@@ -1514,6 +1516,8 @@ function resetQuickEst() {
   document.getElementById('qe-addr').value = '';
   document.getElementById('qe-addr-detail').value = '';
   document.getElementById('qe-note').value = '';
+  document.getElementById('qe-location').value = '';
+  document.getElementById('qe-leak-status').value = '';
   var items = document.getElementById('qe-items');
   items.innerHTML = '<div class="cost-row" style="display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;"><input class="form-input" placeholder="항목명"><input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" oninput="formatAmountInput(this);calcQeTotal()"><button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button></div>';
   calcQeTotal();
@@ -1556,6 +1560,8 @@ function getQeData() {
     addr: document.getElementById('qe-addr').value.trim(),
     addrDetail: document.getElementById('qe-addr-detail').value.trim(),
     note: document.getElementById('qe-note').value.trim(),
+    location: document.getElementById('qe-location').value.trim(),
+    leakStatus: document.getElementById('qe-leak-status').value.trim(),
     items: items,
     total: items.reduce(function(s,i){return s+i.amount;},0),
     date: new Date().toISOString().slice(0,10),
@@ -1576,6 +1582,8 @@ function makeQeEstimateHTML(data) {
     + '<span style="font-weight:600;">수 신</span><span>'+data.name+' 귀하</span>';
   if (data.addr) html += '<span style="font-weight:600;">현장주소</span><span>'+data.addr+(data.addrDetail?' '+data.addrDetail:'')+'</span>';
   if (data.phone) html += '<span style="font-weight:600;">연 락 처</span><span>'+data.phone+'</span>';
+  if (data.location) html += '<span style="font-weight:600;">누수위치</span><span>'+data.location+'</span>';
+  if (data.leakStatus) html += '<span style="font-weight:600;">누수상태</span><span>'+data.leakStatus+'</span>';
   html += '</div>';
   html += '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px;table-layout:fixed;">'
     + '<thead><tr style="background:#eef2f7;"><th style="border:1px solid #ccc;padding:8px;text-align:center;width:10%;">No</th>'
@@ -1705,6 +1713,8 @@ function editQe(id) {
     document.getElementById('qe-addr').value = q.addr||'';
     document.getElementById('qe-addr-detail').value = q.addrDetail||'';
     document.getElementById('qe-note').value = q.note||'';
+    document.getElementById('qe-location').value = q.location||'';
+    document.getElementById('qe-leak-status').value = q.leakStatus||'';
     var container = document.getElementById('qe-items');
     container.innerHTML = '';
     q.items.forEach(function(it) {

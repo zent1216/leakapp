@@ -347,8 +347,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
 .doc-table th,.doc-table td{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;color:#333;}
 .doc-table th{background:#1a3a6e;color:white !important;font-weight:600;text-align:left;}
-.a4-preview td,.a4-preview span,.a4-preview div,.a4-preview p{color:#333;}
-.a4-preview th{color:white !important;}
+.a4-preview *{color:#333;}
+.a4-preview .doc-table th{color:white !important;background:#1a3a6e !important;}
+.a4-preview td[style*="background:#f0f5ff"]{background:#f0f5ff !important;}
 
 .doc-total-section{
   background:#f0f5ff;border:2px solid #1a3a6e;border-radius:6px;
@@ -717,7 +718,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div id="client-suggestions" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:4px;max-height:150px;overflow-y:auto;"></div>
       </div>
       <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
-        <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" type="tel"></div>
+        <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
       <div class="form-group">
         <label class="form-label">주소 *</label>
@@ -950,7 +951,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="form-card">
       <div class="form-card-title">👤 고객 정보</div>
       <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="qe-name" placeholder="홍길동"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="qe-phone" placeholder="010-0000-0000" type="tel"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="qe-phone" placeholder="010-0000-0000" type="tel" oninput="formatPhoneInput(this)"></div>
       <div class="form-group">
         <label class="form-label">주소</label>
         <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
@@ -1385,6 +1386,20 @@ function loadPhotosLocal() {
 }
 
 
+
+// 전화번호 자동 하이픈
+function formatPhoneInput(el) {
+  var v = el.value.replace(/[^0-9]/g, '');
+  if (v.length > 11) v = v.slice(0, 11);
+  if (v.length > 7) {
+    el.value = v.slice(0,3) + '-' + v.slice(3,7) + '-' + v.slice(7);
+  } else if (v.length > 3) {
+    el.value = v.slice(0,3) + '-' + v.slice(3);
+  } else {
+    el.value = v;
+  }
+}
+
 // 금액 입력 콤마 자동 포맷
 function formatAmountInput(el) {
   var pos = el.selectionStart;
@@ -1562,17 +1577,17 @@ function makeQeEstimateHTML(data) {
   if (data.addr) html += '<span style="font-weight:600;">현장주소</span><span>'+data.addr+(data.addrDetail?' '+data.addrDetail:'')+'</span>';
   if (data.phone) html += '<span style="font-weight:600;">연 락 처</span><span>'+data.phone+'</span>';
   html += '</div>';
-  html += '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px;">'
-    + '<thead><tr style="background:#eef2f7;"><th style="border:1px solid #ccc;padding:6px;text-align:center;width:40px;">No</th>'
-    + '<th style="border:1px solid #ccc;padding:6px;text-align:center;">항목</th>'
-    + '<th style="border:1px solid #ccc;padding:6px;text-align:right;width:100px;">금액</th></tr></thead><tbody>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px;table-layout:fixed;">'
+    + '<thead><tr style="background:#eef2f7;"><th style="border:1px solid #ccc;padding:8px;text-align:center;width:10%;">No</th>'
+    + '<th style="border:1px solid #ccc;padding:8px;text-align:center;width:60%;">항목</th>'
+    + '<th style="border:1px solid #ccc;padding:8px;text-align:right;width:25%;">금액</th></tr></thead><tbody>';
   data.items.forEach(function(it, i) {
-    html += '<tr><td style="border:1px solid #ccc;padding:6px;text-align:center;">'+(i+1)+'</td>'
-      + '<td style="border:1px solid #ccc;padding:6px;">'+it.name+'</td>'
-      + '<td style="border:1px solid #ccc;padding:6px;text-align:right;">'+it.amount.toLocaleString()+'</td></tr>';
+    html += '<tr><td style="border:1px solid #ccc;padding:8px 10px;text-align:center;">'+(i+1)+'</td>'
+      + '<td style="border:1px solid #ccc;padding:8px 10px;">'+it.name+'</td>'
+      + '<td style="border:1px solid #ccc;padding:8px 10px;text-align:right;">'+it.amount.toLocaleString()+'</td></tr>';
   });
-  html += '<tr style="background:#eef2f7;font-weight:700;"><td style="border:1px solid #ccc;padding:6px;text-align:center;" colspan="2">합 계</td>'
-    + '<td style="border:1px solid #ccc;padding:6px;text-align:right;">'+data.total.toLocaleString()+'</td></tr></tbody></table>';
+  html += '<tr style="background:#eef2f7;font-weight:700;"><td style="border:1px solid #ccc;padding:8px 10px;text-align:center;" colspan="2">합 계</td>'
+    + '<td style="border:1px solid #ccc;padding:8px 10px;text-align:right;font-size:16px;">'+data.total.toLocaleString()+'</td></tr></tbody></table>';
   if (data.note) html += '<div style="font-size:13px;color:#555;margin-bottom:12px;">※ '+data.note+'</div>';
   html += '<div style="font-size:13px;color:#777;line-height:1.6;">위 금액은 부가세 별도 금액이며, 현장 상황에 따라 변동될 수 있습니다.<br>본 견적서는 발행일로부터 7일간 유효합니다.</div>';
   html += '<div style="text-align:right;margin-top:30px;font-size:14px;"><div style="font-weight:600;">'+co+'</div><div style="color:#555;">대표 '+(biz.ceo||'-')+'</div>';
@@ -1670,7 +1685,7 @@ function renderQeList() {
     html += '<div style="font-size:12px;color:var(--text3);margin-bottom:10px;">항목: '+q.items.map(function(i){return i.name;}).join(', ')+'</div>';
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
     html += '<button class="btn btn-secondary btn-sm" onclick="editQe('+q.id+')" style="font-size:11px;padding:4px 10px;">✏️ 수정</button>';
-    html += '<button class="btn btn-secondary btn-sm" onclick="resendQe('+q.id+')" style="font-size:11px;padding:4px 10px;">📤 보내기</button>';
+    html += '<button class="btn btn-secondary btn-sm" onclick="previewQeFromList('+q.id+')" style="font-size:11px;padding:4px 10px;">👁️ 미리보기</button>';
     html += '<button class="btn btn-primary btn-sm" onclick="convertQeToJob('+q.id+')" style="font-size:11px;padding:4px 10px;">🔄 새 작업으로</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="deleteQe('+q.id+')" style="font-size:11px;padding:4px 10px;color:var(--red);">🗑️</button>';
     html += '</div></div>';
@@ -1701,6 +1716,35 @@ function editQe(id) {
     });
     calcQeTotal();
   }, 100);
+}
+
+
+// 간편견적 목록에서 미리보기 (보내기 버튼 포함)
+function previewQeFromList(id) {
+  var q = _quickEstimates.find(function(x){return x.id===id;});
+  if (!q) return;
+  var modal = document.createElement('div');
+  modal.id = 'qe-preview-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;';
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  var scaler = document.createElement('div');
+  var screenW = window.innerWidth - 24;
+  var a4W = 794;
+  var scale = screenW < a4W ? screenW / a4W : 1;
+  scaler.style.cssText = 'width:794px;transform-origin:top left;transform:scale('+scale+');margin:0 auto;';
+  if (scale < 1) scaler.style.marginBottom = '-' + Math.round(1123*(1-scale)) + 'px';
+  var content = document.createElement('div');
+  content.style.cssText = 'width:794px;min-height:1123px;background:white;padding:50px 40px 80px;font-family:sans-serif;color:#333;box-sizing:border-box;position:relative;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  content.innerHTML = makeQeEstimateHTML(q);
+  scaler.appendChild(content);
+  // 하단 버튼바
+  var btnBar = document.createElement('div');
+  btnBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:12px 16px env(safe-area-inset-bottom, 12px);display:flex;gap:8px;z-index:10000;';
+  btnBar.innerHTML = '<button onclick="document.getElementById(\'qe-preview-modal\').remove()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text1);font-size:14px;cursor:pointer;">닫기</button>'
+    + '<button onclick="document.getElementById(\'qe-preview-modal\').remove();resendQe('+id+')" style="flex:2;padding:12px;border:none;border-radius:8px;background:var(--accent);color:white;font-size:14px;font-weight:600;cursor:pointer;">📤 보내기</button>';
+  modal.appendChild(scaler);
+  modal.appendChild(btnBar);
+  document.body.appendChild(modal);
 }
 
 async function resendQe(id) {
@@ -3322,7 +3366,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<tr><td style="background:#f0f5ff;font-weight:600;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
     + '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;">'
-    + '<colgroup><col style="width:55%"><col style="width:33%"><col style="width:32px"></colgroup><thead><tr><th>항목</th><th style="text-align:right;">금액(원)</th><th class="est-del-btn" style="background:#1a3a6e;"></th></tr></thead>'
+    + '<colgroup><col style="width:50%"><col style="width:38%"><col style="width:32px"></colgroup><thead><tr><th style="width:50%">항목</th><th style="width:38%;text-align:right;">금액(원)</th><th class="est-del-btn" style="width:32px;background:#1a3a6e;"></th></tr></thead>'
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'
@@ -3333,7 +3377,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '</div>'
     + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>'
     + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
-    + '<thead><tr><th colspan="2" style="background:#2c5f9e;">입금 계좌</th></tr></thead>'
+    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white !important;">입금 계좌</th></tr></thead>'
     + '<tbody>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'
@@ -4901,7 +4945,7 @@ async function doSendAllDocs(mode) {
   estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;color:#333;font-family:sans-serif;padding:40px 36px;box-sizing:border-box;';
   estDiv.innerHTML = makeEstimateHTML(j, biz, today, co, insTotal, extraCost, 'false');
   var forceStyle = document.createElement('style');
-    forceStyle.textContent = 'div,td,span,p,th,label,input,textarea{color:#333 !important;} th{color:white !important;background:#1a3a6e !important;} table{border-collapse:collapse;} td,th{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;}';
+    forceStyle.textContent = '*{color:#333 !important;box-sizing:border-box;} .doc-table th{color:white !important;background:#1a3a6e !important;} .doc-table td,.doc-table th{border:1px solid #c8d8f0 !important;padding:8px 10px !important;font-size:14px !important;} table{border-collapse:collapse;width:100%;} td{background:white;} td[style*="background:#f0f5ff"]{background:#f0f5ff !important;color:#333 !important;}';
     wrap.appendChild(forceStyle);
     wrap.appendChild(estDiv);
 

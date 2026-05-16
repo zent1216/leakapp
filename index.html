@@ -1503,6 +1503,7 @@ function resetQuickEst() {
 }
 
 var _editingQeId = null;
+var _isSaving = false;
 
 function openQeAddr() {
   new daum.Postcode({
@@ -2902,10 +2903,14 @@ function removePhoto(type, idx, e) {
 }
 
 async function saveJob() {
+  if (_isSaving) return;
+  _isSaving = true;
+  var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중...'; }
   const name = document.getElementById('f-name').value.trim();
   const addr = document.getElementById('f-addr').value.trim();
   const date = document.getElementById('f-date').value;
-  if (!name || !addr || !date) { showToast('고객명, 주소, 작업일은 필수입니다'); return; }
+  if (!name || !addr || !date) { showToast('고객명, 주소, 작업일은 필수입니다'); _isSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; } return; }
   const addrDetail = document.getElementById('f-addr-detail').value.trim();
   const fullAddr = addrDetail ? (addr + ' ' + addrDetail) : addr;
   const costItems = getCostItems();
@@ -2966,11 +2971,15 @@ async function saveJob() {
   } catch(e) { console.error('사진 업로드 오류:', e); }
   // 저장 결과 확인 후 메시지
   const ok = await saveJobs();
+  _isSaving = false;
+  var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; }
   if (ok) {
     showToast(_editingJobId ? '✅ 수정됐습니다' : '✅ 저장됐습니다');
     updateMainStats();
+    var wasEdit = !!_editingJobId;
     resetForm();
-    goBack();
+    goPage('page-calendar');
   }
   // 실패 시에는 폼 유지 (사용자가 다시 시도할 수 있게)
 }

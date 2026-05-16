@@ -387,10 +387,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .doc-edit-hint{font-size:11px;color:var(--text3);text-align:center;padding:6px 0 2px;display:flex;align-items:center;justify-content:center;gap:4px;}
 /* 인쇄용 */
 /* 미리보기/PDF 캡처 시 삭제 버튼 숨기기 */
-.a4-scale-page .est-del-btn,
-.a4-preview .est-del-btn,
+.a4-scale-page .a4-preview .est-del-btn,
 .a4-preview-page .est-del-btn {
   display: none !important;
+}
+@media print {
+  .est-del-btn { display: none !important; }
 }
 
 

@@ -4898,13 +4898,16 @@ async function doSendAllDocs(mode) {
 
   // 견적서
   var estDiv = document.createElement('div');
-  estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
+  estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;color:#333;font-family:sans-serif;padding:40px 36px;box-sizing:border-box;';
   estDiv.innerHTML = makeEstimateHTML(j, biz, today, co, insTotal, extraCost, 'false');
-  wrap.appendChild(estDiv);
+  var forceStyle = document.createElement('style');
+    forceStyle.textContent = 'div,td,span,p,th,label,input,textarea{color:#333 !important;} th{color:white !important;background:#1a3a6e !important;} table{border-collapse:collapse;} td,th{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;}';
+    wrap.appendChild(forceStyle);
+    wrap.appendChild(estDiv);
 
   // 소견서
   var opDiv = document.createElement('div');
-  opDiv.style.cssText = 'width:794px;min-height:1123px;background:white;';
+  opDiv.style.cssText = 'width:794px;min-height:1123px;background:white;color:#333;font-family:sans-serif;padding:40px 36px;box-sizing:border-box;';
   opDiv.innerHTML = makeOpinionHTML(j, biz, today, co, 'false');
   wrap.appendChild(opDiv);
 

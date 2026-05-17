@@ -344,12 +344,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   background:rgba(79,142,247,0.12);
   box-shadow:0 0 0 2px rgba(79,142,247,0.3);
 }
-.doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+.doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;}
+.doc-table td,.doc-table th{overflow:hidden;word-break:break-all;}
 .doc-table th,.doc-table td{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;color:#333;}
 .doc-table th{background:#1a3a6e;color:white !important;font-weight:600;text-align:left;}
-.a4-preview *{color:#333;}
+.a4-preview, .a4-preview *{color:#333 !important;}
 .a4-preview .doc-table th{color:white !important;background:#1a3a6e !important;}
-.a4-preview td[style*="background:#f0f5ff"]{background:#f0f5ff !important;}
+.a4-preview .doc-table td{background:white !important;color:#333 !important;}
+.a4-preview td[style*="background:#f0f5ff"]{background:#f0f5ff !important;color:#333 !important;}
+.a4-preview th[style*="background:#2c5f9e"]{background:#2c5f9e !important;color:white !important;}
 
 .doc-total-section{
   background:#f0f5ff;border:2px solid #1a3a6e;border-radius:6px;
@@ -387,13 +390,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .doc-edit-hint{font-size:11px;color:var(--text3);text-align:center;padding:6px 0 2px;display:flex;align-items:center;justify-content:center;gap:4px;}
 /* 인쇄용 */
 /* 미리보기/PDF 캡처 시 삭제 버튼 숨기기 */
-.a4-scale-page .a4-preview .est-del-btn,
-.a4-preview-page .est-del-btn {
-  display: none !important;
-}
-@media print {
-  .est-del-btn { display: none !important; }
-}
+
 
 
 /* 하단 고정 탭 네비게이션 */
@@ -3317,7 +3314,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     extraRow = '<tr>'
       + '<td contenteditable="'+ce+'">추가 구간('+j.extraSpots+'개소)</td>'
       + '<td style="text-align:right;" contenteditable="'+ce+'">'+((j.extraSpots||0)*200000).toLocaleString()+'</td>'
-      + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+      + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
       + '</tr>';
   }
 
@@ -3329,9 +3326,9 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       // 미리보기에서 0원 항목 표시 여부: ce='true'(편집)면 표시, 아니면 금액>0만 표시
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:30%;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
-          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3340,9 +3337,9 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     j.costItems.forEach(function(item) {
       if (item.name || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td contenteditable="'+ce+'">'+(item.name||'')+'</td>'
-          + '<td style="text-align:right;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
-          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+(item.name||'')+'</td>'
+          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3355,9 +3352,9 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     defaultItems.forEach(function(item) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:30%;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
-          + '<td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>'
+          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3371,29 +3368,28 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
     + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">견&nbsp;&nbsp;적&nbsp;&nbsp;서</div></div>'
     + '<table class="doc-table" style="margin-bottom:10px;">'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">연락처</td><td contenteditable="'+ce+'">'+(j.phone||'-')+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">주소</td><td contenteditable="'+ce+'">'+j.addr+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">연락처</td><td contenteditable="'+ce+'">'+(j.phone||'-')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">주소</td><td contenteditable="'+ce+'">'+j.addr+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
-    + '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;">'
-    + '<colgroup><col style="width:50%"><col style="width:38%"><col style="width:32px"></colgroup><thead><tr><th style="width:50%">항목</th><th style="width:38%;text-align:right;">금액(원)</th><th class="est-del-btn" style="width:32px;background:#1a3a6e;"></th></tr></thead>'
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:50%"><col style="width:38%"><col style="width:32px"></colgroup><thead><tr><th style="width:50%">항목</th><th style="width:38%;text-align:right;">금액(원)</th><th style="width:32px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th style="width:60%">항목</th><th style="width:40%;text-align:right;">금액(원)</th></tr></thead>')
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'
-    + '<button class="est-del-btn" onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>'
+    + (ce === 'true' ? '<button onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>' : '')
     + '<div class="doc-total-section">'
     + '<span class="doc-total-label">합계 금액 (VAT 별도)</span>'
     + '<span class="doc-total-val">'+displayTotal.toLocaleString()+'원</span>'
     + '</div>'
     + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>'
     + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
-    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white !important;">입금 계좌</th></tr></thead>'
+    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white;">입금 계좌</th></tr></thead>'
     + '<tbody>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'
-    + '<tr><td style="background:#f0f5ff;font-weight:600;">예금주</td><td contenteditable="'+ce+'">'+(biz.holder||biz.ceo||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">예금주</td><td contenteditable="'+ce+'">'+(biz.holder||biz.ceo||'&nbsp;')+'</td></tr>'
     + '</tbody></table>'
     + '<div style="font-size:12px;color:#555;text-align:center;margin-top:10px;" contenteditable="'+ce+'">본 견적서는 수신일로부터 15일 이내에 유효합니다</div>'
     + '<div class="doc-sign-row">'
@@ -3407,7 +3403,7 @@ function addEstItem() {
   var tbody = document.getElementById('est-items-body');
   if (!tbody) return;
   var tr = document.createElement('tr');
-  tr.innerHTML = '<td contenteditable="true">항목명</td><td style="text-align:right;" contenteditable="true">0</td><td class="est-del-btn" style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
+  tr.innerHTML = '<td style="width:50%;word-break:break-all;" contenteditable="true">항목명</td><td style="text-align:right;width:38%;word-break:break-all;" contenteditable="true">0</td><td style="width:32px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
   tbody.appendChild(tr);
 }
 

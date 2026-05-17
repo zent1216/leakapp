@@ -3339,7 +3339,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td style="width:120px;text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3350,7 +3350,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (item.name || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+(item.name||'')+'</td>'
-          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + '<td style="width:120px;text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3365,7 +3365,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td style="width:120px;text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3386,7 +3386,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
-    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:120px;text-align:right;">금액(원)</th><th style="width:36px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:130px;text-align:right;">금액(원)</th></tr></thead>')
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;width:100%;"><thead><tr><th style="width:55%;">항목</th><th style="width:25%;text-align:right;">금액(원)</th><th style="width:36px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;width:100%;"><thead><tr><th style="width:65%;">항목</th><th style="width:35%;text-align:right;">금액(원)</th></tr></thead>')
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'

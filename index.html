@@ -345,14 +345,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   box-shadow:0 0 0 2px rgba(79,142,247,0.3);
 }
 .doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;}
-.doc-table td,.doc-table th{overflow:hidden;word-break:break-all;}
+.doc-table td,.doc-table th{overflow:hidden;white-space:nowrap;}
 .doc-table th,.doc-table td{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;color:#333;}
 .doc-table th{background:#1a3a6e;color:white !important;font-weight:600;text-align:left;}
-.a4-preview, .a4-preview *{color:#333 !important;}
-.a4-preview .doc-table th{color:white !important;background:#1a3a6e !important;}
-.a4-preview .doc-table td{background:white !important;color:#333 !important;}
-.a4-preview td[style*="background:#f0f5ff"]{background:#f0f5ff !important;color:#333 !important;}
-.a4-preview th[style*="background:#2c5f9e"]{background:#2c5f9e !important;color:white !important;}
+.a4-preview, .a4-preview *{color:#333 !important;-webkit-text-fill-color:#333 !important;}
+.a4-preview .doc-table th{color:white !important;-webkit-text-fill-color:white !important;background:#1a3a6e !important;}
+.a4-preview .doc-table td{background:white !important;color:#333 !important;-webkit-text-fill-color:#333 !important;}
+.a4-preview td[style*="background:#f0f5ff"]{background:#f0f5ff !important;}
 
 .doc-total-section{
   background:#f0f5ff;border:2px solid #1a3a6e;border-radius:6px;
@@ -3326,8 +3325,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       // 미리보기에서 0원 항목 표시 여부: ce='true'(편집)면 표시, 아니면 금액>0만 표시
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3337,8 +3336,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     j.costItems.forEach(function(item) {
       if (item.name || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+(item.name||'')+'</td>'
-          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+(item.name||'')+'</td>'
+          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3352,8 +3351,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     defaultItems.forEach(function(item) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;word-break:break-all;" contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:38%;word-break:break-all;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3403,7 +3402,7 @@ function addEstItem() {
   var tbody = document.getElementById('est-items-body');
   if (!tbody) return;
   var tr = document.createElement('tr');
-  tr.innerHTML = '<td style="width:50%;word-break:break-all;" contenteditable="true">항목명</td><td style="text-align:right;width:38%;word-break:break-all;" contenteditable="true">0</td><td style="width:32px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
+  tr.innerHTML = '<td style="width:50%;white-space:nowrap;" contenteditable="true">항목명</td><td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="true">0</td><td style="width:32px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
   tbody.appendChild(tr);
 }
 

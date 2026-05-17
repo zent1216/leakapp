@@ -3301,8 +3301,10 @@ function syncEstimateEditToPreview() {
   rows.forEach(function(tr) {
     var cells = tr.querySelectorAll('td');
     if (cells.length >= 2) {
-      var name = cells[0].textContent.trim();
-      var amount = cells[1].textContent.trim().replace(/,/g, '');
+      var inp0 = cells[0].querySelector('input');
+      var inp1 = cells[1].querySelector('input');
+      var name = inp0 ? inp0.value.trim() : cells[0].textContent.trim();
+      var amount = inp1 ? inp1.value.trim().replace(/,/g, '') : cells[1].textContent.trim().replace(/,/g, '');
       var val = parseFloat(amount) || 0;
       if (name) items.push({name: name, amount: val});
     }
@@ -3386,7 +3388,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
-    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;width:100%;"><thead><tr><th style="width:55%;">항목</th><th style="width:25%;text-align:right;">금액(원)</th><th style="width:36px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;width:100%;"><thead><tr><th style="width:65%;">항목</th><th style="width:35%;text-align:right;">금액(원)</th></tr></thead>')
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:130px;text-align:right;">금액(원)</th><th style="width:40px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:130px;text-align:right;">금액(원)</th></tr></thead>')
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'

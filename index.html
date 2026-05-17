@@ -35,6 +35,19 @@ input, textarea, select, button {
   color: #1a1a2e !important;
   -webkit-text-fill-color: #1a1a2e !important;
 }
+.doc-a4-page .doc-table td,
+.doc-a4-page .doc-table th {
+  border: 1px solid #c8d8f0 !important;
+}
+.doc-a4-page .doc-table td {
+  background: white !important;
+  color: #333 !important;
+  -webkit-text-fill-color: #333 !important;
+}
+.doc-a4-page td[style*="background:#f0f5ff"] {
+  background: #f0f5ff !important;
+}
+
 .a4-preview-page *, .a4-scale-page *, .doc-a4-page * {
   -webkit-text-fill-color: inherit !important;
 }
@@ -347,7 +360,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
 
 .doc-table th,.doc-table td{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;color:#333;}
-.doc-table th{background:#1a3a6e;color:white !important;font-weight:600;text-align:left;}
+.doc-table th{background:#1a3a6e;color:white !important;-webkit-text-fill-color:white !important;font-weight:600;text-align:left;}
 .a4-preview, .a4-preview *{color:#333 !important;-webkit-text-fill-color:#333 !important;}
 .a4-preview .doc-table th{color:white !important;-webkit-text-fill-color:white !important;background:#1a3a6e !important;}
 .a4-preview .doc-table td{background:white !important;color:#333 !important;-webkit-text-fill-color:#333 !important;}
@@ -3384,7 +3397,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '</div>'
     + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>'
     + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
-    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white;">입금 계좌</th></tr></thead>'
+    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white !important;-webkit-text-fill-color:white !important;">입금 계좌</th></tr></thead>'
     + '<tbody>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'

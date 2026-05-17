@@ -136,7 +136,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);
   background:rgba(30,34,53,0.95);color:var(--text);
   padding:10px 20px;border-radius:30px;font-size:13px;
-  z-index:9999;opacity:0;transition:all 0.3s;white-space:nowrap;
+  z-index:9999;opacity:0;transition:all 0.3s;
   border:1px solid var(--border2);backdrop-filter:blur(10px);
   box-shadow:var(--shadow);pointer-events:none;
 }
@@ -344,8 +344,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   background:rgba(79,142,247,0.12);
   box-shadow:0 0 0 2px rgba(79,142,247,0.3);
 }
-.doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;}
-.doc-table td,.doc-table th{overflow:hidden;white-space:nowrap;}
+.doc-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+
 .doc-table th,.doc-table td{border:1px solid #c8d8f0;padding:8px 10px;font-size:14px;color:#333;}
 .doc-table th{background:#1a3a6e;color:white !important;font-weight:600;text-align:left;}
 .a4-preview, .a4-preview *{color:#333 !important;-webkit-text-fill-color:#333 !important;}
@@ -369,7 +369,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .doc-stamp-img{width:44px;height:44px;border-radius:50%;object-fit:contain;border:1px solid #c8d8f0;}
 .ins-page-divider{display:flex;align-items:center;gap:8px;margin:12px 0 6px;}
 .ins-page-divider-line{flex:1;height:1px;background:var(--border2);}
-.ins-page-num{font-size:11px;color:var(--text3);white-space:nowrap;background:var(--bg3);padding:3px 10px;border-radius:20px;}
+.ins-page-num{font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:20px;}
 .share-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-top:10px;}
 /* A4 문서 편집/미리보기 */
 .doc-a4-wrap{
@@ -3325,8 +3325,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       // 미리보기에서 0원 항목 표시 여부: ce='true'(편집)면 표시, 아니면 금액>0만 표시
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3336,8 +3336,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     j.costItems.forEach(function(item) {
       if (item.name || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+(item.name||'')+'</td>'
-          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + '<td contenteditable="'+ce+'">'+(item.name||'')+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3351,8 +3351,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     defaultItems.forEach(function(item) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
-          + '<td style="width:50%;white-space:nowrap;" contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + '<td contenteditable="'+ce+'">'+item.name+'</td>'
+          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
           + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
@@ -3373,7 +3373,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
-    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:50%"><col style="width:38%"><col style="width:32px"></colgroup><thead><tr><th style="width:50%">항목</th><th style="width:38%;text-align:right;">금액(원)</th><th style="width:32px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th style="width:60%">항목</th><th style="width:40%;text-align:right;">금액(원)</th></tr></thead>')
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col><col style="width:120px"><col style="width:32px"></colgroup><thead><tr><th>항목</th><th style="width:120px;text-align:right;">금액(원)</th><th style="width:32px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th style="width:60%">항목</th><th style="width:40%;text-align:right;">금액(원)</th></tr></thead>')
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'
@@ -3402,7 +3402,7 @@ function addEstItem() {
   var tbody = document.getElementById('est-items-body');
   if (!tbody) return;
   var tr = document.createElement('tr');
-  tr.innerHTML = '<td style="width:50%;white-space:nowrap;" contenteditable="true">항목명</td><td style="text-align:right;width:38%;white-space:nowrap;" contenteditable="true">0</td><td style="width:32px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
+  tr.innerHTML = '<td contenteditable="true">항목명</td><td style="text-align:right;" contenteditable="true">0</td><td style="width:32px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>';
   tbody.appendChild(tr);
 }
 
@@ -4533,8 +4533,8 @@ function renderCatalog() {
     cats[cat].forEach(function(c){
       html+='<div class="month-job-row" onclick="openCatalogForm('+(c.id||0)+')" style="cursor:pointer;align-items:center;-webkit-tap-highlight-color:rgba(0,0,0,0.1);">';
       html+=c.photo?'<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;margin-right:10px;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:44px;height:44px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;font-size:20px;">📦</div>';
-      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
-      var curP=getCatalogCurrentPrice(c); if(curP) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;white-space:nowrap;">'+curP.toLocaleString()+'원</div>';
+      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
+      var curP=getCatalogCurrentPrice(c); if(curP) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+curP.toLocaleString()+'원</div>';
       html+='</div>';
     });
   });
@@ -4703,7 +4703,7 @@ function doJobSearch() {
     html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + '</div>';
-    html += '<div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);overflow:hidden;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
     if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
     html += '</div>';
   });

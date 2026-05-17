@@ -3326,7 +3326,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     extraRow = '<tr>'
       + '<td contenteditable="'+ce+'">추가 구간('+j.extraSpots+'개소)</td>'
       + '<td style="text-align:right;" contenteditable="'+ce+'">'+((j.extraSpots||0)*200000).toLocaleString()+'</td>'
-      + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+      + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
       + '</tr>';
   }
 
@@ -3339,8 +3339,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
-          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3350,8 +3350,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (item.name || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+(item.name||'')+'</td>'
-          + '<td style="text-align:right;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
-          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+(item.amount||0).toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3365,8 +3365,8 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
       if (ce === 'true' || item.amount > 0) {
         itemRows += '<tr>'
           + '<td contenteditable="'+ce+'">'+item.name+'</td>'
-          + '<td style="text-align:right;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
-          + (ce === 'true' ? '<td style="text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+          + '<td style="text-align:right;white-space:nowrap;" contenteditable="'+ce+'">'+item.amount.toLocaleString()+'</td>'
+          + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
           + '</tr>';
       }
     });
@@ -3386,7 +3386,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
     + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
     + '</table>'
-    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col><col style="width:120px"><col style="width:32px"></colgroup><thead><tr><th>항목</th><th style="width:120px;text-align:right;">금액(원)</th><th style="width:32px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;table-layout:fixed;"><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th style="width:60%">항목</th><th style="width:40%;text-align:right;">금액(원)</th></tr></thead>')
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:120px;text-align:right;">금액(원)</th><th style="width:36px;background:#1a3a6e;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:130px;text-align:right;">금액(원)</th></tr></thead>')
     + '<tbody id="est-items-body">'
     + itemRows
     + '</tbody></table>'

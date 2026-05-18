@@ -824,7 +824,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title" id="docs-title">문서 <span>생성</span></div>
     <div style="display:flex;gap:6px;">
-      <button class="topbar-action" id="docs-send-all-btn" onclick="sendAllDocs()" style="background:var(--bg3);color:var(--text1);font-size:11px;padding:4px 8px;">📤 모아보내기</button>
+      <button class="topbar-action" id="docs-send-all-btn" onclick="sendAllDocs()" style="display:none;background:var(--bg3);color:var(--text1);font-size:11px;padding:4px 8px;">📤 모아보내기</button>
       <button class="topbar-action" id="docs-mode-btn" onclick="toggleDocsMode()">👁️ 미리보기</button>
     </div>
   </div>
@@ -3099,6 +3099,7 @@ function setDocType(type) {
   } else {
     document.getElementById('share-normal').style.display = 'block';
     document.getElementById('share-insurance').style.display = 'none';
+    document.getElementById('docs-send-all-btn').style.display = 'inline-block';
     renderDocPreview();
   }
 }
@@ -3193,6 +3194,7 @@ function toggleDocsMode() {
     if (docsBody) docsBody.classList.add('preview-mode');
     if (_curDocType === 'insurance') {
       document.getElementById('share-normal').style.display = 'none';
+    document.getElementById('docs-send-all-btn').style.display = 'none';
       document.getElementById('share-insurance').style.display = 'block';
     } else {
       document.getElementById('share-normal').style.display = 'block';
@@ -3622,7 +3624,7 @@ async function downloadPDF() {
   showToast('PDF 생성 중... ⏳');
   try {
     const area = document.getElementById('docs-preview-area');
-    const page = area.querySelector('.a4-scale-page');
+    var page = area.querySelector('.a4-scale-page') || area.querySelector('.a4-preview');
     if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
     const canvas = await captureA4Page(page.parentElement);
     if (!canvas) { showToast('캡처 실패'); return; }
@@ -3726,12 +3728,13 @@ async function shareImage() {
   showToast('이미지 생성 중... ⏳');
   try {
     const area = document.getElementById('docs-preview-area');
-    const page = area.querySelector('.a4-scale-page');
+    var page = area.querySelector('.a4-scale-page') || area.querySelector('.a4-preview');
     if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
-    const canvas = await captureA4Page(page.parentElement);
+    var captTarget = page.classList.contains('a4-preview') ? page : (page.parentElement || page);
+    const canvas = await captureA4Page(captTarget);
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
-    const label = _curDocType === 'estimate' ? '견적서' : '소견서';
+    const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'receipt' ? '영수증' : '소견서';
     const fname = j.date + '_' + j.name + '_' + label + '.png';
     if (navigator.share && navigator.canShare) {
       try {
@@ -3755,18 +3758,18 @@ async function shareKakao() {
     const target = area.querySelector('.a4-scale-page, .a4-preview') || area;
     const canvas = await html2canvas(target.parentElement || target, {scale:3, useCORS:true, backgroundColor:'#ffffff'});
     const dataUrl = canvas.toDataURL('image/png');
-    const fname = j.date+'_'+j.name+'_'+(_curDocType==='estimate'?'견적서':'소견서')+'.png';
+    const fname = j.date+'_'+j.name+'_'+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+'.png';
     // Web Share API로 카카오/문자 등 앱 선택 가능
     if (navigator.share) {
       try {
         const blob = await (await fetch(dataUrl)).blob();
         const file = new File([blob], fname, {type:'image/png'});
-        await navigator.share({files:[file], title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':'소견서')});
+        await navigator.share({files:[file], title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')});
         return;
       } catch(shareErr) {
         if (shareErr.name !== 'AbortError') {
           // 파일 공유 불가시 텍스트만
-          await navigator.share({title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':'소견서')+' - 누수프로'});
+          await navigator.share({title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+' - 누수프로'});
         }
         return;
       }

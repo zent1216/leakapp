@@ -140,7 +140,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 /* ── 배지 ── */
 .badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;}
 .badge.done{background:var(--green-bg);color:var(--green);}
-.badge.pending{background:var(--orange-bg);color:var(--orange);}
+.badge.pending,.badge.unpaid{background:var(--orange-bg);color:var(--orange);}
+.badge.failed{background:rgba(239,68,68,0.15);color:#ef4444;}
 .badge.as{background:var(--purple-bg);color:var(--purple);}
 .badge.as-done{background:var(--bg3);color:var(--text2);}
 
@@ -649,12 +650,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="main-stats">
       <div class="stat-card"><div class="stat-num green" id="ms-done">0</div><div class="stat-label">이달 완료</div></div>
-      <div class="stat-card"><div class="stat-num orange" id="ms-pending">0</div><div class="stat-label">진행중</div></div>
+      <div class="stat-card"><div class="stat-num orange" id="ms-pending">0</div><div class="stat-label">미수현장</div></div>
       <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이달 수입</div></div>
     </div>
     <div class="main-stats" style="margin-top:6px;">
-      <div class="stat-card"><div class="stat-num accent" id="ms-year-revenue" style="font-size:16px;">0</div><div class="stat-label">올해 누적</div></div>
-      <div class="stat-card"><div class="stat-num" id="ms-total-revenue" style="font-size:16px;color:var(--text1);">0</div><div class="stat-label">전체 누적</div></div>
+      <div class="stat-card"><div class="stat-num accent" id="ms-year-revenue" style="font-size:16px;">0</div><div class="stat-label">올해 순수익</div></div>
+      <div class="stat-card"><div class="stat-num" id="ms-total-revenue" style="font-size:16px;color:var(--text1);">0</div><div class="stat-label">전체 순수익</div></div>
       <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
     </div>
   </div>
@@ -748,8 +749,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div class="form-group">
           <label class="form-label">상태</label>
           <select class="form-select" id="f-status">
-            <option value="pending">진행중</option>
             <option value="done">완료</option>
+            <option value="unpaid">미수</option>
+            <option value="failed">실패</option>
           </select>
         </div>
       </div>
@@ -813,7 +815,28 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div style="height:10px;"></div>
   </div>
   <div class="total-bar">
-    <div><div class="total-label">합계</div><div class="total-amount" id="total-display">0원</div></div>
+    <div><div class="total-label">합계</div><div class="total-amount" id="total-display">0원</div>
+
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <div class="form-group">
+          <label class="form-label">💳 결제유형</label>
+          <select class="form-select" id="f-pay-type" onchange="onPayTypeChange()">
+            <option value="cash">현금</option>
+            <option value="transfer">계좌이체</option>
+            <option value="card">카드</option>
+          </select>
+        </div>
+        <div id="f-receipt-check" style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <input type="checkbox" id="f-cash-receipt" onchange="onPayTypeChange()">
+          <label for="f-cash-receipt" style="font-size:13px;color:var(--text1);">현금영수증 발행</label>
+        </div>
+        <div id="f-vat-display" style="display:none;margin-top:8px;padding:10px;background:var(--bg3);border-radius:var(--r-sm);font-size:13px;">
+          <div style="display:flex;justify-content:space-between;"><span>공급가액</span><span id="f-supply-amount">0원</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;"><span>VAT (10%)</span><span id="f-vat-amount" style="color:var(--accent);font-weight:600;">0원</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid var(--border);padding-top:4px;font-weight:700;"><span>합계 (VAT 포함)</span><span id="f-total-with-vat">0원</span></div>
+        </div>
+      </div>
+    </div>
     <button class="btn btn-primary" style="width:auto;padding:12px 28px;" onclick="saveJob()">💾 저장</button>
   </div>
 </div>
@@ -1063,7 +1086,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group"><label class="form-label">업체명</label><input class="form-input" id="biz-name" placeholder="누수프로"></div>
       <div class="form-group"><label class="form-label">대표자명</label><input class="form-input" id="biz-ceo" placeholder="홍길동"></div>
       <div class="form-group"><label class="form-label">사업자등록번호</label><input class="form-input" id="biz-reg" placeholder="000-00-00000"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="biz-tel" placeholder="02-0000-0000" type="tel"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="biz-tel" placeholder="02-0000-0000" type="tel" oninput="formatPhoneInput(this)"></div>
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="biz-addr" placeholder="서울시 강남구"></div>
     </div>
     <div class="form-card">
@@ -1401,6 +1424,43 @@ function loadPhotosLocal() {
 
 
 // 전화번호 자동 하이픈
+
+// 결제유형 변경 시 VAT 계산
+function onPayTypeChange() {
+  var payType = document.getElementById('f-pay-type').value;
+  var receiptCheck = document.getElementById('f-receipt-check');
+  var vatDisplay = document.getElementById('f-vat-display');
+  var cashReceipt = document.getElementById('f-cash-receipt');
+  
+  // 카드면 항상 VAT, 현금/계좌면 현금영수증 체크 시 VAT
+  if (payType === 'card') {
+    receiptCheck.style.display = 'none';
+    vatDisplay.style.display = 'block';
+  } else {
+    receiptCheck.style.display = 'flex';
+    vatDisplay.style.display = cashReceipt.checked ? 'block' : 'none';
+  }
+  updateVatDisplay();
+}
+
+function updateVatDisplay() {
+  var total = getCostItemsTotal();
+  var payType = (document.getElementById('f-pay-type') || {}).value || 'cash';
+  var cashReceipt = (document.getElementById('f-cash-receipt') || {}).checked;
+  var showVat = payType === 'card' || cashReceipt;
+  
+  if (showVat) {
+    var supply = Math.round(total / 1.1);
+    var vat = total - supply;
+    var el1 = document.getElementById('f-supply-amount');
+    var el2 = document.getElementById('f-vat-amount');
+    var el3 = document.getElementById('f-total-with-vat');
+    if (el1) el1.textContent = supply.toLocaleString() + '원';
+    if (el2) el2.textContent = vat.toLocaleString() + '원';
+    if (el3) el3.textContent = total.toLocaleString() + '원';
+  }
+}
+
 function formatPhoneInput(el) {
   var v = el.value.replace(/[^0-9]/g, '');
   if (v.length > 11) v = v.slice(0, 11);
@@ -2076,7 +2136,7 @@ function updateMainStats() {
   const thisMonth = _jobs.filter(j => (j.date||'').startsWith(prefix));
   const doneJobs = thisMonth.filter(j => j.status === 'done');
   const done = doneJobs.length;
-  const pending = thisMonth.filter(j => j.status !== 'done').length;
+  const pending = _jobs.filter(j => j.status === 'unpaid' || j.status === 'pending').length;
   const revenue = doneJobs.reduce((s,j) => s + jobTotal(j), 0);
   const commission = doneJobs.reduce((s,j) => s + (j.commission||0), 0);
   const netRevenue = revenue - commission;
@@ -2241,7 +2301,7 @@ function renderCalendar() {
       return '<div class="job-card'+(asCount>0?(j.asHistory.slice(-1)[0]?.status==='as-done'?' as-done':' has-as'):'')
         +'" onclick="showDetail('+j.id+')">'
         +'<div class="job-card-top"><span class="job-name">'+j.name+'</span>'
-        +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':'진행중')+'</span></div>'
+        +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수')+'</span></div>'
         +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
         +'<span class="job-amount">'+fmtMoney(total)+'</span>'
@@ -2319,7 +2379,7 @@ function showDetail(id) {
   html += '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span>';
   if (j.phone) html += ' <span style="font-size:12px;color:var(--text2);">' + j.phone + '</span>';
   html += '</div>';
-  html += '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':'진행중') + '</span></div>';
+  html += '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수') + '</span></div>';
 
   // 기본 정보
   html += '<div class="detail-info-card">';
@@ -2498,7 +2558,10 @@ function editJob(id) {
   document.getElementById('f-addr-detail').value = j.addrDetail || '';
   document.getElementById('f-location').value = j.location || '';
   document.getElementById('f-date').value = j.date || '';
-  document.getElementById('f-status').value = j.status || 'pending';
+  document.getElementById('f-status').value = j.status || 'done';
+  document.getElementById('f-pay-type').value = j.payType || 'cash';
+  document.getElementById('f-cash-receipt').checked = j.cashReceipt || false;
+  onPayTypeChange();
   document.getElementById('f-type').value = j.type || '배관 누수';
   document.getElementById('f-before').value = j.before || '';
   document.getElementById('f-action').value = j.action || '';
@@ -2789,6 +2852,7 @@ function calcTotal() {
   const el = document.getElementById('total-display');
   if (el) el.textContent = fmtMoney(total);
   calcNetProfit();
+  updateVatDisplay();
 }
 
 function addCommissionRow(name, amount) {
@@ -2989,6 +3053,8 @@ async function saveJob() {
   const job = {
     id: _editingJobId || getNextId(),
     clientCompany: clientCompany,
+    payType: document.getElementById('f-pay-type').value || 'cash',
+    cashReceipt: document.getElementById('f-cash-receipt').checked || false,
     name,
     addr: fullAddr,
     addrBase: addr,
@@ -3398,10 +3464,23 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '</tbody></table>'
     + (ce === 'true' ? '<button onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>' : '')
     + '<div class="doc-total-section">'
-    + '<span class="doc-total-label">합계 금액 (VAT 별도)</span>'
-    + '<span class="doc-total-val">'+displayTotal.toLocaleString()+'원</span>'
-    + '</div>'
-    + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>'
+    + (function(){
+      var hasVat = j.payType === 'card' || j.cashReceipt;
+      if (hasVat) {
+        var supply = Math.round(displayTotal / 1.1);
+        var vat = displayTotal - supply;
+        return '<span class="doc-total-label">합계 금액 (VAT 포함)</span>'
+          + '<span class="doc-total-val">' + displayTotal.toLocaleString() + '원</span>'
+          + '</div>'
+          + '<div style="font-size:12px;color:#555;text-align:right;margin-top:4px;margin-bottom:8px;">'
+          + '공급가액: ' + supply.toLocaleString() + '원 / VAT(10%): ' + vat.toLocaleString() + '원</div>';
+      } else {
+        return '<span class="doc-total-label">합계 금액 (VAT 별도)</span>'
+          + '<span class="doc-total-val">' + displayTotal.toLocaleString() + '원</span>'
+          + '</div>'
+          + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>';
+      }
+    }())
     + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
     + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white !important;-webkit-text-fill-color:white !important;">입금 계좌</th></tr></thead>'
     + '<tbody>'
@@ -3825,6 +3904,17 @@ function printDoc() { window.print(); }
 // ════════════════════════════════════════
 //  실적관리
 // ════════════════════════════════════════
+
+function calcVatTotal(jobs) {
+  return jobs.filter(function(j) {
+    return j.payType === 'card' || j.cashReceipt;
+  }).reduce(function(s, j) {
+    var total = jobTotal(j);
+    var vat = total - Math.round(total / 1.1);
+    return s + vat;
+  }, 0);
+}
+
 function renderStats() {
   const el = document.getElementById('stats-body');
   const yearSel = document.getElementById('stats-year');
@@ -3850,6 +3940,10 @@ function renderStats() {
     + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
     + '</div>'
     + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 VAT 합계</div>'
+    + '<div style="font-size:22px;font-weight:700;color:var(--purple);font-family:IBM Plex Mono,monospace;">'+fmtMoney(calcVatTotal(yearDone))+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">수수료 합계</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-'+fmtMoney(totalComm)+'</div>'
     + '</div>'
@@ -3861,7 +3955,7 @@ function renderStats() {
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
     + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체 건수</div></div>'
     + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'
-    + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done').length+'</div><div class="stat-label">진행중</div></div>'
+    + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done').length+'</div><div class="stat-label">미수현장</div></div>'
     + '</div>'
     // 월별
     + Array.from({length:12},(_,i)=>{
@@ -5287,7 +5381,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-body">
       <div class="form-group"><label class="form-label">업체명 *</label><input class="form-input" id="cf-name" placeholder="예: OO중개, OO관리단"></div>
       <div class="form-group"><label class="form-label">담당자</label><input class="form-input" id="cf-contact" placeholder="담당자명"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)"></div>
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
       <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
       <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cf-memo" placeholder="결제 조건, 특이사항 등"></textarea></div>

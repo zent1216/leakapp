@@ -4018,6 +4018,7 @@ function renderStats() {
             + '<div style="text-align:right;">'
             + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobTotal(j))+'</div>'
             + (hasComm ? '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0))+'</div>' : '')
+            + ((j.payType==='card'||j.cashReceipt) ? '<div style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</div>' : '')
             + '</div>'
             + '</div>';
         }).join('')
@@ -4813,6 +4814,12 @@ function setSearchRange(range) {
   doJobSearch();
 }
 
+
+function onSearchClick(id) {
+  closeModal('search-modal');
+  showDetail(id);
+}
+
 function doJobSearch() {
   var kw = (document.getElementById('search-keyword').value||'').trim().toLowerCase();
   var dateFrom = document.getElementById('search-date-from').value;
@@ -4846,7 +4853,7 @@ function doJobSearch() {
     var totalAmt = 0;
     if (j.costItems && j.costItems.length) { j.costItems.forEach(function(c){ totalAmt += (c.amount||0); }); }
     else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
-    html += '<div style="padding:14px 12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
+    html += '<div style="padding:14px 12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;" onclick="onSearchClick(\'' + j.id + '\')">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
     html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</div>';
     html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';

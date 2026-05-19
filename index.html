@@ -742,7 +742,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">📋 작업 정보</div>
-      <div class="form-group"><label class="form-label">작업일 *</label><input class="form-input" id="f-date" type="date"></div>
+      <div class="form-row2">
+        <div class="form-group"><label class="form-label">작업일 *</label><input class="form-input" id="f-date" type="date"></div>
         <div class="form-group">
           <label class="form-label">상태</label>
           <select class="form-select" id="f-status">
@@ -790,6 +791,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid var(--border);padding-top:4px;font-weight:700;"><span>합계 (VAT 포함)</span><span id="f-total-with-vat">0원</span></div>
         </div>
       </div>
+      </div>
       <div class="form-group">
         <label class="form-label">자재 목록</label>
         <div id="material-list"></div>
@@ -832,6 +834,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   </div>
   <div class="total-bar">
     <div><div class="total-label">합계</div><div class="total-amount" id="total-display">0원</div>
+
+      </div>
     <button class="btn btn-primary" style="width:auto;padding:12px 28px;" onclick="saveJob()">💾 저장</button>
   </div>
 </div>
@@ -1092,7 +1096,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">🏦 계좌 정보</div>
-      <div class="form-group"><label class="form-label">은행</label><input class="form-input" id="biz-bank" placeholder="국민은행"></div>
+      <div class="form-row2">
+        <div class="form-group"><label class="form-label">은행</label><input class="form-input" id="biz-bank" placeholder="국민은행"></div>
         <div class="form-group"><label class="form-label">예금주</label><input class="form-input" id="biz-holder" placeholder="홍길동"></div>
       </div>
       <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="biz-account" placeholder="000-0000-0000-00"></div>
@@ -1702,6 +1707,7 @@ function previewQe() {
 async function saveQeOnly() {
   var data = getQeData();
   if (!data) return;
+  data.memo = (document.getElementById('qe-memo')||{}).value || '';
   if (_editingQeId) {
     data.id = _editingQeId;
     var idx = _quickEstimates.findIndex(function(q){return q.id===_editingQeId;});
@@ -1802,7 +1808,6 @@ function editQe(id) {
     document.getElementById('qe-addr').value = q.addr||'';
     document.getElementById('qe-addr-detail').value = q.addrDetail||'';
     document.getElementById('qe-note').value = q.note||'';
-    if(document.getElementById('qe-memo')) document.getElementById('qe-memo').value = q.memo||'';
     document.getElementById('qe-location').value = q.location||'';
     document.getElementById('qe-leak-status').value = q.leakStatus||'';
     var container = document.getElementById('qe-items');
@@ -4817,10 +4822,7 @@ function doJobSearch() {
     if (dateTo && (j.date||'') > dateTo) return false;
     if (!kw) return true;
     var clientPhone = '';
-    if (j.clientCompany) {
-      var cl = _clients.find(function(x){ return x.name === j.clientCompany; });
-      if (cl && cl.phone) clientPhone = cl.phone;
-    }
+    if (j.clientCompany) { var cl = _clients.find(function(x){ return x.name === j.clientCompany; }); if (cl && cl.phone) clientPhone = cl.phone; }
     var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo, clientPhone].filter(Boolean).join(' ').toLowerCase();
     return searchable.indexOf(kw) >= 0;
   });

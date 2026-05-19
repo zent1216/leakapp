@@ -651,10 +651,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="main-stats">
       <div class="stat-card"><div class="stat-num green" id="ms-done">0</div><div class="stat-label">이달 완료</div></div>
       <div class="stat-card"><div class="stat-num orange" id="ms-pending">0</div><div class="stat-label">미수현장</div></div>
-      <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이달 수입</div></div>
+      <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
     </div>
     <div class="main-stats" style="margin-top:6px;">
-      <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
+      <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이달 순수익</div></div>
       <div class="stat-card"><div class="stat-num accent" id="ms-year-revenue" style="font-size:16px;">0</div><div class="stat-label">올해 순수익</div></div>
       <div class="stat-card"><div class="stat-num" id="ms-total-revenue" style="font-size:16px;color:var(--text1);">0</div><div class="stat-label">전체 순수익</div></div>
     </div>
@@ -759,7 +759,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <label class="form-label">누수 유형</label>
         <select class="form-select" id="f-type">
           <option>배관 누수</option><option>수전 누수</option><option>옥상 방수</option>
-          <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>기타</option>
+          <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>기타</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea></div>

@@ -720,15 +720,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="page-body">
     <div class="form-card">
       <div class="form-card-title">👤 고객 정보</div>
-      <div class="form-row2">
-        <div class="form-group">
+      <div class="form-group">
         <label class="form-label">의뢰처 (일감 받은 업체)</label>
         <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
           <input class="form-input" id="f-client-company" placeholder="직접 입력 또는 선택" oninput="onClientInput()" autocomplete="off">
           <button class="btn btn-secondary btn-sm" onclick="openClientPicker()" style="padding:0;">📋 선택</button>
         </div>
         <div id="client-suggestions" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:4px;max-height:150px;overflow-y:auto;"></div>
-      </div>
       <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
@@ -744,8 +742,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">📋 작업 정보</div>
-      <div class="form-row2">
-        <div class="form-group"><label class="form-label">작업일 *</label><input class="form-input" id="f-date" type="date"></div>
+      <div class="form-group"><label class="form-label">작업일 *</label><input class="form-input" id="f-date" type="date"></div>
         <div class="form-group">
           <label class="form-label">상태</label>
           <select class="form-select" id="f-status">
@@ -759,7 +756,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <label class="form-label">누수 유형</label>
         <select class="form-select" id="f-type">
           <option>배관 누수</option><option>수전 누수</option><option>옥상 방수</option>
-          <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>기타</option>
+          <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>베란다 방수</option><option>메인관 누수</option><option>공용부 누수</option><option>스프링쿨러 누수</option><option>기타</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea></div>
@@ -975,10 +972,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title">간편 <span>견적</span></div>
-    <div style="display:flex;gap:6px;">
-      <button class="topbar-action" onclick="goPage('page-quick-est-list')" style="font-size:11px;padding:4px 8px;">📋 목록</button>
-      <button class="topbar-action" onclick="resetQuickEst()">초기화</button>
-    </div>
+    <button class="topbar-action" onclick="resetQuickEst()">초기화</button>
   </div>
   <div class="page-body">
     <div style="font-size:12px;color:var(--accent);text-align:center;margin-bottom:12px;">⚡ 수입에 반영되지 않는 견적서만 작성합니다</div>
@@ -1017,9 +1011,18 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <textarea class="form-textarea" id="qe-note" rows="2" placeholder="추가 안내사항 (선택)"></textarea>
     </div>
 
+    <div class="form-card">
+      <div class="form-card-title">📝 내부 메모</div>
+      <textarea class="form-textarea" id="qe-memo" rows="2" placeholder="내부 메모 (고객에게 안보임)"></textarea>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
-      <button class="btn btn-secondary" onclick="previewQe()" style="padding:14px;">👁️ 미리보기</button>
-      <button class="btn btn-primary" onclick="saveAndSendQe()" style="padding:14px;">💾 저장 및 보내기</button>
+      <button class="btn btn-secondary" onclick="goPage('page-quick-est-list')" style="padding:12px;">📋 목록</button>
+      <button class="btn btn-secondary" onclick="saveQeOnly()" style="padding:12px;">💾 저장</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="previewQe()" style="padding:12px;">👁️ 미리보기</button>
+      <button class="btn btn-primary" onclick="saveAndSendQe()" style="padding:12px;">📤 보내기</button>
     </div>
   </div>
 </div>
@@ -1092,8 +1095,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     </div>
     <div class="form-card">
       <div class="form-card-title">🏦 계좌 정보</div>
-      <div class="form-row2">
-        <div class="form-group"><label class="form-label">은행</label><input class="form-input" id="biz-bank" placeholder="국민은행"></div>
+      <div class="form-group"><label class="form-label">은행</label><input class="form-input" id="biz-bank" placeholder="국민은행"></div>
         <div class="form-group"><label class="form-label">예금주</label><input class="form-input" id="biz-holder" placeholder="홍길동"></div>
       </div>
       <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="biz-account" placeholder="000-0000-0000-00"></div>
@@ -1590,6 +1592,7 @@ function resetQuickEst() {
   document.getElementById('qe-note').value = '';
   document.getElementById('qe-location').value = '';
   document.getElementById('qe-leak-status').value = '';
+  if(document.getElementById('qe-memo')) document.getElementById('qe-memo').value = '';
   var items = document.getElementById('qe-items');
   items.innerHTML = '<div class="cost-row" style="display:grid;grid-template-columns:1fr 100px 28px;gap:6px;margin-bottom:6px;align-items:center;"><input class="form-input" placeholder="항목명"><input class="form-input" type="text" inputmode="numeric" placeholder="금액" style="text-align:right;" oninput="formatAmountInput(this);calcQeTotal()"><button class="btn-icon" onclick="this.closest(\'.cost-row\').remove();calcQeTotal();" style="color:var(--red);font-size:16px;">✕</button></div>';
   calcQeTotal();
@@ -1632,6 +1635,7 @@ function getQeData() {
     addr: document.getElementById('qe-addr').value.trim(),
     addrDetail: document.getElementById('qe-addr-detail').value.trim(),
     note: document.getElementById('qe-note').value.trim(),
+    memo: (document.getElementById('qe-memo')||{}).value||'',
     location: document.getElementById('qe-location').value.trim(),
     leakStatus: document.getElementById('qe-leak-status').value.trim(),
     items: items,
@@ -1695,6 +1699,22 @@ function previewQe() {
   scaler.appendChild(content);
   modal.appendChild(scaler);
   document.body.appendChild(modal);
+}
+
+
+async function saveQeOnly() {
+  var data = getQeData();
+  if (!data) return;
+  if (_editingQeId) {
+    data.id = _editingQeId;
+    var idx = _quickEstimates.findIndex(function(q){return q.id===_editingQeId;});
+    if (idx>=0) _quickEstimates[idx] = data;
+  } else {
+    data.id = Date.now();
+    _quickEstimates.push(data);
+  }
+  await saveQuickEstimates();
+  showToast('간편 견적 저장됨 ✅');
 }
 
 async function saveAndSendQe() {
@@ -1785,6 +1805,7 @@ function editQe(id) {
     document.getElementById('qe-addr').value = q.addr||'';
     document.getElementById('qe-addr-detail').value = q.addrDetail||'';
     document.getElementById('qe-note').value = q.note||'';
+    if(document.getElementById('qe-memo')) document.getElementById('qe-memo').value = q.memo||'';
     document.getElementById('qe-location').value = q.location||'';
     document.getElementById('qe-leak-status').value = q.leakStatus||'';
     var container = document.getElementById('qe-items');
@@ -3511,7 +3532,7 @@ function makeOpinionHTML(j, biz, today, co, ce) {
     + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
     + '<div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
     + '<div style="font-size:12px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
-    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">'+today+'</div></div>'
+    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
     + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
     + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
     + '<table class="doc-table" style="border:none;margin:0;">'
@@ -3946,11 +3967,11 @@ function renderStats() {
     + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
     + '</div>'
     + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">순수익</div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 순수익</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev - totalComm)+'</div>'
     + '</div>'
     + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">수수료 합계</div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 수수료</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-'+fmtMoney(totalComm)+'</div>'
     + '</div>'
     + '<div class="stat-card">'
@@ -4798,7 +4819,12 @@ function doJobSearch() {
     if (dateFrom && (j.date||'') < dateFrom) return false;
     if (dateTo && (j.date||'') > dateTo) return false;
     if (!kw) return true;
-    var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo].filter(Boolean).join(' ').toLowerCase();
+    var clientPhone = '';
+    if (j.clientCompany) {
+      var cl = _clients.find(function(x){ return x.name === j.clientCompany; });
+      if (cl && cl.phone) clientPhone = cl.phone;
+    }
+    var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo, clientPhone].filter(Boolean).join(' ').toLowerCase();
     return searchable.indexOf(kw) >= 0;
   });
   results.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
@@ -4817,16 +4843,16 @@ function doJobSearch() {
   var html = '';
   results.forEach(function(j) {
     var statusColor = j.status==='done'?'var(--green)':j.status==='cancel'?'var(--red)':'var(--orange)';
-    var statusText = j.status==='done'?'완료':j.status==='cancel'?'취소':'진행중';
+    var statusText = j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='cancel'?'취소':'미수';
     var totalAmt = 0;
     if (j.costItems && j.costItems.length) { j.costItems.forEach(function(c){ totalAmt += (c.amount||0); }); }
     else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
-    html += '<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
+    html += '<div style="padding:14px 12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
     html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + '</div>';
     html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
     html += '</div>';
-    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + ((j.payType==='card'||j.cashReceipt) ? ' · <span style="color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</span>' : '') + '</div>';
     html += '<div style="font-size:12px;color:var(--text2);overflow:hidden;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
     if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
     html += '</div>';

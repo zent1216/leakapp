@@ -870,8 +870,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">공유 및 내보내기</div>
         <div class="share-btns">
           <button class="share-btn pdf-btn" onclick="downloadPDF()">📄 PDF 저장</button>
-          <button class="share-btn kakao" onclick="shareKakao()" style="grid-column:1/-1;">📤 이미지로 공유 (카카오/문자)</button>
           <button class="share-btn" onclick="shareImage()">🖼️ 이미지 저장</button>
+          <button class="share-btn kakao" onclick="shareKakao()">📤 이미지로 공유</button>
           <button class="share-btn" onclick="printDoc()" style="background:var(--green-bg);color:var(--green);border-color:rgba(62,207,142,0.3);">🖨️ 인쇄</button>
         </div>
       </div>
@@ -4848,7 +4848,7 @@ function doJobSearch() {
     else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
     html += '<div style="padding:14px 12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;" onclick="closeModal(\\\'search-modal\\\');showDetail(\\\''+j.id+'\\\')">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
-    html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + '</div>';
+    html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</div>';
     html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + ((j.payType==='card'||j.cashReceipt) ? ' · <span style="color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</span>' : '') + '</div>';

@@ -3550,6 +3550,10 @@ function renderReceiptEdit(j, el) {
   html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">본문</label>';
   html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.') + '</textarea></div>';
+  var hasVat = j.payType === 'card' || j.cashReceipt;
+  html += '<div style="margin-top:12px;padding:10px;background:' + (hasVat ? 'rgba(62,207,142,0.1)' : 'rgba(245,158,11,0.1)') + ';border-radius:8px;font-size:13px;color:var(--text1);">';
+  html += hasVat ? '✅ <b>VAT 포함</b> (' + (j.payType==='card' ? '카드결제' : '현금영수증') + ') - 영수증에 VAT 10%가 자동 추가됩니다' : '⚠️ <b>VAT 별도</b> - 영수증에 입력한 금액 그대로 표시됩니다';
+  html += '</div>';
   html += '</div>';
   el.innerHTML = html;
 }
@@ -3957,11 +3961,7 @@ function renderStats() {
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">비용처리 (자재비)</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">'+fmtMoney(doneJobs.reduce(function(s,j){return s+(j.materialCost||0);},0))+'</div>'
     + '</div>'
-    + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">순수익</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(netRev)+'</div>'
-    + '</div>'
-    + '</div>'
+        + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
     + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체 건수</div></div>'
     + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'

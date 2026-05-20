@@ -2263,6 +2263,42 @@ function removeAsPhoto(type, idx, e) {
 }
 
 
+
+function filterCalByDay(day) {
+  var prefix = document.querySelector('.cal-header div').textContent.trim();
+  var match = prefix.match(/(\d{4})년\s*(\d+)월/);
+  if (!match) return;
+  var dateStr = match[1] + '-' + String(parseInt(match[2])).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+  var list = document.getElementById('cal-job-list');
+  if (!list) return;
+  var items = list.querySelectorAll('.job-card');
+  var allVisible = true;
+  items.forEach(function(item) {
+    if (item.style.display === 'none') allVisible = false;
+  });
+  // 이미 필터 중이면 해제
+  if (!allVisible) {
+    items.forEach(function(item) { item.style.display = ''; });
+    showToast('필터 해제');
+    return;
+  }
+  var count = 0;
+  items.forEach(function(item) {
+    var meta = item.querySelector('.job-meta');
+    if (meta && meta.textContent.includes(dateStr)) {
+      item.style.display = '';
+      count++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+  if (count === 0) {
+    items.forEach(function(item) { item.style.display = ''; });
+  } else {
+    showToast(dateStr + ' : ' + count + '건');
+  }
+}
+
 function renderCalendar() {
   const title = document.getElementById('cal-title');
   const body = document.getElementById('calendar-body');
@@ -2324,7 +2360,7 @@ function renderCalendar() {
       const asCount = (j.asHistory||[]).length;
       return '<div class="job-card'+(asCount>0?(j.asHistory.slice(-1)[0]?.status==='as-done'?' as-done':' has-as'):'')
         +'" onclick="showDetail('+j.id+')">'
-        +'<div class="job-card-top"><span class="job-name">'+j.name+'</span>'
+        +'<div class="job-card-top"><span class="job-name">'+j.name+(j.phone?' <span style="font-size:12px;font-weight:400;color:var(--text2);">'+j.phone+'</span>':'')+'</span>'
         +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수')+'</span></div>'
         +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
@@ -4818,7 +4854,9 @@ function setSearchRange(range) {
 
 function onSearchClick(id) {
   closeModal('search-modal');
-  showDetail(id);
+  // 현장관리 페이지로 이동 후 상세보기
+  goPage('page-field');
+  setTimeout(function() { showDetail(Number(id) || id); }, 300);
 }
 
 function doJobSearch() {
@@ -4859,7 +4897,7 @@ function doJobSearch() {
     html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</div>';
     html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
     html += '</div>';
-    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · ' + j.clientCompany : '') + ((j.payType==='card'||j.cashReceipt) ? ' · <span style="color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</span>' : '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · <span style="color:var(--accent);">' + j.clientCompany + (function(){ var cl=_clients.find(function(x){return x.name===j.clientCompany;}); return cl&&cl.phone?' ['+cl.phone+']':''; }()) + '</span>' : '') + ((j.payType==='card'||j.cashReceipt) ? ' · <span style="color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</span>' : '') + '</div>';
     html += '<div style="font-size:12px;color:var(--text2);overflow:hidden;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
     if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
     html += '</div>';
@@ -5575,7 +5613,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <button class="btn btn-secondary btn-sm" onclick="setSearchRange('all')">전체</button>
       </div>
       <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
-      <div id="search-results"></div>
+      <div id="search-results" style="padding-bottom:80px;"></div>
     </div>
   </div>
 </div>

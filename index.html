@@ -2265,7 +2265,7 @@ function removeAsPhoto(type, idx, e) {
 
 
 function filterCalByDay(day) {
-  var prefix = document.querySelector('.cal-header div').textContent.trim();
+  var prefix = document.getElementById('cal-title').textContent.trim();
   var match = prefix.match(/(\d{4})년\s*(\d+)월/);
   if (!match) return;
   var dateStr = match[1] + '-' + String(parseInt(match[2])).padStart(2,'0') + '-' + String(day).padStart(2,'0');
@@ -2364,7 +2364,7 @@ function renderCalendar() {
         +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수')+'</span></div>'
         +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        +'<span class="job-amount">'+fmtMoney(total)+'</span>'
+        +'<span class="job-amount">'+fmtMoney(total)+((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+'</span>'
         +(asCount>0?'<span style="font-size:11px;color:var(--purple);">🔧 AS '+asCount+'건</span>':'')
         +'</div></div>';
     }).join('');

@@ -727,7 +727,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <button class="btn btn-secondary btn-sm" onclick="openClientPicker()" style="padding:0;">📋 선택</button>
         </div>
         <div id="client-suggestions" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:4px;max-height:150px;overflow-y:auto;"></div>
-      <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
+      <div class="form-group" style="margin-top:12px;"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
       <div class="form-group">
@@ -4008,6 +4008,7 @@ function renderStats() {
           + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>'
           + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
+        + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
         + mJobs.map(j=>{
           const hasComm = (j.commission||0) > 0;
           return '<div class="month-job-row">'

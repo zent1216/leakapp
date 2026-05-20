@@ -2265,10 +2265,7 @@ function removeAsPhoto(type, idx, e) {
 
 
 function filterCalByDay(day) {
-  var prefix = document.getElementById('cal-title').textContent.trim();
-  var match = prefix.match(/(\d{4})년\s*(\d+)월/);
-  if (!match) return;
-  var dateStr = match[1] + '-' + String(parseInt(match[2])).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+  var dateStr = _curYear + '-' + String(_curMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
   var list = document.getElementById('cal-job-list');
   if (!list) return;
   var items = list.querySelectorAll('.job-card');
@@ -2513,6 +2510,10 @@ function showDetail(id) {
     if (j.materialCost) html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">자재비</span><span>' + fmtMoney(j.materialCost) + '</span></div>';
   }
   html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">' + fmtMoney(total) + '</span></div>';
+  if (j.payType==='card'||j.cashReceipt) {
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:var(--purple);">VAT (10%)</span><span style="color:var(--purple);">' + fmtMoney(Math.round(total*0.1)) + '</span></div>';
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;"><span>VAT 포함 합계</span><span style="color:var(--accent);">' + fmtMoney(total + Math.round(total*0.1)) + '</span></div>';
+  }
   // 수수료 내역 표시
   if (j.commissions && j.commissions.length > 0) {
     html += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">';

@@ -2266,34 +2266,36 @@ function removeAsPhoto(type, idx, e) {
 
 function filterCalByDay(day) {
   var dateStr = _curYear + '-' + String(_curMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
-  var list = document.getElementById('cal-job-list');
-  if (!list) return;
-  var items = list.querySelectorAll('.job-card');
-  var allVisible = true;
-  items.forEach(function(item) {
-    if (item.style.display === 'none') allVisible = false;
-  });
-  // 이미 필터 중이면 해제
-  if (!allVisible) {
-    items.forEach(function(item) { item.style.display = ''; });
+  // 이미 같은 날짜 필터 중이면 해제
+  if (window._calFilterDate === dateStr) {
+    window._calFilterDate = null;
+    renderCalendar();
     showToast('필터 해제');
     return;
   }
-  var count = 0;
-  items.forEach(function(item) {
-    var meta = item.querySelector('.job-meta');
-    if (meta && meta.textContent.includes(dateStr)) {
-      item.style.display = '';
-      count++;
-    } else {
-      item.style.display = 'none';
-    }
-  });
-  if (count === 0) {
-    items.forEach(function(item) { item.style.display = ''; });
-  } else {
-    showToast(dateStr + ' : ' + count + '건');
+  window._calFilterDate = dateStr;
+  var list = document.getElementById('cal-job-list');
+  if (!list) return;
+  // 해당 날짜 현장만 필터
+  var filtered = _jobs.filter(function(j) { return j.date === dateStr; });
+  if (filtered.length === 0) {
+    showToast('해당 날짜에 작업이 없습니다');
+    window._calFilterDate = null;
+    return;
   }
+  var html = '';
+  filtered.forEach(function(j) {
+    var total = jobTotal(j);
+    html += '<div class="job-card" onclick="showDetail('+j.id+')">'
+      + '<div class="job-card-top"><span class="job-name">' + j.name + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</span>'
+      + '<span class="badge '+j.status+'">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수') + '</span></div>'
+      + '<div class="job-meta">📅 '+j.date+' · 📍 '+(j.addr||'')+'</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
+      + '<span class="job-amount">' + fmtMoney(total) + ((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'') + '</span>'
+      + '</div></div>';
+  });
+  list.innerHTML = html;
+  showToast(dateStr + ' : ' + filtered.length + '건');
 }
 
 function renderCalendar() {

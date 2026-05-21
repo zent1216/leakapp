@@ -2277,7 +2277,9 @@ function filterCalByDay(day) {
   var list = document.getElementById('cal-job-list');
   if (!list) return;
   // 해당 날짜 현장만 필터
-  var filtered = _jobs.filter(function(j) { return j.date === dateStr; });
+  console.log('filterCalByDay:', dateStr, '_jobs count:', _jobs.length);
+  var filtered = _jobs.filter(function(j) { return (j.date||'').indexOf(dateStr) === 0; });
+  console.log('filtered:', filtered.length);
   if (filtered.length === 0) {
     showToast('해당 날짜에 작업이 없습니다');
     window._calFilterDate = null;
@@ -4048,11 +4050,11 @@ function renderStats() {
           + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
-        + mJobs.map(j=>{
+        + mJobs.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
           const hasComm = (j.commission||0) > 0;
           return '<div class="month-job-row">'
             + '<div style="flex:1;">'
-            + '<span>'+j.name+' · '+j.type+'</span>'
+            + '<span style="color:var(--text2);font-size:11px;margin-right:6px;">'+(j.date?j.date.slice(5).replace('-','.'):'')+'</span><span>'+j.name+' · '+j.type+'</span>'
             + (hasComm ? '<span style="font-size:10px;color:var(--purple);margin-left:6px;">['+( j.commissionName||'수수료')+']</span>' : '')
             + '</div>'
             + '<div style="text-align:right;">'

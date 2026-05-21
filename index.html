@@ -3778,7 +3778,7 @@ async function downloadPDF() {
     const imgH = 210 * canvas.height / canvas.width;
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, imgH);
     const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'opinion' ? '소견서' : '문서';
-    pdf.save(j.date + '_' + j.name + '_' + label + '.pdf');
+    pdf.save(j.date + '_' + j.name + '고객님_' + label + '.pdf');
     showToast('PDF 저장됐습니다 ✓');
   } catch(e) { showToast('PDF 실패: ' + e.message); }
 }
@@ -3823,7 +3823,7 @@ async function downloadInsurancePDF() {
       const imgH = 210 * canvas.height / canvas.width;
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, imgH);
     }
-    pdf.save(j.date + '_' + j.name + '_보험청구서류.pdf');
+    pdf.save(j.date + '_' + j.name + '고객님_보험청구서류.pdf');
     showToast('PDF ' + pages.length + '페이지 저장됐습니다 ✓');
   } catch(e) { showToast('PDF 실패: ' + e.message); }
 }
@@ -3851,7 +3851,7 @@ async function downloadInsuranceImages() {
       if (!canvas) continue;
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
-      a.download = j.date + '_' + j.name + '_' + (labels[i] || '페이지' + (i+1)) + '.png';
+      a.download = j.date + '_' + j.name + '고객님_' + (labels[i] || '페이지' + (i+1)) + '.png';
       a.click();
       await new Promise(r => setTimeout(r, 400));
     }
@@ -3880,7 +3880,7 @@ async function shareImage() {
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
     const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'receipt' ? '영수증' : '소견서';
-    const fname = j.date + '_' + j.name + '_' + label + '.png';
+    const fname = j.date + '_' + j.name + '고객님_' + label + '.png';
     if (navigator.share && navigator.canShare) {
       try {
         const blob = await (await fetch(dataUrl)).blob();
@@ -3903,7 +3903,7 @@ async function shareKakao() {
     const target = area.querySelector('.a4-scale-page, .a4-preview') || area;
     const canvas = await html2canvas(target.parentElement || target, {scale:3, useCORS:true, backgroundColor:'#ffffff'});
     const dataUrl = canvas.toDataURL('image/png');
-    const fname = j.date+'_'+j.name+'_'+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+'.png';
+    const fname = j.date+'_'+j.name+'고객님_'+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+'.png';
     // Web Share API로 카카오/문자 등 앱 선택 가능
     if (navigator.share) {
       try {
@@ -3947,7 +3947,7 @@ async function shareInsuranceImage() {
       const canvas = await captureA4Page(pages[i]);
       if (!canvas) continue;
       const blob = await (await fetch(canvas.toDataURL('image/png'))).blob();
-      files.push(new File([blob], j.date+'_'+j.name+'_'+(labels[i]||'p'+(i+1))+'.png', {type:'image/png'}));
+      files.push(new File([blob], j.date+'_'+j.name+'고객님_'+(labels[i]||'p'+(i+1))+'.png', {type:'image/png'}));
     }
     if (navigator.share && navigator.canShare && navigator.canShare({files})) {
       await navigator.share({files, title:'보험서류_'+j.name});
@@ -5199,7 +5199,7 @@ async function doSendAllDocs(mode) {
       }
       document.body.removeChild(wrap);
       var pdfBlob = pdf.output('blob');
-      var pdfFile = new File([pdfBlob], j.name + '_문서합본.pdf', {type: 'application/pdf'});
+      var pdfFile = new File([pdfBlob], j.name + '고객님_문서합본.pdf', {type: 'application/pdf'});
 
       if (navigator.share && navigator.canShare && navigator.canShare({files: [pdfFile]})) {
         await navigator.share({
@@ -5211,7 +5211,7 @@ async function doSendAllDocs(mode) {
         // 미지원시 다운로드
         var url = URL.createObjectURL(pdfBlob);
         var a = document.createElement('a');
-        a.href = url; a.download = j.name + '_문서합본.pdf';
+        a.href = url; a.download = j.name + '고객님_문서합본.pdf';
         a.click(); URL.revokeObjectURL(url);
         showToast('PDF 다운로드 완료');
       }

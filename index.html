@@ -2344,7 +2344,7 @@ function renderCalendar() {
     const dotColor = jobs.some(j=>j.status==='done') ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
     const col = (firstDay + d - 1) % 7;
     const textColor = col===0?'var(--red)':col===6?'var(--accent)':'var(--text)';
-    html += '<div onclick="'+(hasJob?'filterCalByDay('+d+')':'')+'" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:'+(hasJob?'pointer':'default')+';background:'+(isToday?'var(--accent)':hasJob?'var(--bg3)':'transparent')+';position:relative;">'
+    html += '<div data-day="'+(hasJob?d:'')+'" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:'+(hasJob?'pointer':'default')+';background:'+(isToday?'var(--accent)':hasJob?'var(--bg3)':'transparent')+';position:relative;">'
       + '<span style="font-size:13px;font-weight:'+(isToday||hasJob?'700':'400')+';color:'+(isToday?'white':textColor)+';">'+d+'</span>'
       + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:'+dotColor+';"></div>' : '')
       + '</div>';
@@ -2374,6 +2374,13 @@ function renderCalendar() {
     html += '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">이번 달 작업이 없습니다</div></div>';
   }
   body.innerHTML = html;
+  // 달력 날짜 클릭 이벤트 위임
+  body.addEventListener('click', function(e) {
+    var cell = e.target.closest('[data-day]');
+    if (cell && cell.getAttribute('data-day')) {
+      filterCalByDay(parseInt(cell.getAttribute('data-day')));
+    }
+  });
 }
 
 function filterCalByDay(d) {

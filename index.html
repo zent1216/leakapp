@@ -2361,4 +2361,3271 @@ function renderCalendar() {
       const asCount = (j.asHistory||[]).length;
       return '<div class="job-card'+(asCount>0?(j.asHistory.slice(-1)[0]?.status==='as-done'?' as-done':' has-as'):'')
         +'" onclick="showDetail('+j.id+')">'
-        +'<div class="job-card-top"><span class=
+        +'<div class="job-card-top"><span class="job-name">'+j.name+(j.phone?' <span style="font-size:12px;font-weight:400;color:var(--text2);">'+j.phone+'</span>':'')+'</span>'
+        +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수')+'</span></div>'
+        +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        +'<span class="job-amount">'+fmtMoney(total)+((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+'</span>'
+        +(asCount>0?'<span style="font-size:11px;color:var(--purple);">🔧 AS '+asCount+'건</span>':'')
+        +'</div></div>';
+    }).join('');
+    html += '</div>';
+  } else {
+    html += '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">이번 달 작업이 없습니다</div></div>';
+  }
+  body.innerHTML = html;
+}
+
+
+
+
+function changeMonth(dir) {
+  _curMonth += dir;
+  if (_curMonth < 0) { _curMonth = 11; _curYear--; }
+  if (_curMonth > 11) { _curMonth = 0; _curYear++; }
+  renderCalendar();
+}
+
+// ════════════════════════════════════════
+//  작업 상세 모달
+// ════════════════════════════════════════
+
+// 상세 모달 버튼 래퍼 함수들 (onclick 이스케이프 문제 해결)
+function doEditJob(id) {
+  closeModal('detail-modal');
+  editJob(id);
+}
+function doGoDoc() {
+  closeModal('detail-modal');
+  goPage('page-docs', 'estimate');
+}
+function doOpenAs(jobId) {
+  closeModal('detail-modal');
+  openAsForm(jobId, null);
+}
+function doEditAs(jobId, asIdx) {
+  closeModal('detail-modal');
+  openAsForm(jobId, asIdx);
+}
+function doDeleteJob(id) {
+  if (!confirm('이 작업을 삭제하시겠습니까?')) return;
+  _jobs = _jobs.filter(function(j){ return j.id !== id; });
+  saveJobs();
+  closeModal('detail-modal');
+  renderCalendar();
+  updateMainStats();
+  showToast('삭제됐습니다');
+}
+function showDetail(id) {
+  const j = _jobs.find(function(x){ return x.id === id; });
+  if (!j) return;
+  const total = jobTotal(j);
+  document.getElementById('detail-title').textContent = j.name + ' 작업';
+  const body = document.getElementById('detail-body');
+  const bPh = (j.photosBefore||[]).filter(Boolean);
+  const aPh = (j.photosAfter||[]).filter(Boolean);
+
+  let html = '';
+
+  // 고객명 + 상태
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
+  html += '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span>';
+  if (j.phone) html += ' <span style="font-size:12px;color:var(--text2);">' + j.phone + '</span>';
+  html += '</div>';
+  html += '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':'미수') + '</span></div>';
+
+  // 기본 정보
+  html += '<div class="detail-info-card">';
+  html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + (j.date||'-') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + (j.addr||'-') + (j.location?' ('+j.location+')':'') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + (j.type||'-') + '</div></div>';
+  html += '</div>';
+
+  // 사진 (전체 표시)
+  if (bPh.length || aPh.length) {
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\\\'' + j.id + '\\\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
+    if (bPh.length) {
+      html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 전 (' + bPh.length + '장)</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';
+      bPh.forEach(function(src) {
+        html += '<div style="aspect-ratio:1;background:var(--bg3);border-radius:var(--r-sm);overflow:hidden;"><img src="' + src + '" style="width:100%;height:100%;object-fit:cover;"></div>';
+      });
+      html += '</div>';
+    }
+    if (aPh.length) {
+      html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 후 (' + aPh.length + '장)</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';
+      aPh.forEach(function(src) {
+        html += '<div style="aspect-ratio:1;background:var(--bg3);border-radius:var(--r-sm);overflow:hidden;"><img src="' + src + '" style="width:100%;height:100%;object-fit:cover;"></div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  // 작업 내용 (before/action/afterDesc/expertOpinion)
+  if (j.before || j.action || j.afterDesc || j.expertOpinion) {
+    html += '<div class="detail-info-card">';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">작업 내용</div>';
+    if (j.before) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 전 상황</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.before + '</div></div>';
+    }
+    if (j.action) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 내용</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.action + '</div></div>';
+    }
+    if (j.afterDesc) {
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">조치 후 상태</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.afterDesc + '</div></div>';
+    }
+    if (j.expertOpinion) {
+      html += '<div style="margin-bottom:4px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">전문가 소견</div>';
+      html += '<div style="font-size:13px;line-height:1.6;">' + j.expertOpinion + '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  // 비용 내역 (costItems 우선, 없으면 기존 필드 호환)
+  html += '<div class="detail-info-card">';
+  html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">비용 내역</div>';
+  if (j.costItems && j.costItems.length > 0) {
+    j.costItems.forEach(function(item) {
+      if (item.name || item.amount > 0) {
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);">'
+          + '<span style="color:var(--text2);">' + (item.name||'-') + '</span>'
+          + '<span>' + fmtMoney(item.amount||0) + '</span></div>';
+      }
+    });
+  } else {
+    // 기존 데이터 호환
+    if (j.inspectCost) html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">검사비</span><span>' + fmtMoney(j.inspectCost) + '</span></div>';
+    if (j.baseCost) html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">공사비</span><span>' + fmtMoney(j.baseCost) + '</span></div>';
+    if ((j.extraSpots||0) > 0) {
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">추가구간(' + j.extraSpots + '개소)</span><span>' + fmtMoney((j.extraSpots||0)*200000) + '</span></div>';
+    }
+    if (j.materialCost) html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">자재비</span><span>' + fmtMoney(j.materialCost) + '</span></div>';
+  }
+  html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="font-weight:700;">합계</span><span style="font-size:16px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">' + fmtMoney(total) + '</span></div>';
+  if (j.payType==='card'||j.cashReceipt) {
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:var(--purple);">VAT (10%)</span><span style="color:var(--purple);">' + fmtMoney(Math.round(total*0.1)) + '</span></div>';
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;"><span>VAT 포함 합계</span><span style="color:var(--accent);">' + fmtMoney(total + Math.round(total*0.1)) + '</span></div>';
+  }
+  // 수수료 내역 표시
+  if (j.commissions && j.commissions.length > 0) {
+    html += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">';
+    html += '<div style="font-size:11px;color:var(--purple);margin-bottom:4px;">🔒 내부 (수수료)</div>';
+    j.commissions.forEach(function(c) {
+      html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;"><span style="color:var(--text2);">' + (c.name||'-') + '</span><span style="color:var(--red);">-' + fmtMoney(c.amount||0) + '</span></div>';
+    });
+    const netAmount = total - (j.commission || 0);
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;font-size:12px;">순수익</span><span style="font-size:14px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">' + fmtMoney(netAmount) + '</span></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // 메모
+  if (j.memo) {
+    html += '<div style="background:var(--bg3);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:12px;">';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📝 메모</div>';
+    html += '<div style="font-size:13px;">' + j.memo + '</div></div>';
+  }
+
+  // 수정/문서 버튼
+  html += '<div class="btn-group">';
+  html += '<button class="btn btn-secondary" onclick="doEditJob(' + j.id + ')">✏️ 수정</button>';
+  html += '<button class="btn btn-primary" onclick="doGoDoc()">📋 문서</button>';
+  html += '</div>';
+
+  // AS 내역
+  const asHistory = j.asHistory || [];
+  if (asHistory.length > 0) {
+    html += '<div style="background:var(--purple-bg);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:8px;">🔧 AS 내역 (' + asHistory.length + '건)</div>';
+    asHistory.forEach(function(a, idx) {
+      html += '<div style="border-bottom:1px solid rgba(168,85,247,0.15);padding-bottom:8px;margin-bottom:8px;cursor:pointer;" onclick="doEditAs(' + j.id + ',' + idx + ')">';
+      html += '<div style="display:flex;justify-content:space-between;margin-bottom:3px;">';
+      html += '<span style="font-size:12px;color:var(--purple);">' + (a.date||'') + '</span>';
+      html += '<span class="badge ' + (a.status||'as') + '">' + (a.status==='as-done'?'AS완료':'AS접수') + '</span>';
+      html += '</div>';
+      if (a.symptom) html += '<div style="font-size:12px;color:var(--text2);">증상: ' + a.symptom + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;color:var(--purple);border-color:rgba(168,85,247,0.3);" onclick="doOpenAs(' + j.id + ')">🔧 AS 접수</button>';
+  html += '<button class="btn btn-danger" onclick="doDeleteJob(' + j.id + ')">🗑️ 삭제</button>';
+
+  body.innerHTML = html;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+
+function deleteJob(id) {
+  if (!confirm('이 작업을 삭제하시겠습니까?')) return;
+  _jobs = _jobs.filter(j => j.id !== id);
+  saveJobs();
+  closeModal('detail-modal');
+  renderCalendar();
+  showToast('삭제됐습니다');
+}
+
+// ════════════════════════════════════════
+//  현장 등록 폼
+// ════════════════════════════════════════
+function resetForm() {
+  _editingJobId = null;
+  _extraSpotCount = 0;
+  _tempPhotos = {before:[null,null,null], after:[null,null,null]};
+  document.getElementById('field-title').innerHTML = '새 <span>작업</span>';
+  ['f-name','f-phone','f-addr','f-addr-detail','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo','f-client-company'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['f-inspect','f-base','f-material-cost'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-status').value = 'pending';
+  document.getElementById('f-type').value = '배관 누수';
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('extra-spots').innerHTML = '';
+  document.getElementById('material-list').innerHTML = '';
+  document.getElementById('commission-list').innerHTML = '';
+  document.getElementById('cost-items-list').innerHTML = '';
+  addCostItem('', '');
+  addMaterialRow();
+  renderPhotoSlots();
+  addCostItem('', '');
+  calcTotal();
+}
+
+function editJob(id) {
+  const j = _jobs.find(x => x.id === id);
+  if (!j) return;
+  _editingJobId = id;
+  // 먼저 페이지 이동 (display:flex 상태에서 폼 채워야 함)
+  goPage('page-field');
+  // 페이지 이동 후 폼 채우기
+  document.getElementById('field-title').innerHTML = '작업 <span style="color:var(--accent)">수정</span>';
+  document.getElementById('f-client-company').value = j.clientCompany || '';
+  document.getElementById('f-name').value = j.name || '';
+  document.getElementById('f-phone').value = j.phone || '';
+  document.getElementById('f-addr').value = j.addrBase || j.addr || '';
+  document.getElementById('f-addr-detail').value = j.addrDetail || '';
+  document.getElementById('f-location').value = j.location || '';
+  document.getElementById('f-date').value = j.date || '';
+  document.getElementById('f-status').value = j.status || 'done';
+  document.getElementById('f-pay-type').value = j.payType || 'cash';
+  document.getElementById('f-cash-receipt').checked = j.cashReceipt || false;
+  onPayTypeChange();
+  document.getElementById('f-type').value = j.type || '배관 누수';
+  document.getElementById('f-before').value = j.before || '';
+  document.getElementById('f-action').value = j.action || '';
+  document.getElementById('f-after-desc').value = j.afterDesc || '';
+  document.getElementById('f-expert-opinion').value = j.expertOpinion || '';
+  // 비용 항목 불러오기
+  document.getElementById('cost-items-list').innerHTML = '';
+  if (j.costItems && j.costItems.length) {
+    j.costItems.forEach(function(c){ addCostItem(c.name, c.amount); });
+  } else {
+    // 기존 형식 호환: 검사비/공사비/자재비 → 항목으로 변환
+    if (j.inspectCost) addCostItem('누수 탐지 검사비', j.inspectCost);
+    if (j.baseCost) addCostItem('누수 보수 공사비', j.baseCost);
+    if (j.materialCost) addCostItem('자재비', j.materialCost);
+    if ((j.extraSpots||0) > 0) addCostItem('추가 구간 (' + j.extraSpots + '개소)', j.extraSpots * 200000);
+    if (!j.costItems && !j.inspectCost && !j.baseCost) addCostItem('', '');
+  }
+  document.getElementById('f-memo').value = j.memo || '';
+  // 수수료 목록 불러오기
+  document.getElementById('commission-list').innerHTML = '';
+  const comms = j.commissions || (j.commissionName ? [{name: j.commissionName, amount: j.commission||0}] : []);
+  if (comms.length > 0) {
+    comms.forEach(function(c){ addCommissionRow(c.name, c.amount); });
+  }
+  // 자재
+  document.getElementById('material-list').innerHTML = '';
+  const mats = j.materials || [];
+  if (mats.length) mats.forEach(m => addMaterialRow(m.name, m.qty));
+  else addMaterialRow();
+  // 추가 구간
+  _extraSpotCount = 0;
+  document.getElementById('extra-spots').innerHTML = '';
+  for (let i = 0; i < (j.extraSpots||0); i++) addExtraSpot();
+  // 사진
+  _tempPhotos = {
+    before: (j.photosBefore||[]).filter(Boolean),
+    after:  (j.photosAfter||[]).filter(Boolean)
+  };
+  renderPhotoSlots();
+  calcTotal();
+}
+
+
+// ══════════════════════════════════════════
+//  의뢰처 관리
+// ══════════════════════════════════════════
+let _clients = [];
+let _editingClientId = null;
+let _materials = [];  // 자재 구매 내역
+
+function getNextClientId() {
+  return _clients.length ? Math.max.apply(null, _clients.map(function(c){return c.id||0;})) + 1 : 1;
+}
+
+// 의뢰처 목록 렌더
+function renderClientList() {
+  const list = document.getElementById('client-list');
+  if (!list) return;
+  if (!_clients.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">등록된 의뢰처가 없습니다</div></div>';
+    return;
+  }
+  // 가나다순 정렬
+  const sorted = _clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  list.innerHTML = sorted.map(function(c) {
+    return '<div class="client-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;cursor:pointer;" onclick="selectClient(' + c.id + ')">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
+      + '<span style="font-size:15px;font-weight:700;">' + (c.name||'') + '</span>'
+      + '<button class="btn-icon" onclick="event.stopPropagation();openClientForm(' + c.id + ')" style="font-size:14px;">✏️</button>'
+      + '</div>'
+      + (c.contact ? '<div style="font-size:12px;color:var(--text2);">👤 ' + c.contact + '</div>' : '')
+      + (c.phone ? '<div style="font-size:12px;color:var(--text2);">📞 ' + c.phone + '</div>' : '')
+      + (c.commissionRate ? '<div style="font-size:12px;color:var(--purple);">💰 수수료 ' + c.commissionRate + '%</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+// 의뢰처 선택 모달 열기
+function openClientPicker() {
+  renderClientList();
+  document.getElementById('client-picker-modal').classList.add('open');
+}
+
+// 의뢰처 선택 → 현장 폼에 반영
+function selectClient(id) {
+  const c = _clients.find(function(x){ return x.id === id; });
+  if (!c) return;
+  document.getElementById('f-client-company').value = c.name;
+  // 기본 수수료율이 있으면 자동으로 수수료 추가
+  if (c.commissionRate && c.name) {
+    // 이미 같은 업체 수수료가 있는지 확인
+    const comms = getCommissions();
+    const exists = comms.some(function(cm){ return cm.name === c.name; });
+    if (!exists) {
+      // 비용 합계 기준 수수료 자동 계산
+      const total = getCostItemsTotal();
+      const amount = Math.round(total * c.commissionRate / 100);
+      if (total > 0) {
+        addCommissionRow(c.name + ' (' + c.commissionRate + '%)', amount);
+      }
+    }
+  }
+  closeModal('client-picker-modal');
+  showToast('의뢰처 "' + c.name + '" 선택됨 ✓');
+}
+
+// 의뢰처 작성/수정 폼 열기
+function openClientForm(id) {
+  _editingClientId = id;
+  const titleEl = document.getElementById('client-form-title');
+  const delBtn = document.getElementById('cf-delete-btn');
+  if (id) {
+    const c = _clients.find(function(x){ return x.id === id; });
+    if (!c) return;
+    titleEl.textContent = '의뢰처 수정';
+    document.getElementById('cf-name').value = c.name || '';
+    document.getElementById('cf-contact').value = c.contact || '';
+    document.getElementById('cf-phone').value = c.phone || '';
+    document.getElementById('cf-addr').value = c.addr || '';
+    document.getElementById('cf-commission-rate').value = c.commissionRate || '';
+    document.getElementById('cf-memo').value = c.memo || '';
+    if (delBtn) delBtn.style.display = 'block';
+  } else {
+    titleEl.textContent = '새 의뢰처 추가';
+    ['cf-name','cf-contact','cf-phone','cf-addr','cf-commission-rate','cf-memo'].forEach(function(f){
+      const el = document.getElementById(f);
+      if (el) el.value = '';
+    });
+    // 현재 입력 중인 이름이 있으면 자동으로 채움
+    const typed = document.getElementById('f-client-company')?.value?.trim();
+    if (typed) document.getElementById('cf-name').value = typed;
+    if (delBtn) delBtn.style.display = 'none';
+  }
+  closeModal('client-picker-modal');
+  document.getElementById('client-form-modal').classList.add('open');
+}
+
+// 의뢰처 저장
+async function saveClient() {
+  const name = document.getElementById('cf-name').value.trim();
+  if (!name) { showToast('업체명은 필수입니다'); return; }
+  const client = {
+    id: _editingClientId || getNextClientId(),
+    name: name,
+    contact: document.getElementById('cf-contact').value.trim(),
+    phone: document.getElementById('cf-phone').value.trim(),
+    addr: document.getElementById('cf-addr').value.trim(),
+    commissionRate: parseFloat(document.getElementById('cf-commission-rate').value) || 0,
+    memo: document.getElementById('cf-memo').value.trim(),
+  };
+  if (_editingClientId) {
+    _clients = _clients.map(function(c){ return c.id === _editingClientId ? client : c; });
+    showToast('의뢰처가 수정됐습니다 ✓');
+  renderCompaniesPage();
+  } else {
+    _clients.push(client);
+    showToast('의뢰처가 추가됐습니다 ✓');
+  renderCompaniesPage();
+  }
+  await saveClients();
+  closeModal('client-form-modal');
+  // 바로 선택 적용
+  document.getElementById('f-client-company').value = client.name;
+}
+
+// 의뢰처 삭제
+async function deleteClient() {
+  if (!_editingClientId) return;
+  if (!confirm('이 의뢰처를 삭제하시겠습니까?')) return;
+  _clients = _clients.filter(function(c){ return c.id !== _editingClientId; });
+  await saveClients();
+  closeModal('client-form-modal');
+  showToast('의뢰처가 삭제됐습니다');
+}
+
+// Firestore에 의뢰처 저장
+async function saveClients() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({clients: JSON.stringify(_clients)}, {merge: true});
+  } catch(e) { console.error('saveClients:', e); }
+}
+
+// 입력 중 자동완성 제안
+function onClientInput() {
+  const input = document.getElementById('f-client-company');
+  const box = document.getElementById('client-suggestions');
+  if (!input || !box) return;
+  const q = input.value.trim().toLowerCase();
+  if (!q) { box.style.display = 'none'; return; }
+  const matches = _clients.filter(function(c){
+    return (c.name||'').toLowerCase().includes(q);
+  }).slice(0, 5);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(function(c){
+    return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="selectClient(' + c.id + ');document.getElementById(\'client-suggestions\').style.display=\'none\'">'
+      + '<span style="font-weight:600;">' + c.name + '</span>'
+      + (c.commissionRate ? '<span style="font-size:11px;color:var(--purple);margin-left:8px;">수수료 ' + c.commissionRate + '%</span>' : '')
+      + '</div>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+// 새 의뢰처 자동 저장 (저장된 의뢰처에 없으면 추가)
+async function autoSaveClient(companyName) {
+  if (!companyName) return;
+  const existing = _clients.find(function(c){ return c.name === companyName; });
+  if (existing) return; // 이미 있으면 저장 안 함
+  _clients.push({
+    id: getNextClientId(),
+    name: companyName,
+    contact: '',
+    phone: '',
+    addr: '',
+    commissionRate: 0,
+    memo: ''
+  });
+  await saveClients();
+}
+
+
+// ══════════════════════════════════════════
+//  다음 주소 검색
+// ══════════════════════════════════════════
+function openAddressSearch() {
+  if (typeof daum === 'undefined' || !daum.Postcode) {
+    showToast('주소 검색 로딩 중입니다. 잠시 후 다시 시도해주세요');
+    return;
+  }
+  new daum.Postcode({
+    oncomplete: function(data) {
+      var fullAddr = data.address;
+      // 참고항목 (건물명, 아파트명)
+      if (data.buildingName && data.apartment === 'Y') {
+        fullAddr += ' (' + data.buildingName + ')';
+      }
+      document.getElementById('f-addr').value = fullAddr;
+      // 상세주소 입력으로 포커스
+      setTimeout(function() {
+        document.getElementById('f-addr-detail').focus();
+      }, 100);
+    },
+    theme: {
+      bgColor: '#ffffff',
+      searchBgColor: '#2c5f9e',
+      queryTextColor: '#ffffff',
+      contentBgColor: '#ffffff'
+    }
+  }).open();
+}
+
+// ══════════════════════════════════════════
+//  비용 항목 (자유 추가)
+// ══════════════════════════════════════════
+function addCostItem(name, amount) {
+  const list = document.getElementById('cost-items-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'cost-item-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:6px;margin-bottom:6px;';
+  div.innerHTML = '<input class="form-input cost-item-name" placeholder="항목명 (예: 누수탐지, 배관교체)" value="'+(name||'')+'">'
+    + '<input class="form-input cost-item-amount" type="text" inputmode="numeric" placeholder="0" value="'+(amount ? amount.toLocaleString() : '')+'" oninput="formatAmountInput(this);calcTotal()" style="text-align:right;">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove();calcTotal()">×</button>';
+  list.appendChild(div);
+  calcTotal();
+}
+
+function getCostItems() {
+  const rows = document.querySelectorAll('.cost-item-row');
+  const result = [];
+  rows.forEach(function(row) {
+    const nameEl = row.querySelector('.cost-item-name');
+    const amountEl = row.querySelector('.cost-item-amount');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const amount = amountEl ? parseAmountStr(amountEl.value) : 0;
+    if (name || amount > 0) result.push({name: name, amount: amount});
+  });
+  return result;
+}
+
+function getCostItemsTotal() {
+  return getCostItems().reduce(function(s, c){ return s + c.amount; }, 0);
+}
+
+
+function calcTotal() {
+  const total = getCostItemsTotal();
+  const el = document.getElementById('total-display');
+  if (el) el.textContent = fmtMoney(total);
+  calcNetProfit();
+  updateVatDisplay();
+}
+
+function addCommissionRow(name, amount) {
+  const list = document.getElementById('commission-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'commission-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 36px;gap:6px;margin-bottom:6px;';
+  div.innerHTML = '<input class="form-input" placeholder="지급처 (광고업체, 협력업체 등)" value="'+(name||'')+'">'
+    + '<input class="form-input" type="text" inputmode="numeric" placeholder="금액" value="'+(amount ? amount.toLocaleString() : '')+'" oninput="formatAmountInput(this);calcNetProfit()" style="text-align:right;">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove();calcNetProfit()">×</button>';
+  list.appendChild(div);
+  calcNetProfit();
+}
+
+function getCommissions() {
+  const rows = document.querySelectorAll('.commission-row');
+  const result = [];
+  rows.forEach(function(row) {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0] ? inputs[0].value.trim() : '';
+    const amount = inputs[1] ? parseAmountStr(inputs[1].value) : 0;
+    if (name || amount > 0) result.push({name: name, amount: amount});
+  });
+  return result;
+}
+
+function getTotalCommission() {
+  return getCommissions().reduce(function(s, c){ return s + c.amount; }, 0);
+}
+
+function calcNetProfit() {
+  const total = getCostItemsTotal();
+  const totalComm = getTotalCommission();
+  const net = total - totalComm;
+  const el = document.getElementById('net-profit-display');
+  if (el) el.textContent = fmtMoney(net);
+}
+
+function addMaterialRow(name='', qty='') {
+  const list = document.getElementById('material-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'material-row';
+  div.innerHTML = '<input class="form-input" placeholder="자재명" value="'+name+'">'
+    + '<input class="form-input mat-qty" type="number" placeholder="수량" value="'+qty+'">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove()">×</button>';
+  list.appendChild(div);
+}
+
+function getMaterials() {
+  return Array.from(document.querySelectorAll('#material-list .material-row')).map(r => {
+    const ins = r.querySelectorAll('input');
+    return { name: ins[0]?.value?.trim()||'', qty: ins[1]?.value?.trim()||'' };
+  }).filter(m => m.name);
+}
+
+function addExtraSpot() {
+  _extraSpotCount++;
+  const cont = document.getElementById('extra-spots');
+  const div = document.createElement('div');
+  div.className = 'extra-spot-row';
+  if (div.dataset) div.dataset.idx = _extraSpotCount;
+  div.innerHTML = '<span class="spot-label">추가 구간 ' + _extraSpotCount + ' (+20만원)</span>'
+    + '<button class="btn-icon" onclick="removeExtraSpot(this)">×</button>';
+  cont.appendChild(div);
+  calcTotal();
+}
+
+function removeExtraSpot(btn) {
+  btn.parentElement.remove();
+  _extraSpotCount--;
+  document.querySelectorAll('.extra-spot-row').forEach((r,i) => {
+    r.querySelector('.spot-label').textContent = '추가 구간 ' + (i+1) + ' (+20만원)';
+  });
+  calcTotal();
+}
+
+// 사진
+function renderPhotoSlots() {
+  ['before', 'after'].forEach(function(type) {
+    const container = document.getElementById('photos-' + type);
+    if (!container) return;
+    const photos = _tempPhotos[type] || [];
+    const validPhotos = photos.filter(Boolean);
+
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    // 기존 사진들
+    validPhotos.forEach(function(src, idx) {
+      html += '<div style="width:90px;height:90px;background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;flex-shrink:0;">';
+      html += '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;">';
+      html += '<button onclick="removePhoto(\'' + type + '\',' + idx + ')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:white;border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>';
+      html += '</div>';
+    });
+    // + 추가 버튼
+    html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="width:90px;height:90px;background:var(--bg3);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:28px;flex-shrink:0;">📷</div>';
+    html += '</div>';
+    container.innerHTML = html;
+  });
+}
+
+
+function addPhoto(type, idx) {
+  _photoTarget = { type: type, idx: _tempPhotos[type].length };
+  document.getElementById('photo-input').click();
+}
+
+// 이미지 압축 함수 (Firestore 1MB 제한 대응)
+// 최대 가로 1400px, JPEG 품질 0.72 → 보통 80~150KB
+function compressImage(dataUrl, maxWidth, quality) {
+  return new Promise(function(resolve, reject) {
+    maxWidth = maxWidth || 1400;
+    quality = quality || 0.85;
+    const img = new Image();
+    img.onload = function() {
+      try {
+        let w = img.width, h = img.height;
+        // 가로 최대값 제한
+        if (w > maxWidth) {
+          h = Math.round(h * maxWidth / w);
+          w = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        // 고품질 리사이징 설정
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        // 흰 배경 (투명 PNG 처리)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        // JPEG로 압축 (PNG보다 훨씬 작음)
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } catch(e) { reject(e); }
+    };
+    img.onerror = function() { reject(new Error('이미지 로드 실패')); };
+    img.src = dataUrl;
+  });
+}
+
+
+function handlePhotoUpload(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length || !_photoTarget) return;
+  showToast('사진 ' + files.length + '장 처리 중...');
+  const type = _photoTarget.type;
+  _photoTarget = null;
+  let done = 0, failed = 0;
+  files.forEach(function(file) {
+    const reader = new FileReader();
+    reader.onload = async function(ev) {
+      try {
+        const compressed = await compressImage(ev.target.result, 1400, 0.85);
+        _tempPhotos[type].push(compressed);
+        done++;
+        if (done + failed === files.length) {
+          renderPhotoSlots();
+          showToast('사진 ' + done + '장 추가됨' + (failed?' (실패 '+failed+')':'') + ' ✓');
+        }
+      } catch(err) {
+        failed++;
+        if (done + failed === files.length) {
+          renderPhotoSlots();
+          showToast('사진 처리: 성공 ' + done + ' / 실패 ' + failed);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function removePhoto(type, idx, e) {
+  if (e) e.stopPropagation();
+  _tempPhotos[type].splice(idx, 1);
+  renderPhotoSlots();
+}
+
+async function saveJob() {
+  if (_isSaving) return;
+  _isSaving = true;
+  var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중...'; }
+  const name = document.getElementById('f-name').value.trim();
+  const addr = document.getElementById('f-addr').value.trim();
+  const date = document.getElementById('f-date').value;
+  if (!name || !addr || !date) { showToast('고객명, 주소, 작업일은 필수입니다'); _isSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; } return; }
+  const addrDetail = document.getElementById('f-addr-detail').value.trim();
+  const fullAddr = addrDetail ? (addr + ' ' + addrDetail) : addr;
+  const costItems = getCostItems();
+  const costTotal = getCostItemsTotal();
+  const clientCompany = document.getElementById('f-client-company').value.trim();
+  // 새 의뢰처면 자동 저장
+  if (clientCompany) autoSaveClient(clientCompany);
+  const job = {
+    id: _editingJobId || getNextId(),
+    clientCompany: clientCompany,
+    payType: document.getElementById('f-pay-type').value || 'cash',
+    cashReceipt: document.getElementById('f-cash-receipt').checked || false,
+    name,
+    addr: fullAddr,
+    addrBase: addr,
+    addrDetail: addrDetail,
+    date,
+    phone: document.getElementById('f-phone').value.trim(),
+    location: document.getElementById('f-location').value.trim(),
+    status: document.getElementById('f-status').value,
+    type: document.getElementById('f-type').value,
+    before: document.getElementById('f-before').value.trim(),
+    action: document.getElementById('f-action').value.trim(),
+    afterDesc: document.getElementById('f-after-desc').value.trim(),
+    expertOpinion: document.getElementById('f-expert-opinion').value.trim(),
+    costItems: costItems,
+    costTotal: costTotal,
+    // 기존 호환용 필드 (계산 결과를 inspect에 모두 몰아넣음)
+    inspectCost: costTotal,
+    baseCost: 0,
+    materialCost: 0,
+    extraSpots: 0,
+    materials: getMaterials(),
+    photosBefore: (_tempPhotos.before||[]).filter(Boolean),
+    photosAfter: (_tempPhotos.after||[]).filter(Boolean),
+    memo: document.getElementById('f-memo').value.trim(),
+    commissions: getCommissions(),
+    commission: getTotalCommission(),
+  };
+  if (_editingJobId) {
+    const existing = _jobs.find(j => j.id === _editingJobId);
+    if (existing) job.asHistory = existing.asHistory;
+    _jobs = _jobs.map(j => j.id === _editingJobId ? job : j);
+  } else {
+    _jobs.push(job);
+  }
+  // 사진을 Firebase Storage에 업로드 (Base64 → URL, 이미 URL이면 스킵)
+  try {
+    var jobIdx = _jobs.findIndex(function(x){ return x.id === job.id; });
+    if (jobIdx >= 0) {
+      var jj = _jobs[jobIdx];
+      var hasBase64 = false;
+      (jj.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) hasBase64 = true; });
+      (jj.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) hasBase64 = true; });
+      if (hasBase64) {
+        showToast('사진 업로드 중...');
+        _jobs[jobIdx] = await uploadJobPhotos(jj);
+      }
+    }
+  } catch(e) { console.error('사진 업로드 오류:', e); }
+  // 저장 결과 확인 후 메시지
+  const ok = await saveJobs();
+  _isSaving = false;
+  var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; }
+  if (ok) {
+    showToast(_editingJobId ? '✅ 수정됐습니다' : '✅ 저장됐습니다');
+    updateMainStats();
+    var wasEdit = !!_editingJobId;
+    resetForm();
+    goPage('page-calendar');
+  }
+  // 실패 시에는 폼 유지 (사용자가 다시 시도할 수 있게)
+}
+
+// ════════════════════════════════════════
+//  문서 (견적서/소견서/보험서류)
+// ════════════════════════════════════════
+function initDocs(type) {
+  _isPreview = false;
+  _insReceipts = [];
+  // 버튼 상태 초기화
+  const modeBtn = document.getElementById('docs-mode-btn');
+  if (modeBtn) { modeBtn.textContent = '👁️ 미리보기'; modeBtn.style.background = 'var(--accent)'; modeBtn.style.color = 'white'; }
+  // 공유버튼 숨기기
+  document.getElementById('share-normal').style.display = 'none';
+  document.getElementById('share-insurance').style.display = 'none';
+  // 미리보기 숨기기, 편집 보이기
+  document.getElementById('docs-edit-area').style.display = 'block';
+  document.getElementById('docs-preview-area').style.display = 'none';
+  // 작업 목록 로드
+  const sel = document.getElementById('doc-job-sel');
+  if (sel) {
+    sel.innerHTML = _jobs.length
+      ? _jobs.slice().sort((a,b)=>b.date>a.date?1:-1).map(j => '<option value="'+j.id+'">'+j.date+' · '+j.name+' · '+j.type+'</option>').join('')
+      : '<option value="">저장된 작업 없음</option>';
+  }
+  setDocType(type);
+  setTimeout(scaleDocPage, 100);
+}
+
+function setDocType(type) {
+  _curDocType = type;
+  // 탭 스타일
+  ['estimate','opinion','receipt'].forEach(t => {
+    const b = document.getElementById('tab-' + t);
+    if (!b) return;
+    if (t === type) { b.style.background='var(--accent)'; b.style.color='white'; b.style.border='none'; }
+    else { b.style.background='var(--bg3)'; b.style.color='var(--text2)'; b.style.border='1px solid var(--border)'; }
+  });
+  // 타이틀
+  const titles = {estimate:'견적서',opinion:'소견서',receipt:'영수증'};
+  const titleEl = document.getElementById('docs-title');
+  if (titleEl) titleEl.innerHTML = (titles[type]||type) + ' <span>생성</span>';
+  // 공유버튼: 편집모드면 숨기기, 미리보기면 타입에 맞게 표시
+  if (!_isPreview) {
+    document.getElementById('share-normal').style.display = 'none';
+    document.getElementById('share-insurance').style.display = 'none';
+    renderDocEdit();
+  } else {
+    document.getElementById('share-normal').style.display = 'block';
+    document.getElementById('share-insurance').style.display = 'none';
+    document.getElementById('docs-send-all-btn').style.display = 'inline-block';
+    renderDocPreview();
+  }
+}
+
+function onDocJobChange() {
+  if (_isPreview) renderDocPreview();
+  else renderDocEdit();
+}
+
+function scaleDocPage() {
+  // 100% 반응형으로 변경되어 transform 스케일링 불필요
+}
+
+// 숫자 → 한글 금액 변환
+function numToKorean(num) {
+  if (!num || num === 0) return '영';
+  var units = ['', '만', '억', '조'];
+  var digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+  var pos = ['', '십', '백', '천'];
+  var result = '';
+  var n = Math.floor(num);
+  var unitIdx = 0;
+  while (n > 0) {
+    var chunk = n % 10000;
+    if (chunk > 0) {
+      var chunkStr = '';
+      var c = chunk;
+      for (var i = 0; i < 4; i++) {
+        var d = c % 10;
+        if (d > 0) {
+          chunkStr = (d === 1 && i > 0 ? '' : digits[d]) + pos[i] + chunkStr;
+        }
+        c = Math.floor(c / 10);
+      }
+      result = chunkStr + units[unitIdx] + result;
+    }
+    n = Math.floor(n / 10000);
+    unitIdx++;
+  }
+  return result;
+}
+
+
+// 영수증 금액 입력 시 한글 금액 실시간 변환
+function onReceiptAmountChange() {
+  const input = document.getElementById('receipt-amount');
+  const preview = document.getElementById('receipt-korean-preview');
+  if (!input || !preview) return;
+  const amount = parseAmountStr(input.value);
+  preview.textContent = '金 ' + numToKorean(amount) + ' 원정';
+}
+
+
+function scaleA4() {
+  var previewArea = document.getElementById('docs-preview-area');
+  if (!previewArea) return;
+  // a4-scale-page (견적서/소견서 미리보기)
+  previewArea.querySelectorAll('.a4-scale-page').forEach(function(page) {
+    var wrap = page.parentElement;
+    if (!wrap) return;
+    var w = wrap.offsetWidth || 340;
+    var scale = w / 794;
+    page.style.transform = 'scale(' + scale + ')';
+    wrap.style.height = Math.ceil(page.offsetHeight * scale) + 'px';
+  });
+  // a4-preview > div (보험서류 미리보기)
+  previewArea.querySelectorAll('.a4-preview > div').forEach(function(page) {
+    var wrap = page.parentElement;
+    if (!wrap) return;
+    var w = wrap.offsetWidth || 340;
+    var scale = w / 794;
+    page.style.width = '794px';
+    page.style.transformOrigin = 'top left';
+    page.style.transform = 'scale(' + scale + ')';
+    wrap.style.height = Math.ceil((page.scrollHeight || 1123) * scale) + 'px';
+    wrap.style.overflow = 'hidden';
+  });
+}
+
+function toggleDocsMode() {
+  _isPreview = !_isPreview;
+  const modeBtn = document.getElementById('docs-mode-btn');
+  const editArea = document.getElementById('docs-edit-area');
+  const previewArea = document.getElementById('docs-preview-area');
+  const docsBody = document.getElementById('docs-body');
+  if (_isPreview) {
+    if (modeBtn) { modeBtn.textContent = '✏️ 편집'; modeBtn.style.background = 'var(--bg3)'; modeBtn.style.color = 'var(--text2)'; }
+    const hint = document.getElementById('docs-edit-hint');
+    if (hint) hint.style.display = 'none';
+    editArea.style.display = 'none';
+    previewArea.style.display = 'block';
+    if (docsBody) docsBody.classList.add('preview-mode');
+    if (_curDocType === 'insurance') {
+      document.getElementById('share-normal').style.display = 'none';
+    document.getElementById('docs-send-all-btn').style.display = 'none';
+      document.getElementById('share-insurance').style.display = 'block';
+    } else {
+      document.getElementById('share-normal').style.display = 'block';
+      document.getElementById('share-insurance').style.display = 'none';
+    }
+    // 편집 내용 미리보기에 반영
+    if (_curDocType === 'receipt') {
+      var j2 = getSelJob();
+      if (j2) {
+        var ra = document.getElementById('receipt-amount');
+        var rt = document.getElementById('receipt-to');
+        var rad = document.getElementById('receipt-addr');
+        var rb = document.getElementById('receipt-body');
+        if (ra) j2._receiptAmount = parseAmountStr(ra.value);
+        if (rt) j2._receiptTo = rt.value;
+        if (rad) j2._receiptAddr = rad.value;
+        if (rb) j2._receiptBody = rb.value;
+      }
+    } else if (_curDocType === 'insurance') {
+      var j2 = getSelJob();
+      if (j2) {
+        var ic = document.getElementById('ins-company');
+        var ip = document.getElementById('ins-policy');
+        var ib = document.getElementById('ins-bank');
+        var ia = document.getElementById('ins-account');
+        var ih = document.getElementById('ins-holder');
+        if (ic) j2._insCompany = ic.value;
+        if (ip) j2._insPolicy = ip.value;
+        if (ib) _biz.bank = ib.value;
+        if (ia) _biz.account = ia.value;
+        if (ih) _biz.holder = ih.value;
+        // 영수증 편집 내용 저장
+        var rAmt = document.getElementById('receipt-amount');
+        var rTo = document.getElementById('receipt-to');
+        var rBody = document.getElementById('receipt-body');
+        if (rAmt) j2._receiptAmount = parseAmountStr(rAmt.value);
+        if (rTo) j2._receiptTo = rTo.value;
+        var rAddr = document.getElementById('receipt-addr');
+        if (rAddr) j2._receiptAddr = rAddr.value;
+        if (rBody) j2._receiptBody = rBody.value;
+      }
+    } else if (_curDocType === 'estimate') {
+      // 편집 영역의 현재 항목들을 읽어서 미리보기에 반영
+      syncEstimateEditToPreview();
+    }
+    renderDocPreview();
+    setTimeout(scaleA4, 150);
+    window._scaleHandler = function(){ scaleA4(); };
+    window.addEventListener('resize', window._scaleHandler);
+  } else {
+    if (modeBtn) { modeBtn.textContent = '👁️ 미리보기'; modeBtn.style.background = 'var(--accent)'; modeBtn.style.color = 'white'; }
+    const hint = document.getElementById('docs-edit-hint');
+    if (hint) hint.style.display = 'flex';
+    editArea.style.display = 'block';
+    previewArea.style.display = 'none';
+    if (docsBody) docsBody.classList.remove('preview-mode');
+    document.getElementById('share-normal').style.display = 'none';
+    document.getElementById('share-insurance').style.display = 'none';
+    if (window._scaleHandler) window.removeEventListener('resize', window._scaleHandler);
+    renderDocEdit();
+    setTimeout(scaleDocPage, 50);
+    window._scaleDocHandler = scaleDocPage;
+    window.addEventListener('resize', window._scaleDocHandler);
+  }
+}
+
+// ── 공통 HTML 생성 함수 (편집+미리보기 모두 사용) ──
+function renderDocEdit() {
+  var el = document.getElementById('docs-edit-area');
+  if (!el) return;
+  var j = getSelJob();
+  var biz = _biz;
+  if (!j) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">먼저 작업을 선택하거나 저장해주세요</div></div>';
+    return;
+  }
+  var ce = 'true';
+  var today = new Date().toLocaleDateString('ko-KR');
+  var co = biz.name || '업체명';
+  var insTotal = jobTotal(j);
+  var extraCost = (j.extraSpots||0) * 200000;
+  var editHint = '<div style="background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.3);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent);">✏️ 텍스트를 직접 터치해서 수정할 수 있어요</div>';
+
+  if (_curDocType === 'estimate') {
+    el.innerHTML = editHint + '<div class="doc-a4-wrap"><div class="doc-a4-page" id="doc-page-est">'
+      + makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce)
+      + '</div></div>';
+  } else if (_curDocType === 'opinion') {
+    el.innerHTML = editHint + '<div class="doc-a4-wrap"><div class="doc-a4-page" id="doc-page-op">'
+      + makeOpinionHTML(j, biz, today, co, ce)
+      + '</div></div>';
+  } else {
+    renderReceiptEdit(j, el);
+  }
+}
+
+// 견적서 편집 영역 → _jobs 동기화 (미리보기 전환 시 호출)
+function syncEstimateEditToPreview() {
+  var j = getSelJob();
+  if (!j) return;
+  // 현재 편집 영역의 항목 tbody 읽기
+  var tbody = document.getElementById('est-items-body');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  var items = [];
+  rows.forEach(function(tr) {
+    var cells = tr.querySelectorAll('td');
+    if (cells.length >= 2) {
+      var inp0 = cells[0].querySelector('input');
+      var inp1 = cells[1].querySelector('input');
+      var name = inp0 ? inp0.value.trim() : cells[0].textContent.trim();
+      var amount = inp1 ? inp1.value.trim().replace(/,/g, '') : cells[1].textContent.trim().replace(/,/g, '');
+      var val = parseFloat(amount) || 0;
+      if (name) items.push({name: name, amount: val});
+    }
+  });
+  // 합계 재계산
+  var total = 0;
+  items.forEach(function(i){ total += i.amount; });
+  // 항목 정보를 j에 임시 저장
+  j._editItems = items;
+  j._editTotal = total;
+}
+
+
+function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
+  // 편집에서 동기화된 항목이 있으면 사용, 아니면 기본값
+  var items = j._editItems || null;
+  var displayTotal = (j._editTotal !== undefined) ? j._editTotal : insTotal;
+
+  var extraRow = '';
+  if (!items && (j.extraSpots||0) > 0) {
+    extraRow = '<tr>'
+      + (ce==='true'
+      ? '<td style="padding:4px 8px;border:1px solid #c8d8f0;background:white;"><input type="text" value="추가 구간('+j.extraSpots+'개소)" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="padding:4px 8px;border:1px solid #c8d8f0;text-align:right;background:white;width:130px;"><input type="text" value="'+((j.extraSpots||0)*200000).toLocaleString()+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;text-align:right;outline:none;color:#333;-webkit-text-fill-color:#333;"></td>'
+      : '<td>추가 구간('+j.extraSpots+'개소)</td><td style="text-align:right;">'+((j.extraSpots||0)*200000).toLocaleString()+'</td>')
+      + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+      + '</tr>';
+  }
+
+  // 항목 행 생성
+  var itemRows = '';
+  if (items) {
+    // 편집에서 동기화된 항목 사용
+    items.forEach(function(item) {
+      // 미리보기에서 0원 항목 표시 여부: ce='true'(편집)면 표시, 아니면 금액>0만 표시
+      if (ce === 'true' || item.amount > 0) {
+        itemRows += '<tr>'
+          + (ce==='true'
+          ? '<td style="padding:4px 8px;border:1px solid #c8d8f0;background:white;"><input type="text" value="'+item.name+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="padding:4px 8px;border:1px solid #c8d8f0;text-align:right;background:white;width:130px;"><input type="text" value="'+item.amount.toLocaleString()+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;text-align:right;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="width:40px;text-align:center;cursor:pointer;color:#e74c3c;-webkit-text-fill-color:#e74c3c;font-weight:700;border:1px solid #c8d8f0;background:white;" onclick="this.parentNode.remove()">×</td>'
+          : '<td>'+item.name+'</td><td style="text-align:right;">'+item.amount.toLocaleString()+'</td>')
+          + '</tr>';
+      }
+    });
+  } else if (j.costItems && j.costItems.length > 0) {
+    // 새 형식: costItems 사용
+    j.costItems.forEach(function(item) {
+      if (item.name || item.amount > 0) {
+        itemRows += '<tr>'
+          + (ce==='true'
+          ? '<td style="padding:4px 8px;border:1px solid #c8d8f0;background:white;"><input type="text" value="'+(item.name||'')+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="padding:4px 8px;border:1px solid #c8d8f0;text-align:right;background:white;width:130px;"><input type="text" value="'+(item.amount||0).toLocaleString()+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;text-align:right;outline:none;color:#333;-webkit-text-fill-color:#333;"></td>'
+          : '<td>'+(item.name||'')+'</td><td style="text-align:right;">'+(item.amount||0).toLocaleString()+'</td>')
+          + (ce === 'true' ? '<td style="width:36px;text-align:center;cursor:pointer;color:#e74c3c;font-weight:700;" onclick="this.parentNode.remove()">×</td>' : '')
+          + '</tr>';
+      }
+    });
+  } else {
+    // 기존 형식 호환: 검사비/공사비/자재비
+    var defaultItems = [
+      {name:'누수 탐지 검사비', amount: j.inspectCost||0},
+      {name:'누수 보수 공사비', amount: j.baseCost||0}
+    ];
+    defaultItems.forEach(function(item) {
+      if (ce === 'true' || item.amount > 0) {
+        itemRows += '<tr>'
+          + (ce==='true'
+          ? '<td style="padding:4px 8px;border:1px solid #c8d8f0;background:white;"><input type="text" value="'+item.name+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="padding:4px 8px;border:1px solid #c8d8f0;text-align:right;background:white;width:130px;"><input type="text" value="'+item.amount.toLocaleString()+'" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;text-align:right;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="width:40px;text-align:center;cursor:pointer;color:#e74c3c;-webkit-text-fill-color:#e74c3c;font-weight:700;border:1px solid #c8d8f0;background:white;" onclick="this.parentNode.remove()">×</td>'
+          : '<td>'+item.name+'</td><td style="text-align:right;">'+item.amount.toLocaleString()+'</td>')
+          + '</tr>';
+      }
+    });
+    itemRows += extraRow;
+  }
+
+  return ''
+    + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
+    + '<div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
+    + '<div style="font-size:12px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
+    + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">견&nbsp;&nbsp;적&nbsp;&nbsp;서</div></div>'
+    + '<table class="doc-table" style="margin-bottom:10px;">'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">연락처</td><td contenteditable="'+ce+'">'+(j.phone||'-')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">주소</td><td contenteditable="'+ce+'">'+j.addr+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">작업일</td><td contenteditable="'+ce+'">'+j.date+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">유형</td><td contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
+    + '</table>'
+    + (ce === 'true' ? '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th style="background:#1a3a6e;color:white;-webkit-text-fill-color:white;padding:8px 10px;border:1px solid #c8d8f0;">항목</th><th style="background:#1a3a6e;color:white;-webkit-text-fill-color:white;padding:8px 10px;border:1px solid #c8d8f0;width:130px;text-align:right;">금액(원)</th><th style="background:#1a3a6e;width:40px;border:1px solid #c8d8f0;"></th></tr></thead>' : '<table class="doc-table" style="margin-bottom:4px;"><thead><tr><th>항목</th><th style="width:130px;text-align:right;">금액(원)</th></tr></thead>')
+    + '<tbody id="est-items-body">'
+    + itemRows
+    + '</tbody></table>'
+    + (ce === 'true' ? '<button onclick="addEstItem()" style="width:100%;padding:7px;font-size:12px;color:#4f8ef7;background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:4px;cursor:pointer;margin-bottom:10px;">+ 항목 추가</button>' : '')
+    + '<div class="doc-total-section">'
+    + (function(){
+      var hasVat = j.payType === 'card' || j.cashReceipt;
+      if (hasVat) {
+        var supply = displayTotal;
+        var vat = Math.round(displayTotal * 0.1);
+        var totalWithVat = displayTotal + vat;
+        return '<span class="doc-total-label">합계 금액 (VAT 포함)</span>'
+          + '<span class="doc-total-val">' + totalWithVat.toLocaleString() + '원</span>'
+          + '</div>'
+          + '<div style="font-size:12px;color:#555;text-align:right;margin-top:4px;margin-bottom:8px;">'
+          + '공급가액: ' + supply.toLocaleString() + '원 / VAT(10%): ' + vat.toLocaleString() + '원</div>';
+      } else {
+        return '<span class="doc-total-label">합계 금액 (VAT 별도)</span>'
+          + '<span class="doc-total-val">' + displayTotal.toLocaleString() + '원</span>'
+          + '</div>'
+          + '<div style="font-size:12px;color:#888;text-align:right;margin-top:4px;margin-bottom:8px;">※ 부가세(VAT 10%)는 위 금액에 별도 적용됩니다</div>';
+      }
+    }())
+    + '<table class="doc-table" style="margin-top:8px;margin-bottom:0;">'
+    + '<thead><tr><th colspan="2" style="background:#2c5f9e;color:white !important;-webkit-text-fill-color:white !important;">입금 계좌</th></tr></thead>'
+    + '<tbody>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">은행</td><td contenteditable="'+ce+'">'+(biz.bank||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">계좌번호</td><td contenteditable="'+ce+'">'+(biz.account||'&nbsp;')+'</td></tr>'
+    + '<tr><td style="background:#f0f5ff;font-weight:600;color:#333;">예금주</td><td contenteditable="'+ce+'">'+(biz.holder||biz.ceo||'&nbsp;')+'</td></tr>'
+    + '</tbody></table>'
+    + '<div style="font-size:12px;color:#555;text-align:center;margin-top:10px;" contenteditable="'+ce+'">본 견적서는 수신일로부터 15일 이내만 유효합니다</div>'
+    + '<div class="doc-sign-row">'
+    + (biz.signatureImg ? '<div class="doc-sign-box"><div>담당자</div><img class="doc-sign-img" src="'+biz.signatureImg+'"><div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>' : '')
+    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
+    + '</div>';
+}
+
+
+function addEstItem() {
+  var tbody = document.getElementById('est-items-body');
+  if (!tbody) return;
+  var tr = document.createElement('tr');
+  tr.innerHTML = '<td style="padding:4px 8px;border:1px solid #c8d8f0;background:white;"><input type="text" value="항목명" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="padding:4px 8px;border:1px solid #c8d8f0;text-align:right;background:white;width:130px;"><input type="text" value="0" style="width:100%;border:none;background:transparent;font-size:14px;padding:2px 0;text-align:right;outline:none;color:#333;-webkit-text-fill-color:#333;"></td><td style="width:40px;text-align:center;cursor:pointer;color:#e74c3c;-webkit-text-fill-color:#e74c3c;font-weight:700;border:1px solid #c8d8f0;background:white;" onclick="this.parentNode.remove()">×</td>';
+  tbody.appendChild(tr);
+}
+
+function makeOpinionHTML(j, biz, today, co, ce) {
+  return ''
+    + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
+    + '<div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
+    + '<div style="font-size:12px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
+    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
+    + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
+    + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
+    + '<table class="doc-table" style="border:none;margin:0;">'
+    + '<tr><td style="border:none;width:26%;color:#555;font-weight:600;padding:2px 4px;">고객명</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.name+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">점검일</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.date+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">현장주소</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.addr+'</td></tr>'
+    + '<tr><td style="border:none;color:#555;font-weight:600;padding:2px 4px;">누수유형</td><td style="border:none;padding:2px 4px;" contenteditable="'+ce+'">'+j.type+(j.location?' ('+j.location+')':'')+'</td></tr>'
+    + '</table></div>'
+    + '<div class="doc-section-h">누수 원인 및 발생 경위</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.before||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h">조치 내역</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.action||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h">조치 후 상태</div>'
+    + '<div class="doc-text-editable" contenteditable="'+ce+'">'+(j.afterDesc||'내용을 입력하세요')+'</div>'
+    + '<div class="doc-section-h" style="color:#c0392b;border-left-color:#e74c3c;">전문가 소견</div>'
+    + '<div class="doc-text-editable" style="background:#fff8f8;border-color:#f5c6cb;" contenteditable="'+ce+'">'+(j.expertOpinion||'본 기술자는 현장 점검 결과, 상기 내용과 같이 누수가 발생하였음을 확인합니다.')+'</div>'
+    + '<div class="doc-sign-row">'
+    + '<div class="doc-sign-box"><div>작성자 (기술자)</div>'
+    + (biz.signatureImg ? '<img class="doc-sign-img" src="'+biz.signatureImg+'">' : '<div class="doc-sign-line"></div>')
+    + '<div contenteditable="'+ce+'">'+(biz.ceo||'')+'</div></div>'
+    + (biz.stampImg ? '<div class="doc-sign-box"><img class="doc-stamp-img" src="'+biz.stampImg+'"></div>' : '')
+    + '</div>';
+}
+
+
+function renderReceiptEdit(j, el) {
+  var insTotal = jobTotal(j);
+  var html = '';
+  html += '<div class="form-card">';
+  html += '<div class="form-card-title">🧾 영수증 내용</div>';
+  html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
+  html += '<input class="form-input" id="receipt-amount" type="text" inputmode="numeric" oninput="formatAmountInput(this);calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal).toLocaleString() + '"></div>';
+  html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
+  html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">주소 (선택)</label>';
+  html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">본문</label>';
+  html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.') + '</textarea></div>';
+  var hasVat = j.payType === 'card' || j.cashReceipt;
+  html += '<div style="margin-top:12px;padding:10px;background:' + (hasVat ? 'rgba(62,207,142,0.1)' : 'rgba(245,158,11,0.1)') + ';border-radius:8px;font-size:13px;color:var(--text1);">';
+  html += hasVat ? '✅ <b>VAT 포함</b> (' + (j.payType==='card' ? '카드결제' : '현금영수증') + ') - 영수증에 VAT 10%가 자동 추가됩니다' : '⚠️ <b>VAT 별도</b> - 영수증에 입력한 금액 그대로 표시됩니다';
+  html += '</div>';
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+
+function renderDocPreview() {
+  const el = document.getElementById('docs-preview-area');
+  if (!el) return;
+  const j = getSelJob();
+  if (!j) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">먼저 작업을 선택해주세요</div></div>';
+    return;
+  }
+  const biz = _biz;
+  const today = new Date().toLocaleDateString('ko-KR');
+  const co = biz.name || '업체명';
+  const ce = 'false'; // 미리보기: 편집 불가
+  const insTotal = jobTotal(j);
+  const extraCost = (j.extraSpots||0)*200000;
+
+  if (_curDocType === 'estimate') {
+    el.innerHTML = '<div class="a4-scale-wrap"><div class="a4-scale-page" id="doc-prev-est">'
+      + makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce)
+      + '</div></div>';
+  } else if (_curDocType === 'opinion') {
+    el.innerHTML = '<div class="a4-scale-wrap"><div class="a4-scale-page" id="doc-prev-op">'
+      + makeOpinionHTML(j, biz, today, co, ce)
+      + '</div></div>';
+  } else {
+    // 영수증
+    var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
+    var rK = numToKorean(rA); var rT = j._receiptTo || j.name || ''; var rAd = j._receiptAddr || '';
+    var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.';
+    rB = rB.replace(/\n/g, '<br>');
+    var rH = '<div class="a4-preview"><div style="background:#e8f0f8;padding:36px 32px;min-height:1123px;font-family:sans-serif;display:flex;justify-content:center;">'
+      + '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
+      + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:16px;margin-bottom:50px;color:#333;">영 수 증</div>'
+      + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;"><span style="font-weight:600;letter-spacing:6px;">' + rT + '</span><span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span></div>'
+      + (rAd ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;">주소: ' + rAd + '</div>' : '')
+      + '<div style="border-bottom:1px solid #aaa;margin-bottom:30px;"></div>'
+      + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;"><span style="font-weight:700;margin-right:16px;">金</span><span style="font-weight:700;">' + (j.payType==='card'||j.cashReceipt ? numToKorean(rA+Math.round(rA*0.1)) : rK) + ' 원정</span></div>'
+      + (function(){ var hasV = j.payType==='card'||j.cashReceipt; var dispAmt = hasV ? rA+Math.round(rA*0.1) : rA; return '<div style="text-align:right;margin-bottom:'+(hasV?'10':'40')+'px;font-size:21px;color:#333;padding-right:20px;">₩ <span style="font-weight:600;">' + dispAmt.toLocaleString() + '</span></div>' + (hasV ? '<div style="text-align:right;margin-bottom:40px;font-size:13px;color:#555;padding-right:20px;">공급가액: '+rA.toLocaleString()+'원 / VAT: '+Math.round(rA*0.1).toLocaleString()+'원</div>' : ''); }())
+      + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
+      + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
+      + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
+      + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+      + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div></div></div>';
+    el.innerHTML = rH;
+  }
+  setTimeout(scaleA4, 100);
+}
+
+
+// 영수증
+function handleInsReceipt(e) {
+  const files = Array.from(e.target.files);
+  files.forEach(async function(file) {
+    const reader = new FileReader();
+    reader.onload = async function(ev) {
+      try {
+        const compressed = await compressImage(ev.target.result, 1400, 0.85);
+        _insReceipts.push(compressed);
+        renderInsReceiptList();
+      } catch(err) { console.error('영수증 압축 실패:', err); }
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function openReceiptInput() {
+  var inp = document.getElementById('ins-receipt-input');
+  if (inp) inp.click();
+}
+function renderInsReceiptList() {
+  const list = document.getElementById('ins-receipt-list');
+  if (!list) return;
+  list.innerHTML = '';
+  _insReceipts.forEach((src, i) => {
+    list.innerHTML += '<div style="position:relative;"><img src="'+src+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid var(--border);">'
+      + '<button onclick="_insReceipts.splice('+i+',1);renderInsReceiptList();" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;">×</button></div>';
+  });
+}
+
+// PDF/이미지 다운로드
+// 페이지 원본 크기로 캡처 (transform 제거 후)
+async function captureA4Page(el) {
+  if (!el) return null;
+  const inner = el.querySelector('div') || el;
+  const isWrap = el.classList.contains('a4-preview') || el.classList.contains('a4-scale-wrap');
+  const target = isWrap ? inner : el;
+
+  // 삭제 버튼 임시 숨기기
+  const delBtns = el.querySelectorAll('.est-del-btn');
+  delBtns.forEach(function(b){ b.style.display='none'; });
+
+  // 원래 스타일 저장
+  const origTransform = target.style.transform;
+  const origWidth = target.style.width;
+  const origHeight = target.style.height;
+  const wrapOrigH = isWrap ? el.style.height : '';
+  const wrapOrigO = isWrap ? el.style.overflow : '';
+
+  // transform 제거, 원본 크기 복원
+  target.style.transform = 'none';
+  target.style.width = '794px';
+  target.style.height = 'auto';
+  if (isWrap) {
+    el.style.height = 'auto';
+    el.style.overflow = 'visible';
+  }
+
+  await new Promise(r => setTimeout(r, 80));
+
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    width: 794,
+    windowWidth: 794
+  });
+
+  // 스타일 복원
+  target.style.transform = origTransform;
+  target.style.width = origWidth;
+  target.style.height = origHeight;
+  if (isWrap) {
+    el.style.height = wrapOrigH;
+    el.style.overflow = wrapOrigO;
+  }
+
+  // 삭제 버튼 복원
+  delBtns.forEach(function(b){ b.style.display=''; });
+
+  return canvas;
+}
+
+
+async function downloadPDF() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
+  // 미리보기 모드 강제 전환
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 200));
+  }
+  showToast('PDF 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    var page = area.querySelector('.a4-scale-page') || area.querySelector('.a4-preview');
+    if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
+    const canvas = await captureA4Page(page.parentElement);
+    if (!canvas) { showToast('캡처 실패'); return; }
+    const { jsPDF: JSPDF } = jspdf;
+    const pdf = new JSPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const imgH = 210 * canvas.height / canvas.width;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 210, imgH);
+    const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'opinion' ? '소견서' : '문서';
+    pdf.save(j.date + '_' + j.name + '고객님_' + label + '.pdf');
+    showToast('PDF 저장됐습니다 ✓');
+  } catch(e) { showToast('PDF 실패: ' + e.message); }
+}
+
+// 현재 문서 타입에 맞는 페이지 엘리먼트 반환
+function getDocPage() {
+  const area = document.getElementById('docs-preview-area');
+  if (!area) return null;
+  // 견적서/소견서: a4-scale-page
+  const scalePage = area.querySelector('.a4-scale-page');
+  if (scalePage) return scalePage;
+  // 보험서류: a4-preview > div (첫 번째)
+  const previewDiv = area.querySelector('.a4-preview > div');
+  if (previewDiv) return previewDiv;
+  return area;
+}
+async function downloadInsurancePDF() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF 라이브러리 로딩 중...'); return; }
+  // 미리보기 모드 강제 전환
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  showToast('PDF 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    const pages = area.querySelectorAll('.a4-preview');
+    if (!pages.length) { showToast('미리보기 페이지를 찾을 수 없습니다'); return; }
+    const { jsPDF: JSPDF } = jspdf;
+    const pdf = new JSPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    for (let i = 0; i < pages.length; i++) {
+      showToast('PDF 생성 중... ' + (i+1) + '/' + pages.length + ' ⏳');
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
+      if (i > 0) pdf.addPage();
+      const imgH = 210 * canvas.height / canvas.width;
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, imgH);
+    }
+    pdf.save(j.date + '_' + j.name + '고객님_보험청구서류.pdf');
+    showToast('PDF ' + pages.length + '페이지 저장됐습니다 ✓');
+  } catch(e) { showToast('PDF 실패: ' + e.message); }
+}
+
+
+async function downloadInsuranceImages() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  showToast('이미지 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    const pages = area.querySelectorAll('.a4-preview');
+    if (!pages.length) { showToast('페이지를 찾을 수 없습니다'); return; }
+    const labels = ['1_신청서','2_현장사진','3_소견서','4_사업자등록증','5_영수증'];
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = j.date + '_' + j.name + '고객님_' + (labels[i] || '페이지' + (i+1)) + '.png';
+      a.click();
+      await new Promise(r => setTimeout(r, 400));
+    }
+    showToast(pages.length + '개 이미지 저장됐습니다 ✓');
+  } catch(e) { showToast('이미지 실패: ' + e.message); }
+}
+
+
+async function shareImage() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 200));
+  }
+  showToast('이미지 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    var page = area.querySelector('.a4-scale-page') || area.querySelector('.a4-preview');
+    if (!page) { showToast('문서를 찾을 수 없습니다'); return; }
+    var captTarget = page.classList.contains('a4-preview') ? page : (page.parentElement || page);
+    const canvas = await captureA4Page(captTarget);
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL('image/png');
+    const label = _curDocType === 'estimate' ? '견적서' : _curDocType === 'receipt' ? '영수증' : '소견서';
+    const fname = j.date + '_' + j.name + '고객님_' + label + '.png';
+    if (navigator.share && navigator.canShare) {
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], fname, {type:'image/png'});
+        if (navigator.canShare({files:[file]})) { await navigator.share({files:[file], title:fname}); return; }
+      } catch(e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = dataUrl; a.download = fname; a.click();
+    showToast('이미지 저장됐습니다 ✓');
+  } catch(e) { showToast('실패: ' + e.message); }
+}
+
+
+async function shareKakao() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  showToast('이미지 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    const target = area.querySelector('.a4-scale-page, .a4-preview') || area;
+    const canvas = await html2canvas(target.parentElement || target, {scale:3, useCORS:true, backgroundColor:'#ffffff'});
+    const dataUrl = canvas.toDataURL('image/png');
+    const fname = j.date+'_'+j.name+'고객님_'+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+'.png';
+    // Web Share API로 카카오/문자 등 앱 선택 가능
+    if (navigator.share) {
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], fname, {type:'image/png'});
+        await navigator.share({files:[file], title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')});
+        return;
+      } catch(shareErr) {
+        if (shareErr.name !== 'AbortError') {
+          // 파일 공유 불가시 텍스트만
+          await navigator.share({title:fname, text:j.name+' '+(_curDocType==='estimate'?'견적서':_curDocType==='receipt'?'영수증':'소견서')+' - 누수프로'});
+        }
+        return;
+      }
+    }
+    // 폴백: 이미지 다운로드
+    const a = document.createElement('a'); a.href=dataUrl; a.download=fname; a.click();
+    showToast('이미지 저장됐습니다. 카카오톡/문자로 직접 전송해주세요 ✓');
+  } catch(e) { showToast('실패: '+e.message); }
+}
+
+async function shareInsuranceImage() {
+  const j = getSelJob();
+  if (!j) { showToast('작업을 선택해주세요'); return; }
+  if (!_isPreview) {
+    _isPreview = true;
+    document.getElementById('docs-edit-area').style.display = 'none';
+    document.getElementById('docs-preview-area').style.display = 'block';
+    document.getElementById('docs-body').classList.add('preview-mode');
+    renderDocPreview();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  showToast('이미지 생성 중... ⏳');
+  try {
+    const area = document.getElementById('docs-preview-area');
+    const pages = area.querySelectorAll('.a4-preview');
+    if (!pages.length) { showToast('페이지를 찾을 수 없습니다'); return; }
+    const labels = ['신청서','현장사진','소견서','사업자등록증','영수증'];
+    const files = [];
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await captureA4Page(pages[i]);
+      if (!canvas) continue;
+      const blob = await (await fetch(canvas.toDataURL('image/png'))).blob();
+      files.push(new File([blob], j.date+'_'+j.name+'고객님_'+(labels[i]||'p'+(i+1))+'.png', {type:'image/png'}));
+    }
+    if (navigator.share && navigator.canShare && navigator.canShare({files})) {
+      await navigator.share({files, title:'보험서류_'+j.name});
+      return;
+    }
+    for (const f of files) {
+      const url = URL.createObjectURL(f);
+      const a = document.createElement('a'); a.href=url; a.download=f.name; a.click();
+      URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 300));
+    }
+    showToast(files.length+'개 이미지 저장됐습니다 ✓');
+  } catch(e) { showToast('실패: ' + e.message); }
+}
+
+
+function printDoc() { window.print(); }
+
+
+// ════════════════════════════════════════
+//  실적관리
+// ════════════════════════════════════════
+
+function calcVatTotal(jobs) {
+  return jobs.filter(function(j) {
+    return j.payType === 'card' || j.cashReceipt;
+  }).reduce(function(s, j) {
+    var total = jobTotal(j);
+    var vat = Math.round(total * 0.1);
+    return s + vat;
+  }, 0);
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-body');
+  const yearSel = document.getElementById('stats-year');
+  if (!el) return;
+  const years = [...new Set(_jobs.map(j=>(j.date||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  if (!years.length) years.push(String(new Date().getFullYear()));
+  if (!yearSel.options.length || yearSel.getAttribute('data-loaded') !== '1') {
+    yearSel.innerHTML = years.map(y=>'<option value="'+y+'">'+y+'년</option>').join('');
+    yearSel.setAttribute('data-loaded','1');
+  }
+  const selYear = yearSel.value || years[0];
+  const yearJobs = _jobs.filter(j=>(j.date||'').startsWith(selYear));
+  const doneJobs = yearJobs.filter(j=>j.status==='done');
+  const totalRev = doneJobs.reduce((s,j)=>s+jobTotal(j), 0);
+  const totalComm = doneJobs.reduce((s,j)=>s+(j.commission||0), 0);
+  const netRev = totalRev - totalComm;
+
+  // 연간 요약 카드
+  el.innerHTML = ''
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
+    + '<div class="stat-card" style="grid-column:1/-1;">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출</div>'
+    + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 순수익</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev - totalComm)+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 수수료</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-'+fmtMoney(totalComm)+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 VAT 합계</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--purple);font-family:IBM Plex Mono,monospace;">'+fmtMoney(calcVatTotal(doneJobs))+'</div>'
+    + '</div>'
+    + '<div class="stat-card">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">비용처리 (자재비)</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">'+fmtMoney(doneJobs.reduce(function(s,j){return s+(j.materialCost||0);},0))+'</div>'
+    + '</div>'
+        + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
+    + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체 건수</div></div>'
+    + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'
+    + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done').length+'</div><div class="stat-label">미수현장</div></div>'
+    + '</div>'
+    // 월별
+    + Array.from({length:12},(_,i)=>{
+      const m = String(i+1).padStart(2,'0');
+      const mJobs = yearJobs.filter(j=>(j.date||'').startsWith(selYear+'-'+m));
+      if (!mJobs.length) return '';
+      const mDone = mJobs.filter(j=>j.status==='done');
+      const mRev = mDone.reduce((s,j)=>s+jobTotal(j),0);
+      const mComm = mDone.reduce((s,j)=>s+(j.commission||0),0);
+      const mNet = mRev - mComm;
+      return '<div class="month-row">'
+        + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mJobs.length+'건)</span>'
+        + '<span class="month-total">'+fmtMoney(mRev)+'</span></div>'
+        + '<div class="month-jobs">'
+        // 수수료/순수익 요약
+        + (mComm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
+          + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>'
+          + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
+          + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
+        + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
+        + mJobs.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
+          const hasComm = (j.commission||0) > 0;
+          return '<div class="month-job-row">'
+            + '<div style="flex:1;">'
+            + '<span style="color:var(--text2);font-size:11px;margin-right:6px;">'+(j.date?j.date.slice(5).replace('-','.'):'')+'</span><span>'+j.name+' · '+j.type+'</span>'
+            + (hasComm ? '<span style="font-size:10px;color:var(--purple);margin-left:6px;">['+( j.commissionName||'수수료')+']</span>' : '')
+            + '</div>'
+            + '<div style="text-align:right;">'
+            + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobTotal(j))+'</div>'
+            + (hasComm ? '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0))+'</div>' : '')
+            + ((j.payType==='card'||j.cashReceipt) ? '<div style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</div>' : '')
+            + '</div>'
+            + '</div>';
+        }).join('')
+        + '</div></div>';
+    }).reverse().join('')
+    + '<div style="height:20px;"></div>';
+}
+
+
+// ════════════════════════════════════════
+//  AS 관리
+// ════════════════════════════════════════
+function renderAs() {
+  const el = document.getElementById('as-body');
+  if (!el) return;
+  const allAs = [];
+  _jobs.forEach(j => { (j.asHistory||[]).forEach((a,idx) => allAs.push({...a, jobId:j.id, jobName:j.name, jobAddr:j.addr, asIdx:idx})); });
+  const filtered = _asFilter === 'pending' ? allAs.filter(a=>a.status!=='as-done') : allAs;
+  filtered.sort((a,b)=>(b.date||'')>(a.date||'')?1:-1);
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-text">AS 내역이 없습니다</div></div>';
+    return;
+  }
+  el.innerHTML = filtered.map(a => '<div class="as-card" onclick="openAsForm('+a.jobId+','+a.asIdx+')">'
+    + '<div class="as-header"><span class="as-title">'+a.jobName+'</span><span class="badge '+(a.status||'as')+'">'+(a.status==='as-done'?'AS완료':'AS접수')+'</span></div>'
+    + '<div class="as-meta">'+a.jobAddr+'</div>'
+    + (a.date?'<div class="as-meta">'+a.date+'</div>':'')
+    + (a.symptom?'<div style="font-size:13px;margin-top:6px;color:var(--text);">'+a.symptom+'</div>':'')
+    + '</div>').join('');
+}
+
+function toggleAsFilter() {
+  _asFilter = _asFilter === 'all' ? 'pending' : 'all';
+  const btn = document.getElementById('as-filter-btn');
+  if (btn) btn.textContent = _asFilter === 'all' ? '전체' : '미완료';
+  renderAs();
+}
+
+function openAsForm(jobId, asIdx) {
+  _asEditJobId = jobId;
+  _asEditIdx = asIdx;
+  const j = _jobs.find(x => x.id === jobId);
+  const infoEl = document.getElementById('as-job-info');
+  if (infoEl) infoEl.innerHTML = '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">' + (j?.name||'') + '</div>'
+    + '<div style="font-size:12px;color:var(--text2);">' + (j?.addr||'') + ' · ' + (j?.date||'') + '</div>';
+  const as = (asIdx !== null && asIdx !== undefined && j) ? (j.asHistory||[])[asIdx] : null;
+  document.getElementById('as-date').value = as?.date || new Date().toISOString().slice(0,10);
+  document.getElementById('as-symptom').value = as?.symptom || '';
+  document.getElementById('as-action').value = as?.action || '';
+  document.getElementById('as-memo').value = as?.memo || '';
+  document.getElementById('as-status').value = as?.status || 'as';
+  // 사진 불러오기
+  _tempAsPhotos = {
+    before: [...(as?.photosBefore||[null,null,null])].slice(0,3),
+    after:  [...(as?.photosAfter||[null,null,null])].slice(0,3)
+  };
+  while (_tempAsPhotos.before.length < 3) _tempAsPhotos.before.push(null);
+  while (_tempAsPhotos.after.length < 3) _tempAsPhotos.after.push(null);
+  goPage('page-as-form');
+  renderAsPhotoSlots();
+}
+
+function saveAs() {
+  const j = _jobs.find(x => x.id === _asEditJobId);
+  if (!j) return;
+  if (!j.asHistory) j.asHistory = [];
+  const rec = {
+    date: document.getElementById('as-date').value,
+    symptom: document.getElementById('as-symptom').value.trim(),
+    action: document.getElementById('as-action').value.trim(),
+    memo: document.getElementById('as-memo').value.trim(),
+    status: document.getElementById('as-status').value,
+    photosBefore: _tempAsPhotos.before.filter(Boolean),
+    photosAfter:  _tempAsPhotos.after.filter(Boolean),
+  };
+  if (_asEditIdx !== null && _asEditIdx !== undefined && _asEditIdx < j.asHistory.length) {
+    j.asHistory[_asEditIdx] = rec;
+  } else {
+    j.asHistory.push(rec);
+  }
+  _jobs = _jobs.map(x => x.id === _asEditJobId ? j : x);
+  saveJobs();
+  showToast('저장됐습니다 ✓');
+  goBack();
+}
+
+// ════════════════════════════════════════
+//  고객 연락처
+// ════════════════════════════════════════
+function renderContacts() {
+  const el = document.getElementById('contacts-body');
+  if (!el) return;
+  if (!_jobs.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">등록된 고객이 없습니다</div></div>'; return; }
+  const sorted = _jobs.slice().sort((a,b)=>a.name>b.name?1:-1);
+  el.innerHTML = sorted.map(j => '<div class="contact-card" onclick="showDetail('+j.id+')">'
+    + '<div class="contact-name">'+j.name+'</div>'
+    + '<div class="contact-addr">'+j.addr+'</div>'
+    + (j.phone?'<div class="contact-phone">📞 '+j.phone+'</div>':'')
+    + '</div>').join('');
+}
+
+// ════════════════════════════════════════
+//  사업자 정보
+// ════════════════════════════════════════
+function loadBizForm() {
+  const b = _biz;
+  // 백업 상태 초기화
+  const st = document.getElementById('backup-status');
+  if (st) st.style.display = 'none';
+  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
+    const el = document.getElementById('biz-' + k);
+    if (el) el.value = b[k] || '';
+  });
+  document.getElementById('biz-saved-bar').style.display = 'none';
+  // 서명
+  if (b.signatureImg) {
+    document.getElementById('sig-img').src = b.signatureImg;
+    document.getElementById('sig-preview').style.display = 'block';
+    document.getElementById('sig-empty').style.display = 'none';
+  } else {
+    document.getElementById('sig-preview').style.display = 'none';
+    document.getElementById('sig-empty').style.display = 'block';
+  }
+  // 도장
+  if (b.stampImg) {
+    document.getElementById('stamp-img').src = b.stampImg;
+    document.getElementById('stamp-preview').style.display = 'block';
+    document.getElementById('stamp-empty').style.display = 'none';
+  } else {
+    document.getElementById('stamp-preview').style.display = 'none';
+    document.getElementById('stamp-empty').style.display = 'block';
+  }
+  // 사업자등록증
+  if (b.regImg) {
+    document.getElementById('bizreg-img').src = b.regImg;
+    document.getElementById('bizreg-preview').style.display = 'block';
+    document.getElementById('bizreg-empty').style.display = 'none';
+  } else {
+    document.getElementById('bizreg-preview').style.display = 'none';
+    document.getElementById('bizreg-empty').style.display = 'block';
+  }
+}
+
+function saveBizInfo() {
+  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
+    const el = document.getElementById('biz-' + k);
+    if (el) _biz[k] = el.value.trim();
+  });
+  saveBizData();
+  const bar = document.getElementById('biz-saved-bar');
+  if (bar) { bar.style.display = 'block'; setTimeout(()=>bar.style.display='none', 2000); }
+  showToast('저장됐습니다 ✓');
+}
+
+function handleSigUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 600, 0.85);
+      _biz.signatureImg = compressed; saveBizData();
+      document.getElementById('sig-img').src = compressed;
+      document.getElementById('sig-preview').style.display = 'block';
+      document.getElementById('sig-empty').style.display = 'none';
+      showToast('서명이 저장됐습니다 ✓');
+    } catch(err) { showToast('서명 저장 실패: ' + err.message); }
+  };
+  r.readAsDataURL(file); e.target.value = '';
+}
+function removeSig() {
+  delete _biz.signatureImg; saveBizData();
+  document.getElementById('sig-preview').style.display = 'none';
+  document.getElementById('sig-empty').style.display = 'block';
+}
+function handleStampUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 400, 0.85);
+      _biz.stampImg = compressed; saveBizData();
+      document.getElementById('stamp-img').src = compressed;
+      document.getElementById('stamp-preview').style.display = 'block';
+      document.getElementById('stamp-empty').style.display = 'none';
+      showToast('도장이 저장됐습니다 ✓');
+    } catch(err) { showToast('도장 저장 실패: ' + err.message); }
+  };
+  r.readAsDataURL(file); e.target.value = '';
+}
+function removeStamp() {
+  delete _biz.stampImg; saveBizData();
+  document.getElementById('stamp-preview').style.display = 'none';
+  document.getElementById('stamp-empty').style.display = 'block';
+}
+function handleBizRegUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = async function(ev) {
+    try {
+      const compressed = await compressImage(ev.target.result, 1600, 0.80);
+      _biz.regImg = compressed; saveBizData();
+      document.getElementById('bizreg-img').src = compressed;
+      document.getElementById('bizreg-preview').style.display = 'block';
+      document.getElementById('bizreg-empty').style.display = 'none';
+      showToast('사업자등록증이 저장됐습니다 ✓');
+    } catch(err) { showToast('저장 실패: ' + err.message); }
+  };
+  r.readAsDataURL(file); e.target.value = '';
+}
+function removeBizReg() {
+  delete _biz.regImg; saveBizData();
+  document.getElementById('bizreg-preview').style.display = 'none';
+  document.getElementById('bizreg-empty').style.display = 'block';
+}
+
+// ════════════════════════════════════════
+//  DOMContentLoaded
+// ════════════════════════════════════════
+// ══════════════════════════════════════════
+//  서명 패드
+// ══════════════════════════════════════════
+let _sigPadDrawing = false;
+let _sigPadCtx = null;
+let _sigPadLastX = 0;
+let _sigPadLastY = 0;
+
+function openSigPad() {
+  closeModal('sig-pad-modal');
+  document.getElementById('sig-pad-modal').classList.add('open');
+  setTimeout(function() {
+    initSigPad();
+  }, 100);
+}
+
+function initSigPad() {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  // 캔버스 크기를 실제 표시 크기에 맞게
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width || 400;
+  canvas.height = rect.height || 180;
+  _sigPadCtx = canvas.getContext('2d');
+  _sigPadCtx.fillStyle = 'white';
+  _sigPadCtx.fillRect(0, 0, canvas.width, canvas.height);
+  _sigPadCtx.strokeStyle = '#1a1a2e';
+  _sigPadCtx.lineWidth = 2.5;
+  _sigPadCtx.lineCap = 'round';
+  _sigPadCtx.lineJoin = 'round';
+
+  // 이벤트 리스너 등록
+  canvas.onpointerdown = function(e) {
+    _sigPadDrawing = true;
+    const pos = getSigPos(e);
+    _sigPadLastX = pos.x;
+    _sigPadLastY = pos.y;
+    _sigPadCtx.beginPath();
+    _sigPadCtx.arc(pos.x, pos.y, 1.2, 0, Math.PI*2);
+    _sigPadCtx.fill();
+    e.preventDefault();
+  };
+  canvas.onpointermove = function(e) {
+    if (!_sigPadDrawing) return;
+    const pos = getSigPos(e);
+    _sigPadCtx.beginPath();
+    _sigPadCtx.moveTo(_sigPadLastX, _sigPadLastY);
+    _sigPadCtx.lineTo(pos.x, pos.y);
+    _sigPadCtx.stroke();
+    _sigPadLastX = pos.x;
+    _sigPadLastY = pos.y;
+    e.preventDefault();
+  };
+  canvas.onpointerup = canvas.onpointercancel = function() { _sigPadDrawing = false; };
+}
+
+function getSigPos(e) {
+  const canvas = document.getElementById('sig-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+function clearSigPad() {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas || !_sigPadCtx) return;
+  _sigPadCtx.fillStyle = 'white';
+  _sigPadCtx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function saveSigPad() {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  // 빈 서명 체크
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let hasContent = false;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] < 250 || data[i+1] < 250 || data[i+2] < 250) { hasContent = true; break; }
+  }
+  if (!hasContent) { showToast('서명을 먼저 작성해주세요'); return; }
+
+  const dataUrl = canvas.toDataURL('image/png');
+  _biz.signatureImg = dataUrl;
+  saveBizData();
+  document.getElementById('sig-img').src = dataUrl;
+  document.getElementById('sig-preview').style.display = 'block';
+  document.getElementById('sig-empty').style.display = 'none';
+  closeModal('sig-pad-modal');
+  showToast('서명이 저장됐습니다 ✓');
+}
+
+
+// ════════════════════════════════════════
+//  데이터 백업 / 복원
+// ════════════════════════════════════════
+function exportBackup() {
+  if (!_uid) { showToast('로그인이 필요합니다'); return; }
+  // 백업 시 localStorage 사진도 포함
+  savePhotosLocal();
+  const jobsWithPhotos = _jobs.map(function(j) {
+    const copy = Object.assign({}, j);
+    const photos = localStorage.getItem('photos_' + j.id);
+    if (photos) {
+      const p = JSON.parse(photos);
+      copy.photosBefore = p.before || [];
+      copy.photosAfter = p.after || [];
+    }
+    return copy;
+  });
+  const backup = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    uid: _uid,
+    jobs: jobsWithPhotos,
+    biz: Object.assign({}, _biz),
+    materials: _materials || []
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = '누수설비_백업_' + date + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('백업 파일이 저장됐습니다 ✓');
+  const st = document.getElementById('backup-status');
+  if (st) {
+    st.style.display = 'block';
+    st.style.background = 'var(--green-bg)';
+    st.style.color = 'var(--green)';
+    st.style.border = '1px solid rgba(62,207,142,0.3)';
+    st.textContent = '✅ 백업 완료: 작업 ' + _jobs.length + '건 저장됨 (' + date + ')';
+  }
+}
+
+function importBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const backup = JSON.parse(ev.target.result);
+      // 유효성 검사
+      if (!backup.version || !Array.isArray(backup.jobs)) {
+        throw new Error('유효하지 않은 백업 파일입니다');
+      }
+      const jobCount = backup.jobs.length;
+      if (!confirm('백업 파일에서 작업 ' + jobCount + '건을 불러올게요.\n현재 데이터(' + _jobs.length + '건)는 이 데이터로 교체됩니다.\n계속하시겠습니까?')) {
+        e.target.value = '';
+        return;
+      }
+      // 데이터 복원
+      _jobs = backup.jobs;
+      if (backup.materials) _materials = backup.materials;
+      if (backup.biz) {
+        // biz 이미지 필드는 유지하고 나머지만 덮어씌움
+        const keepImg = {
+          signatureImg: _biz.signatureImg,
+          stampImg: _biz.stampImg,
+          regImg: _biz.regImg
+        };
+        _biz = Object.assign({}, backup.biz, {
+          signatureImg: backup.biz.signatureImg || keepImg.signatureImg,
+          stampImg: backup.biz.stampImg || keepImg.stampImg,
+          regImg: backup.biz.regImg || keepImg.regImg
+        });
+      }
+      // localStorage에 사진 저장
+      savePhotosLocal();
+      // Firebase에 강제 저장 (백업 복원이므로 force=true)
+      await saveJobs(true);
+      await saveBizData();
+      updateMainStats();
+      loadBizForm();
+      showToast('✅ 백업 복원 완료! 작업 ' + jobCount + '건');
+      const st = document.getElementById('backup-status');
+      if (st) {
+        st.style.display = 'block';
+        st.style.background = 'var(--green-bg)';
+        st.style.color = 'var(--green)';
+        st.style.border = '1px solid rgba(62,207,142,0.3)';
+        st.textContent = '✅ 복원 완료: 작업 ' + jobCount + '건 불러옴';
+      }
+    } catch(err) {
+      showToast('복원 실패: ' + err.message);
+      const st = document.getElementById('backup-status');
+      if (st) {
+        st.style.display = 'block';
+        st.style.background = 'var(--red-bg)';
+        st.style.color = 'var(--red)';
+        st.style.border = '1px solid rgba(239,68,68,0.3)';
+        st.textContent = '❌ 복원 실패: ' + err.message;
+      }
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+
+// ══════════════════════════════════════════
+//  자동 주기 백업 (브라우저 localStorage에 7일치)
+// ══════════════════════════════════════════
+function autoBackupToLocal() {
+  if (!_uid || !_jobs) return;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const key = 'auto_backup_' + today;
+    // 오늘 이미 백업했으면 스킵 (앱 자주 열어도 한 번만)
+    if (localStorage.getItem(key)) return;
+
+    const snapshot = {
+      date: today,
+      timestamp: new Date().toISOString(),
+      uid: _uid,
+      jobCount: _jobs.length,
+      jobs: _jobs,
+      biz: _biz,
+      clients: _clients || []
+    };
+    localStorage.setItem(key, JSON.stringify(snapshot));
+
+    // 7일 넘은 자동백업은 삭제
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(function(k) {
+      if (k.startsWith('auto_backup_')) {
+        const date = k.replace('auto_backup_', '');
+        const diff = (new Date(today) - new Date(date)) / (1000 * 60 * 60 * 24);
+        if (diff > 7) {
+          localStorage.removeItem(k);
+        }
+      }
+    });
+    console.log('자동 백업 저장됨:', today, '작업', _jobs.length, '건');
+  } catch(e) {
+    console.warn('자동 백업 실패:', e.message);
+  }
+}
+
+// 자동 백업 목록 가져오기
+function getAutoBackups() {
+  const result = [];
+  const allKeys = Object.keys(localStorage);
+  allKeys.forEach(function(k) {
+    if (k.startsWith('auto_backup_')) {
+      try {
+        const snap = JSON.parse(localStorage.getItem(k));
+        result.push({
+          date: snap.date,
+          timestamp: snap.timestamp,
+          jobCount: snap.jobCount || 0,
+          key: k
+        });
+      } catch(e) {}
+    }
+  });
+  result.sort(function(a, b){ return b.date.localeCompare(a.date); });
+  return result;
+}
+
+// 자동 백업 복원 모달 열기
+function openAutoBackupModal() {
+  const backups = getAutoBackups();
+  const modal = document.getElementById('auto-backup-modal');
+  const body = document.getElementById('auto-backup-list');
+  if (!modal || !body) return;
+
+  if (backups.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">자동 백업 내역이 없습니다</div></div>';
+  } else {
+    body.innerHTML = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">브라우저에 매일 자동 저장된 백업입니다 (최근 7일)</div>'
+      + backups.map(function(b) {
+        const time = new Date(b.timestamp).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+        return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+          + '<div><span style="font-size:15px;font-weight:700;">📅 ' + b.date + '</span>'
+          + '<span style="font-size:11px;color:var(--text2);margin-left:8px;">' + time + '</span></div>'
+          + '<span style="font-size:12px;color:var(--accent);">' + b.jobCount + '건</span></div>'
+          + '<div class="btn-group" style="margin-top:8px;">'
+          + '<button class="btn btn-secondary btn-sm" onclick="downloadAutoBackup(\'' + b.key + '\')">📥 다운로드</button>'
+          + '<button class="btn btn-primary btn-sm" style="flex:2;" onclick="restoreAutoBackup(\'' + b.key + '\')">🔄 이 시점으로 복원</button>'
+          + '</div></div>';
+      }).join('');
+  }
+  modal.classList.add('open');
+}
+
+// 자동 백업 파일 다운로드
+function downloadAutoBackup(key) {
+  try {
+    const snap = JSON.parse(localStorage.getItem(key));
+    const backup = {
+      version: 2,
+      exportedAt: snap.timestamp,
+      uid: snap.uid,
+      jobs: snap.jobs,
+      biz: snap.biz,
+      clients: snap.clients || []
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '누수설비_자동백업_' + snap.date + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('백업 다운로드 완료 ✓');
+  } catch(e) { showToast('다운로드 실패: ' + e.message); }
+}
+
+// 자동 백업 복원
+async function restoreAutoBackup(key) {
+  try {
+    const snap = JSON.parse(localStorage.getItem(key));
+    if (!confirm('⚠️ ' + snap.date + ' 시점으로 복원합니다.\n\n현재 데이터(' + _jobs.length + '건)가 이 시점 데이터(' + snap.jobCount + '건)로 교체됩니다.\n\n계속하시겠습니까?')) {
+      return;
+    }
+    _jobs = snap.jobs || [];
+    _biz = snap.biz || _biz;
+    _clients = snap.clients || _clients || [];
+    const ok = await saveJobs(true);
+    await saveBizData();
+    if (typeof saveClients === 'function') await saveClients();
+    updateMainStats();
+    if (typeof loadBizForm === 'function') loadBizForm();
+    if (ok) {
+      showToast('✅ ' + snap.date + ' 시점으로 복원됨 (' + snap.jobCount + '건)');
+      closeModal('auto-backup-modal');
+    }
+  } catch(e) { showToast('복원 실패: ' + e.message); }
+}
+
+
+// ══════════════════════════════════════════
+//  자재 관리 (회계)
+// ══════════════════════════════════════════
+let _editingMaterialId = null;
+
+function getNextMaterialId() {
+  return _materials.length ? Math.max.apply(null, _materials.map(function(m){return m.id||0;})) + 1 : 1;
+}
+
+
+// ════════════════════════════════════════
+//  자재 카탈로그
+// ════════════════════════════════════════
+var _catalog = [];
+var _editingCatalogId = null;
+var _catalogPhotoData = null;
+var _catalogPickerCallback = null;
+
+function getNextCatalogId() {
+  if (!_catalog.length) return 1;
+  return Math.max.apply(null, _catalog.map(function(c){ return c.id||0; })) + 1;
+}
+
+async function saveCatalog() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({catalog: JSON.stringify(_catalog)}, {merge: true});
+  } catch(e) { console.error('catalog save err', e); }
+}
+
+function handleCatalogPhoto(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxS = 300, w = img.width, h = img.height;
+      if (w > maxS || h > maxS) { if (w > h) { h = h*maxS/w; w = maxS; } else { w = w*maxS/h; h = maxS; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      _catalogPhotoData = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('catalog-photo-preview').innerHTML = '<img src="'+_catalogPhotoData+'" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function openCatalogForm(id) {
+  _editingCatalogId = id ? Number(id) : null; _catalogPhotoData = null;
+  var t = document.getElementById('catalog-form-title'), d = document.getElementById('cat-delete-btn'), p = document.getElementById('catalog-photo-preview');
+  if (id) {
+    var c = _catalog.find(function(x){return x.id===id;}); if(!c) return;
+    t.textContent = '자재 수정';
+    document.getElementById('cat-name').value = c.name||'';
+    document.getElementById('cat-spec').value = c.spec||'';
+    document.getElementById('cat-category').value = c.category||'';
+    document.getElementById('cat-memo').value = c.memo||'';
+    renderPriceHistoryRows(c.priceHistory);
+    if(c.photo){_catalogPhotoData=c.photo; p.innerHTML='<img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;">';}
+    else p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
+    if(d) d.style.display='block';
+  } else {
+    t.textContent = '자재 등록';
+    ['cat-name','cat-spec','cat-category','cat-memo'].forEach(function(f){var el=document.getElementById(f);if(el)el.value='';});
+    renderPriceHistoryRows(null);
+    p.innerHTML='<span style="font-size:32px;color:var(--text2);">📷</span>';
+    if(d) d.style.display='none';
+  }
+  document.getElementById('catalog-form-modal').classList.add('open');
+}
+
+async function saveCatalogItem() {
+  var nm = document.getElementById('cat-name').value.trim();
+  if(!nm){showToast('자재명은 필수입니다');return;}
+  var ex = _editingCatalogId?(_catalog.find(function(c){return c.id===_editingCatalogId;})||{}):{};
+  var item = {id:_editingCatalogId||getNextCatalogId(), name:nm, spec:document.getElementById('cat-spec').value.trim(), priceHistory:getPriceHistory(), price:getCatalogCurrentPrice({priceHistory:getPriceHistory()}), category:document.getElementById('cat-category').value.trim(), memo:document.getElementById('cat-memo').value.trim(), photo:_catalogPhotoData||ex.photo||null};
+  if(_editingCatalogId){_catalog=_catalog.map(function(c){return c.id===_editingCatalogId?item:c;});showToast('자재 수정됨');}
+  else{_catalog.push(item);showToast('자재 등록됨');}
+  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog();
+}
+
+async function deleteCatalogItem() {
+  if(!_editingCatalogId) return;
+  if(!confirm('이 자재를 삭제하시겠습니까?')) return;
+  _catalog=_catalog.filter(function(c){return c.id!==_editingCatalogId;});
+  await saveCatalog(); closeModal('catalog-form-modal'); renderCatalog(); showToast('삭제됨');
+}
+
+function renderCatalog() {
+  var list=document.getElementById('catalog-list'); if(!list) return;
+  var kw=(document.getElementById('catalog-search')||{}).value||''; kw=kw.trim().toLowerCase();
+  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0||(c.category||'').toLowerCase().indexOf(kw)>=0;});
+  if(!f.length){list.innerHTML='<div class="empty-state"><div class="empty-icon">🗂️</div><div class="empty-text">'+(kw?'검색 결과가 없습니다':'등록된 자재가 없습니다')+'</div></div>';return;}
+  var cats={}; f.forEach(function(c){var cat=c.category||'미분류';if(!cats[cat])cats[cat]=[];cats[cat].push(c);});
+  var html='';
+  Object.keys(cats).sort().forEach(function(cat){
+    html+='<div style="font-size:12px;font-weight:600;color:var(--accent);padding:10px 0 6px;border-bottom:1px solid var(--border);">'+cat+' ('+cats[cat].length+')</div>';
+    cats[cat].forEach(function(c){
+      html+='<div class="month-job-row" onclick="openCatalogForm('+(c.id||0)+')" style="cursor:pointer;align-items:center;-webkit-tap-highlight-color:rgba(0,0,0,0.1);">';
+      html+=c.photo?'<div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;margin-right:10px;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:44px;height:44px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;font-size:20px;">📦</div>';
+      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+'</div></div>';
+      var curP=getCatalogCurrentPrice(c); if(curP) html+='<div style="font-size:13px;font-weight:600;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+curP.toLocaleString()+'원</div>';
+      html+='</div>';
+    });
+  });
+  list.innerHTML=html;
+}
+
+function openCatalogPicker(callback) {
+  _catalogPickerCallback=callback;
+  var s=document.getElementById('catalog-picker-search'); if(s)s.value='';
+  renderCatalogPicker();
+  document.getElementById('catalog-picker-modal').classList.add('open');
+}
+
+function renderCatalogPicker() {
+  var list=document.getElementById('catalog-picker-list'); if(!list) return;
+  var kw=(document.getElementById('catalog-picker-search')||{}).value||''; kw=kw.trim().toLowerCase();
+  var f=_catalog; if(kw) f=_catalog.filter(function(c){return(c.name||'').toLowerCase().indexOf(kw)>=0||(c.spec||'').toLowerCase().indexOf(kw)>=0;});
+  if(!f.length){list.innerHTML='<div style="text-align:center;padding:30px;color:var(--text2);">'+(kw?'검색 결과 없음':'등록된 자재가 없습니다')+'</div>';return;}
+  var html='';
+  f.forEach(function(c){
+    html+='<div style="display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;" onclick="pickCatalogItem('+c.id+')">';
+    html+=c.photo?'<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;"><img src="'+c.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>':'<div style="width:40px;height:40px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">📦</div>';
+    html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">'+c.name+'</div><div style="font-size:11px;color:var(--text2);">'+(c.spec||'')+(getCatalogCurrentPrice(c)?' · '+getCatalogCurrentPrice(c).toLocaleString()+'원':'')+'</div></div></div>';
+  });
+  list.innerHTML=html;
+}
+
+function pickCatalogItem(id) {
+  var c=_catalog.find(function(x){return x.id===id;}); if(!c) return;
+  closeModal('catalog-picker-modal');
+  if(_catalogPickerCallback) _catalogPickerCallback(c);
+}
+
+
+// 단가 이력 행 추가
+function addPriceHistoryRow(month, price) {
+  var container = document.getElementById('cat-price-history');
+  if (!container) return;
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;align-items:center;';
+  div.innerHTML = '<input type="month" class="form-input cat-ph-month" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (month||'') + '" placeholder="시작월">'
+    + '<input type="number" class="form-input cat-ph-price" style="flex:1;padding:6px 8px;font-size:12px;" value="' + (price||'') + '" placeholder="단가(원)">'
+    + '<button class="btn-icon" onclick="this.parentElement.remove()" style="flex-shrink:0;">×</button>';
+  container.appendChild(div);
+}
+
+// 이력 데이터 수집
+function getPriceHistory() {
+  var rows = document.querySelectorAll('#cat-price-history > div');
+  var history = [];
+  rows.forEach(function(row) {
+    var m = row.querySelector('.cat-ph-month');
+    var p = row.querySelector('.cat-ph-price');
+    if (m && p && m.value && p.value) {
+      history.push({month: m.value, price: parseFloat(p.value)||0});
+    }
+  });
+  history.sort(function(a,b){ return a.month.localeCompare(b.month); });
+  return history;
+}
+
+// 이력에서 특정 날짜의 단가 조회
+function getCatalogPriceAt(catalogItem, dateStr) {
+  var ph = catalogItem.priceHistory || [];
+  if (!ph.length) return catalogItem.price || 0;
+  var ym = (dateStr||'').slice(0,7); // "2026-04"
+  var matched = 0;
+  ph.forEach(function(h) {
+    if (h.month <= ym) matched = h.price;
+  });
+  return matched || (ph.length ? ph[0].price : 0);
+}
+
+// 현재 단가 (최신 이력 기준)
+function getCatalogCurrentPrice(catalogItem) {
+  var ph = catalogItem.priceHistory || [];
+  if (!ph.length) return catalogItem.price || 0;
+  return ph[ph.length - 1].price || 0;
+}
+
+// 이력 렌더링
+function renderPriceHistoryRows(priceHistory) {
+  var container = document.getElementById('cat-price-history');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!priceHistory || !priceHistory.length) {
+    addPriceHistoryRow('', '');
+    return;
+  }
+  priceHistory.forEach(function(h) {
+    addPriceHistoryRow(h.month, h.price);
+  });
+}
+
+
+// ════════════════════════════════════════
+//  작업 검색
+// ════════════════════════════════════════
+function openSearchModal() {
+  document.getElementById('search-keyword').value = '';
+  document.getElementById('search-date-from').value = '';
+  document.getElementById('search-date-to').value = '';
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-result-count').textContent = '';
+  document.getElementById('search-modal').classList.add('open');
+  setTimeout(function(){ document.getElementById('search-keyword').focus(); }, 300);
+}
+
+function setSearchRange(range) {
+  var now = new Date();
+  var from = '', to = now.toISOString().slice(0,10);
+  if (range === 'today') {
+    from = to;
+  } else if (range === 'week') {
+    var d = new Date(now); d.setDate(d.getDate() - d.getDay());
+    from = d.toISOString().slice(0,10);
+  } else if (range === 'month') {
+    from = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
+  } else if (range === '3month') {
+    var d2 = new Date(now); d2.setMonth(d2.getMonth() - 3);
+    from = d2.toISOString().slice(0,10);
+  } else if (range === 'year') {
+    from = now.getFullYear() + '-01-01';
+  } else {
+    from = ''; to = '';
+  }
+  document.getElementById('search-date-from').value = from;
+  document.getElementById('search-date-to').value = to;
+  doJobSearch();
+}
+
+
+function onSearchClick(id) {
+  closeModal('search-modal');
+  // 현장관리 페이지로 이동 후 상세보기
+  goPage('page-field');
+  setTimeout(function() { showDetail(Number(id) || id); }, 300);
+}
+
+function doJobSearch() {
+  var kw = (document.getElementById('search-keyword').value||'').trim().toLowerCase();
+  var dateFrom = document.getElementById('search-date-from').value;
+  var dateTo = document.getElementById('search-date-to').value;
+  var results = _jobs.filter(function(j) {
+    if (dateFrom && (j.date||'') < dateFrom) return false;
+    if (dateTo && (j.date||'') > dateTo) return false;
+    if (!kw) return true;
+    var clientPhone = '';
+    if (j.clientCompany) { var cl = _clients.find(function(x){ return x.name === j.clientCompany; }); if (cl && cl.phone) clientPhone = cl.phone; }
+    var searchable = [j.name, j.addr, j.location, j.phone, j.clientCompany, j.type, j.before, j.action, j.memo, clientPhone].filter(Boolean).join(' ').toLowerCase();
+    return searchable.indexOf(kw) >= 0;
+  });
+  results.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var countEl = document.getElementById('search-result-count');
+  var listEl = document.getElementById('search-results');
+  if (!kw && !dateFrom && !dateTo) {
+    countEl.textContent = '';
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색어를 입력하거나 날짜를 선택하세요</div>';
+    return;
+  }
+  countEl.textContent = '검색 결과: ' + results.length + '건';
+  if (!results.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색 결과가 없습니다</div>';
+    return;
+  }
+  var html = '';
+  results.forEach(function(j) {
+    var statusColor = j.status==='done'?'var(--green)':j.status==='cancel'?'var(--red)':'var(--orange)';
+    var statusText = j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='cancel'?'취소':'미수';
+    var totalAmt = 0;
+    if (j.costItems && j.costItems.length) { j.costItems.forEach(function(c){ totalAmt += (c.amount||0); }); }
+    else { totalAmt = (j.inspectCost||0)+(j.baseCost||0)+(j.materialCost||0)+(j.extraSpots||0)*200000; }
+    html += '<div style="padding:14px 12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;" onclick="onSearchClick(\'' + j.id + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+    html += '<div style="font-size:14px;font-weight:600;">' + (j.name||'-') + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</div>';
+    html += '<div style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:white;">' + statusText + '</div>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + (j.date||'') + (j.clientCompany ? ' · <span style="color:var(--accent);">' + j.clientCompany + (function(){ var cl=_clients.find(function(x){return x.name===j.clientCompany;}); return cl&&cl.phone?' ['+cl.phone+']':''; }()) + '</span>' : '') + ((j.payType==='card'||j.cashReceipt) ? ' · <span style="color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</span>' : '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text2);overflow:hidden;">' + (j.addr||'') + (j.location ? ' ' + j.location : '') + '</div>';
+    if (totalAmt) html += '<div style="font-size:13px;font-weight:600;color:var(--accent);margin-top:4px;font-family:IBM Plex Mono,monospace;">' + totalAmt.toLocaleString() + '원</div>';
+    html += '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+
+// ════════════════════════════════════════
+//  Firebase Storage 사진 관리
+// ════════════════════════════════════════
+
+// Base64 → Storage 업로드, URL 반환
+async function uploadPhotoToStorage(base64Data, jobId, type, index) {
+  if (!_uid || !base64Data) return null;
+  // 이미 URL이면 그대로 반환
+  if (base64Data.startsWith('http')) return base64Data;
+  try {
+    var path = 'photos/' + _uid + '/' + jobId + '/' + type + '_' + index + '_' + Date.now() + '.jpg';
+    var ref = storage.ref(path);
+    // base64 데이터 추출
+    var base64Only = base64Data.split(',')[1] || base64Data;
+    var byteChars = atob(base64Only);
+    var byteArr = new Uint8Array(byteChars.length);
+    for (var i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+    var blob = new Blob([byteArr], {type: 'image/png'});
+    await ref.put(blob);
+    var url = await ref.getDownloadURL();
+    return url;
+  } catch(e) {
+    console.error('사진 업로드 실패:', e);
+    return null;
+  }
+}
+
+// 작업의 모든 사진을 Storage에 업로드하고 URL로 교체
+async function uploadJobPhotos(job) {
+  if (!job || !job.id) return job;
+  var changed = false;
+  var totalNew = 0;
+  var uploaded = 0;
+  (job.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  (job.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) totalNew++; });
+  if (totalNew === 0) return job;
+
+  await acquireWakeLock();
+  showUploadProgress(0, totalNew, '사진 업로드 준비 중...');
+
+  // before 사진
+  if (job.photosBefore && job.photosBefore.length > 0) {
+    var newBefore = [];
+    for (var i = 0; i < job.photosBefore.length; i++) {
+      var ph = job.photosBefore[i];
+      if (ph && !ph.startsWith('http')) {
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
+        var url = await uploadPhotoToStorage(ph, job.id, 'before', i);
+        newBefore.push(url || ph);
+        if (url) changed = true;
+      } else {
+        newBefore.push(ph);
+      }
+    }
+    job.photosBefore = newBefore.filter(Boolean);
+  }
+
+  // after 사진
+  if (job.photosAfter && job.photosAfter.length > 0) {
+    var newAfter = [];
+    for (var i = 0; i < job.photosAfter.length; i++) {
+      var ph = job.photosAfter[i];
+      if (ph && !ph.startsWith('http')) {
+        uploaded++;
+        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
+        var url = await uploadPhotoToStorage(ph, job.id, 'after', i);
+        newAfter.push(url || ph);
+        if (url) changed = true;
+      } else {
+        newAfter.push(ph);
+      }
+    }
+    job.photosAfter = newAfter.filter(Boolean);
+  }
+
+  hideUploadProgress();
+  releaseWakeLock();
+  return job;
+}
+
+// Storage에서 작업 사진 폴더 삭제
+async function deleteJobPhotos(jobId) {
+  if (!_uid || !jobId) return;
+  try {
+    var listRef = storage.ref('photos/' + _uid + '/' + jobId);
+    var list = await listRef.listAll();
+    var promises = list.items.map(function(item) { return item.delete(); });
+    await Promise.all(promises);
+  } catch(e) {
+    console.log('사진 삭제 참고:', e.message);
+  }
+}
+
+// 기존 작업들의 Base64 사진을 일괄 마이그레이션
+async function migratePhotosToStorage() {
+  if (!_uid || !_jobs.length) return;
+  var count = 0;
+  var total = 0;
+  _jobs.forEach(function(j) {
+    (j.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) total++; });
+    (j.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) total++; });
+  });
+  if (total === 0) return;
+  showToast('기존 사진 ' + total + '장 마이그레이션 시작...');
+  for (var i = 0; i < _jobs.length; i++) {
+    var j = _jobs[i];
+    var had = false;
+    (j.photosBefore||[]).forEach(function(p){ if(p && !p.startsWith('http')) had = true; });
+    (j.photosAfter||[]).forEach(function(p){ if(p && !p.startsWith('http')) had = true; });
+    if (had) {
+      _jobs[i] = await uploadJobPhotos(j);
+      count++;
+      if (count % 3 === 0) {
+        await saveJobs(true);
+        showToast('마이그레이션 진행 중... (' + count + '건)');
+      }
+    }
+  }
+  if (count > 0) {
+    await saveJobs(true);
+    showToast('사진 마이그레이션 완료! (' + total + '장) ✓');
+  }
+}
+
+
+// ════════════════════════════════════════
+//  업로드 프로그레스 바 + 화면 잠금
+// ════════════════════════════════════════
+var _wakeLock = null;
+
+function showUploadProgress(current, total, text) {
+  var bar = document.getElementById('upload-progress-bar');
+  if (!bar) return;
+  bar.style.display = 'block';
+  var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('upload-progress-text').textContent = text || '사진 업로드 중...';
+  document.getElementById('upload-progress-pct').textContent = pct + '%';
+  document.getElementById('upload-progress-fill').style.width = pct + '%';
+}
+
+function hideUploadProgress() {
+  var bar = document.getElementById('upload-progress-bar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) { console.log('WakeLock not available'); }
+}
+
+function releaseWakeLock() {
+  if (_wakeLock) {
+    _wakeLock.release().catch(function(){});
+    _wakeLock = null;
+  }
+}
+
+
+async function shareJobPhotos(jobId) {
+  var j = _jobs.find(function(x){ return x.id === jobId; });
+  if (!j) return;
+  var ap = [];
+  (j.photosBefore||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
+  (j.photosAfter||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
+  if (!ap.length) { showToast('공유할 사진이 없습니다'); return; }
+  if (navigator.share && navigator.canShare) {
+    showToast('사진 준비 중...');
+    try {
+      var files = [];
+      for (var i = 0; i < ap.length; i++) {
+        var r = await fetch(ap[i]);
+        var b = await r.blob();
+        files.push(new File([b], (j.name||'photo') + '_' + (i+1) + '.jpg', {type: 'image/png'}));
+      }
+      if (navigator.canShare({files: files})) {
+        await navigator.share({title: j.name + ' 현장사진', text: j.name + ' ' + ap.length + '장', files: files});
+        return;
+      }
+    } catch(e) { if (e.name !== 'AbortError') console.log(e); return; }
+  }
+  var w = window.open('', '_blank');
+  if (w) {
+    var h = '<html><head><title>' + j.name + '</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' (' + ap.length + '장)</h2>';
+    ap.forEach(function(p) { h += '<img src="' + p + '" style="width:100%;max-width:600px;margin:8px 0;border-radius:8px;display:block">'; });
+    h += '</body></html>';
+    w.document.write(h);
+    w.document.close();
+  }
+}
+
+
+// 문서 모아보내기 (견적서+소견서+영수증)
+function sendAllDocs() {
+  var j = getSelJob();
+  if (!j) { showToast('먼저 작업을 선택해주세요'); return; }
+  // 선택 모달
+  var modal = document.createElement('div');
+  modal.id = 'send-all-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = '<div style="background:var(--bg1);border-radius:16px;padding:24px;width:85%;max-width:320px;text-align:center;">'
+    + '<div style="font-size:16px;font-weight:700;margin-bottom:6px;">📤 문서 모아보내기</div>'
+    + '<div style="font-size:13px;color:var(--text1);margin-bottom:20px;font-weight:500;">' + j.name + ' - 견적서 · 소견서 · 영수증</div>'
+    + '<button onclick="doSendAllDocs(\'pdf\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);color:white;font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">📄 PDF 합본으로 보내기</button>'
+    + '<button onclick="doSendAllDocs(\'image\')" style="width:100%;padding:14px;border:none;border-radius:10px;background:var(--bg3);color:var(--text1);font-size:14px;font-weight:600;margin-bottom:10px;cursor:pointer;">🖼️ 이미지 (JPG 3장)</button>'
+    + '<button onclick="closeSendAllModal()" style="width:100%;padding:12px;border:none;background:none;color:var(--text1);font-size:14px;font-weight:500;cursor:pointer;">취소</button>'
+    + '</div>';
+  modal.onclick = function(e) { if (e.target === modal) closeSendAllModal(); };
+  document.body.appendChild(modal);
+}
+
+function closeSendAllModal() {
+  var m = document.getElementById('send-all-modal');
+  if (m) m.remove();
+}
+
+async function doSendAllDocs(mode) {
+  closeSendAllModal();
+  var j = getSelJob();
+  if (!j) return;
+  var biz = _biz;
+  var today = new Date().toLocaleDateString('ko-KR');
+  var co = biz.name || '업체명';
+  var insTotal = jobTotal(j);
+  var extraCost = (j.extraSpots||0)*200000;
+
+  showToast('문서 생성 중...');
+
+  // 임시 컨테이너
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;';
+  document.body.appendChild(wrap);
+
+  // 견적서
+  var estDiv = document.createElement('div');
+  estDiv.style.cssText = 'width:794px;min-height:1123px;background:white;color:#333;font-family:sans-serif;padding:40px 36px;box-sizing:border-box;';
+  estDiv.innerHTML = makeEstimateHTML(j, biz, today, co, insTotal, extraCost, 'false');
+  var forceStyle = document.createElement('style');
+    forceStyle.textContent = '*{color:#333 !important;box-sizing:border-box;} .doc-table th{color:white !important;background:#1a3a6e !important;} .doc-table td,.doc-table th{border:1px solid #c8d8f0 !important;padding:8px 10px !important;font-size:14px !important;} table{border-collapse:collapse;width:100%;} td{background:white;} td[style*="background:#f0f5ff"]{background:#f0f5ff !important;color:#333 !important;}';
+    wrap.appendChild(forceStyle);
+    wrap.appendChild(estDiv);
+
+  // 소견서
+  var opDiv = document.createElement('div');
+  opDiv.style.cssText = 'width:794px;min-height:1123px;background:white;color:#333;font-family:sans-serif;padding:40px 36px;box-sizing:border-box;';
+  opDiv.innerHTML = makeOpinionHTML(j, biz, today, co, 'false');
+  wrap.appendChild(opDiv);
+
+  // 영수증
+  var rA = (j._receiptAmount !== undefined && j._receiptAmount !== null) ? j._receiptAmount : insTotal;
+  var rK = numToKorean(rA);
+  var rT = j._receiptTo || j.name || '';
+  var rAd = j._receiptAddr || '';
+  var rB = j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.';
+  rB = rB.replace(/\n/g, '<br>');
+  var rcDiv = document.createElement('div');
+  rcDiv.style.cssText = 'width:794px;min-height:1123px;background:#e8f0f8;padding:36px 32px;font-family:sans-serif;display:flex;justify-content:center;';
+  rcDiv.innerHTML = '<div style="background:white;border:1px solid #c0d4e8;width:100%;max-width:660px;padding:60px 50px 40px;display:flex;flex-direction:column;">'
+    + '<div style="text-align:center;font-size:36px;font-weight:700;letter-spacing:16px;margin-bottom:50px;color:#333;">영 수 증</div>'
+    + '<div style="text-align:right;margin-bottom:40px;font-size:18px;color:#333;padding-right:20px;"><span style="font-weight:600;letter-spacing:6px;">' + rT + '</span><span style="font-weight:400;margin-left:12px;letter-spacing:3px;">귀하</span></div>'
+    + (rAd ? '<div style="text-align:right;margin-top:-30px;margin-bottom:30px;font-size:14px;color:#555;padding-right:20px;">주소: ' + rAd + '</div>' : '')
+    + '<div style="border-bottom:1px solid #aaa;margin-bottom:30px;"></div>'
+    + '<div style="text-align:left;margin-bottom:16px;font-size:22px;color:#333;padding-left:20px;"><span style="font-weight:700;margin-right:16px;">金</span><span style="font-weight:700;">' + (j.payType==='card'||j.cashReceipt ? numToKorean(rA+Math.round(rA*0.1)) : rK) + ' 원정</span></div>'
+    + (function(){ var hasV = j.payType==='card'||j.cashReceipt; var dispAmt = hasV ? rA+Math.round(rA*0.1) : rA; return '<div style="text-align:right;margin-bottom:'+(hasV?'10':'40')+'px;font-size:21px;color:#333;padding-right:20px;">₩ <span style="font-weight:600;">' + dispAmt.toLocaleString() + '</span></div>' + (hasV ? '<div style="text-align:right;margin-bottom:40px;font-size:13px;color:#555;padding-right:20px;">공급가액: '+rA.toLocaleString()+'원 / VAT: '+Math.round(rA*0.1).toLocaleString()+'원</div>' : ''); }())
+    + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
+    + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
+    + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
+    + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+    + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div>';
+  wrap.appendChild(rcDiv);
+
+  try {
+    await new Promise(function(r){ setTimeout(r, 300); });
+    var names = ['견적서', '소견서', '영수증'];
+    var divs = [estDiv, opDiv, rcDiv];
+
+    if (mode === 'pdf') {
+      // PDF 합본
+      var pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+      for (var i = 0; i < divs.length; i++) {
+        var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
+        var imgData = canvas.toDataURL('image/jpeg', 0.92);
+        var pW = pdf.internal.pageSize.getWidth();
+        var pH = pdf.internal.pageSize.getHeight();
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, pW, pH);
+      }
+      document.body.removeChild(wrap);
+      var pdfBlob = pdf.output('blob');
+      var pdfFile = new File([pdfBlob], j.name + '고객님_문서합본.pdf', {type: 'application/pdf'});
+
+      if (navigator.share && navigator.canShare && navigator.canShare({files: [pdfFile]})) {
+        await navigator.share({
+          title: j.name + ' 문서',
+          text: j.name + ' - 견적서, 소견서, 영수증 합본',
+          files: [pdfFile]
+        });
+      } else {
+        // 미지원시 다운로드
+        var url = URL.createObjectURL(pdfBlob);
+        var a = document.createElement('a');
+        a.href = url; a.download = j.name + '고객님_문서합본.pdf';
+        a.click(); URL.revokeObjectURL(url);
+        showToast('PDF 다운로드 완료');
+      }
+
+    } else {
+      // 이미지 모드
+      var files = [];
+      for (var i = 0; i < divs.length; i++) {
+        var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
+        var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/jpeg', 0.92); });
+        files.push(new File([blob], j.name + '_' + names[i] + '.jpg', {type: 'image/png'}));
+      }
+      document.body.removeChild(wrap);
+
+      if (navigator.share && navigator.canShare && navigator.canShare({files: files})) {
+        await navigator.share({
+          title: j.name + ' 문서',
+          text: j.name + ' - 견적서, 소견서, 영수증',
+          files: files
+        });
+      } else {
+        var w = window.open('', '_blank');
+        if (w) {
+          var h = '<html><head><title>' + j.name + ' 문서</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' 문서 모음</h2>';
+          for (var k = 0; k < files.length; k++) {
+            h += '<p style="color:#aaa;font-family:sans-serif;margin:16px 0 4px;">' + names[k] + '</p>';
+            h += '<img src="' + URL.createObjectURL(files[k]) + '" style="width:100%;max-width:600px;border-radius:8px;display:block;">';
+          }
+          h += '</body></html>';
+          w.document.write(h);
+          w.document.close();
+        }
+      }
+    }
+  } catch(e) {
+    if (wrap.parentNode) document.body.removeChild(wrap);
+    console.error('문서 모아보내기 실패:', e);
+    showToast('문서 생성 실패: ' + e.message);
+  }
+}
+
+
+// Firestore에 자재 저장
+async function saveMaterials() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({materials: JSON.stringify(_materials)}, {merge: true});
+  } catch(e) { console.error('saveMaterials:', e); }
+}
+
+// 자재 구매 등록 폼 열기
+function openMaterialPurchaseForm(id) {
+  _editingMaterialId = id || null;
+  const titleEl = document.getElementById('mat-form-title');
+  const delBtn = document.getElementById('mp-delete-btn');
+
+  if (id) {
+    const m = _materials.find(function(x){ return x.id === id; });
+    if (!m) return;
+    titleEl.textContent = '📦 자재 수정';
+    document.getElementById('mp-date').value = m.date || '';
+    document.getElementById('mp-name').value = m.name || '';
+    document.getElementById('mp-amount').value = m.amount ? m.amount.toLocaleString() : '';
+    document.getElementById('mp-vendor').value = m.vendor || '';
+    document.getElementById('mp-qty').value = m.qty || '';
+    document.getElementById('mp-memo').value = m.memo || '';
+    if (delBtn) delBtn.style.display = 'block';
+  } else {
+    titleEl.textContent = '📦 자재 구매 등록';
+    document.getElementById('mp-date').value = new Date().toISOString().slice(0,10);
+    ['mp-name','mp-amount','mp-vendor','mp-qty','mp-memo'].forEach(function(f){
+      var el = document.getElementById(f);
+      if (el) el.value = '';
+    });
+    if (delBtn) delBtn.style.display = 'none';
+  }
+  document.getElementById('material-purchase-modal').classList.add('open');
+}
+
+// 자재 구매 저장
+async function saveMaterialPurchase() {
+  const name = document.getElementById('mp-name').value.trim();
+  const amount = parseAmountStr(document.getElementById('mp-amount').value);
+  const date = document.getElementById('mp-date').value;
+  if (!name || !amount || !date) { showToast('품목명, 금액, 구매일은 필수입니다'); return; }
+
+  const item = {
+    id: _editingMaterialId || getNextMaterialId(),
+    date: date,
+    name: name,
+    amount: amount,
+    vendor: document.getElementById('mp-vendor').value.trim(),
+    qty: document.getElementById('mp-qty').value.trim(),
+    memo: document.getElementById('mp-memo').value.trim()
+  };
+
+  if (_editingMaterialId) {
+    _materials = _materials.map(function(m){ return m.id === _editingMaterialId ? item : m; });
+    showToast('자재 수정됨 ✓');
+  } else {
+    _materials.push(item);
+    showToast('자재 등록됨 ✓');
+  }
+  await saveMaterials();
+  closeModal('material-purchase-modal');
+  renderMaterialList();
+  updateMainStats();
+}
+
+// 자재 삭제
+async function deleteMaterialPurchase() {
+  if (!_editingMaterialId) return;
+  if (!confirm('이 자재 구매 내역을 삭제하시겠습니까?')) return;
+  _materials = _materials.filter(function(m){ return m.id !== _editingMaterialId; });
+  await saveMaterials();
+  closeModal('material-purchase-modal');
+  renderMaterialList();
+  updateMainStats();
+  showToast('삭제됨');
+}
+
+// 자재 목록 렌더링
+function renderMaterialList() {
+  const list = document.getElementById('material-purchase-list');
+  if (!list) return;
+
+  const now = new Date();
+  const yearPrefix = String(now.getFullYear());
+  const totalCost = _materials.reduce(function(s,m){ return s + (m.amount||0); }, 0);
+  const yearCost = _materials.filter(function(m){ return (m.date||'').startsWith(yearPrefix); }).reduce(function(s,m){ return s + (m.amount||0); }, 0);
+
+  // 상단 통계 업데이트
+  var e1 = document.getElementById('mat-total-cost');
+  var e2 = document.getElementById('mat-year-cost');
+  var e3 = document.getElementById('mat-count');
+  if (e1) e1.textContent = fmtShort(totalCost);
+  if (e2) e2.textContent = fmtShort(yearCost);
+  if (e3) e3.textContent = _materials.length;
+
+  if (!_materials.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">등록된 자재 구매 내역이 없습니다</div></div>';
+    return;
+  }
+
+  // 날짜 내림차순 정렬
+  var sorted = _materials.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  // 월별 그룹
+  var months = {};
+  sorted.forEach(function(m) {
+    var ym = (m.date||'').slice(0,7);
+    if (!months[ym]) months[ym] = [];
+    months[ym].push(m);
+  });
+
+  var html = '';
+  Object.keys(months).sort().reverse().forEach(function(ym) {
+    var items = months[ym];
+    var monthTotal = items.reduce(function(s,m){ return s + (m.amount||0); }, 0);
+    var label = ym.replace('-','년 ') + '월';
+    html += '<div class="month-row">';
+    html += '<div class="month-header"><span class="month-name">' + label + ' (' + items.length + '건)</span><span class="month-total" style="color:var(--red);">-' + fmtMoney(monthTotal) + '</span></div>';
+    html += '<div class="month-jobs">';
+    items.forEach(function(m) {
+      html += '<div class="month-job-row" onclick="openMaterialPurchaseForm(' + m.id + ')" style="cursor:pointer;">';
+      html += '<div style="flex:1;">';
+      html += '<div style="font-size:13px;font-weight:600;">' + (m.name||'-') + '</div>';
+      html += '<div style="font-size:11px;color:var(--text2);">' + (m.date||'') + (m.vendor ? ' · ' + m.vendor : '') + (m.qty ? ' · ' + m.qty : '') + '</div>';
+      html += '</div>';
+      html += '<div style="font-size:14px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(m.amount||0) + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  list.innerHTML = html;
+}
+
+
+document.addEventListener('click', function(e) {
+  const box = document.getElementById('client-suggestions');
+  const input = document.getElementById('f-client-company');
+  if (box && input && e.target !== input && !box.contains(e.target)) {
+    box.style.display = 'none';
+  }
+});
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('as-date').value = new Date().toISOString().slice(0,10);
+  addMaterialRow();
+  renderPhotoSlots();
+  addCostItem('', '');
+  // 비용 항목은 동적으로 생성되므로 oninput 속성으로 처리
+  window.addEventListener('resize', function() {
+    scaleDocPage();
+    scaleA4();
+  });
+});
+</script>
+
+<!-- 서명 패드 모달 -->
+<div class="modal-overlay" id="sig-pad-modal" onclick="handleOverlayClick(event,'sig-pad-modal')">
+  <div class="modal-sheet" style="max-height:70vh;">
+    <div class="modal-header">
+      <div class="modal-title">✍️ 서명 작성</div>
+      <button class="modal-close" onclick="closeModal('sig-pad-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">아래 흰색 영역에 손가락으로 서명해주세요</div>
+      <div style="border-radius:var(--r-sm);overflow:hidden;border:2px solid var(--border2);background:white;">
+        <canvas id="sig-canvas" style="display:block;touch-action:none;cursor:crosshair;" width="400" height="180"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="clearSigPad()">🗑️ 지우기</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="saveSigPad()">✅ 서명 저장</button>
+      </div>
+      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">또는 이미지 업로드</div>
+        <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="document.getElementById('sig-input').click()">📁 파일에서 업로드</button>
+        <input type="file" id="sig-input" accept="image/*" style="display:none" onchange="handleSigUpload(event)">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 의뢰처 선택/관리 모달 -->
+<div class="modal-overlay" id="client-picker-modal" onclick="handleOverlayClick(event,'client-picker-modal')">
+  <div class="modal-sheet" style="max-height:80vh;">
+    <div class="modal-header">
+      <div class="modal-title">📋 의뢰처 선택</div>
+      <button class="modal-close" onclick="closeModal('client-picker-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">저장된 의뢰처를 선택하거나 새로 추가할 수 있어요</div>
+      <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openClientForm(null)">+ 새 의뢰처 추가</button>
+      <div id="client-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 의뢰처 작성/수정 모달 -->
+<div class="modal-overlay" id="client-form-modal" onclick="handleOverlayClick(event,'client-form-modal')">
+  <div class="modal-sheet" style="max-height:85vh;">
+    <div class="modal-header">
+      <div class="modal-title" id="client-form-title">의뢰처 정보</div>
+      <button class="modal-close" onclick="closeModal('client-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">업체명 *</label><input class="form-input" id="cf-name" placeholder="예: OO중개, OO관리단"></div>
+      <div class="form-group"><label class="form-label">담당자</label><input class="form-input" id="cf-contact" placeholder="담당자명"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)"></div>
+      <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
+      <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cf-memo" placeholder="결제 조건, 특이사항 등"></textarea></div>
+      <div class="btn-group">
+        <button class="btn btn-danger" id="cf-delete-btn" onclick="deleteClient()" style="display:none;">🗑️ 삭제</button>
+        <button class="btn btn-primary" onclick="saveClient()" style="flex:2;">💾 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 자동 백업 목록 모달 -->
+<div class="modal-overlay" id="auto-backup-modal" onclick="handleOverlayClick(event,'auto-backup-modal')">
+  <div class="modal-sheet" style="max-height:80vh;">
+    <div class="modal-header">
+      <div class="modal-title">📅 자동 백업 내역</div>
+      <button class="modal-close" onclick="closeModal('auto-backup-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="auto-backup-list"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 하단 고정 탭 네비게이션 -->
+<div class="bottom-tab-nav" id="bottom-tab-nav">
+  <button class="tab-btn active" onclick="goPage('page-main')" data-page="page-main">
+    <span class="tab-icon">🏠</span><span class="tab-label">홈</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-calendar')" data-page="page-calendar">
+    <span class="tab-icon">🔧</span><span class="tab-label">현장</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-field')" data-page="page-field">
+    <span class="tab-icon">➕</span><span class="tab-label">등록</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-contacts')" data-page="page-contacts">
+    <span class="tab-icon">👥</span><span class="tab-label">고객</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-companies')" data-page="page-companies">
+    <span class="tab-icon">🏢</span><span class="tab-label">의뢰처</span>
+  </button>
+  <button class="tab-btn" onclick="goPage('page-docs')" data-page="page-docs">
+    <span class="tab-icon">📄</span><span class="tab-label">문서</span>
+  </button>
+
+</div>
+
+
+<!-- 자재 구매 등록/수정 모달 -->
+<div class="modal-overlay" id="material-purchase-modal" onclick="handleOverlayClick(event,'material-purchase-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="mat-form-title">📦 자재 구매 등록</div>
+      <button class="modal-close" onclick="closeModal('material-purchase-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">구매일 *</label><input class="form-input" id="mp-date" type="date"></div>
+      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">품목명 *<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openCatalogPicker(function(c){ document.getElementById('mp-name').value=c.name; if(c.price) document.getElementById('mp-amount').value=c.price.toLocaleString(); })">🗂️ 카탈로그</button></label><input class="form-input" id="mp-name" placeholder="예: PVC 파이프, 실리콘, 밸브"></div>
+      <div class="form-group"><label class="form-label">금액 (원) *</label><input class="form-input" id="mp-amount" type="text" inputmode="numeric" placeholder="0" oninput="formatAmountInput(this)"></div>
+      <div class="form-group"><label class="form-label">구매처</label><input class="form-input" id="mp-vendor" placeholder="예: 동아자재, 온라인쇼핑"></div>
+      <div class="form-group"><label class="form-label">수량</label><input class="form-input" id="mp-qty" placeholder="예: 10개, 2박스"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="mp-memo" placeholder="용도, 현장명 등"></textarea></div>
+      <div class="btn-group">
+        <button class="btn btn-danger" id="mp-delete-btn" onclick="deleteMaterialPurchase()" style="display:none;">🗑️</button>
+        <button class="btn btn-primary" onclick="saveMaterialPurchase()" style="flex:2;">💾 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 자재 카탈로그 등록/수정 모달 -->
+<div class="modal-overlay" id="catalog-form-modal" onclick="handleOverlayClick(event,'catalog-form-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="catalog-form-title">🗂️ 자재 등록</div>
+      <button class="modal-close" onclick="closeModal('catalog-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">사진</label>
+        <div id="catalog-photo-preview" style="width:100px;height:100px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;margin-bottom:6px;" onclick="document.getElementById('catalog-photo-input').click()">
+          <span id="catalog-photo-placeholder" style="font-size:32px;color:var(--text2);">📷</span>
+        </div>
+        <input type="file" id="catalog-photo-input" accept="image/*" style="display:none" onchange="handleCatalogPhoto(event)">
+      </div>
+      <div class="form-group"><label class="form-label">자재명 *</label><input class="form-input" id="cat-name" placeholder="예: PVC 파이프 20mm"></div>
+      <div class="form-group"><label class="form-label">규격/사양</label><input class="form-input" id="cat-spec" placeholder="예: 20mm × 3m, 백색"></div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">단가 이력<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="addPriceHistoryRow()">+ 단가 추가</button></label>
+        <div id="cat-price-history" style="margin-top:4px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">시작월 기준으로 해당 기간의 단가가 적용됩니다</div>
+      </div>
+      <div class="form-group"><label class="form-label">카테고리</label><input class="form-input" id="cat-category" placeholder="예: 배관, 부속, 공구, 실링"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cat-memo" rows="2" placeholder="구매처, 특이사항 등"></textarea></div>
+      <div class="btn-group">
+        <button class="btn btn-danger" id="cat-delete-btn" onclick="deleteCatalogItem()" style="display:none;">🗑️</button>
+        <button class="btn btn-primary" onclick="saveCatalogItem()" style="flex:2;">💾 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 자재 카탈로그 선택 모달 (새작업/구매등록에서 사용) -->
+<div class="modal-overlay" id="catalog-picker-modal" onclick="handleOverlayClick(event,'catalog-picker-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">🗂️ 자재 선택</div>
+      <button class="modal-close" onclick="closeModal('catalog-picker-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input class="form-input" id="catalog-picker-search" placeholder="자재명 검색..." oninput="renderCatalogPicker()" style="margin-bottom:10px;">
+      <div id="catalog-picker-list" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 작업 검색 모달 -->
+<div class="modal-overlay" id="search-modal" onclick="handleOverlayClick(event,'search-modal')">
+  <div class="modal-sheet" style="max-height:90vh;">
+    <div class="modal-header">
+      <div class="modal-title">🔍 작업 검색</div>
+      <button class="modal-close" onclick="closeModal('search-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;">
+      <div class="form-group">
+        <input class="form-input" id="search-keyword" placeholder="고객명, 주소, 전화번호, 의뢰처..." oninput="doJobSearch()" style="font-size:15px;padding:12px;">
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div class="form-group" style="flex:1;margin:0;">
+          <label class="form-label" style="font-size:11px;">시작일</label>
+          <input class="form-input" id="search-date-from" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
+        </div>
+        <div class="form-group" style="flex:1;margin:0;">
+          <label class="form-label" style="font-size:11px;">종료일</label>
+          <input class="form-input" id="search-date-to" type="date" onchange="doJobSearch()" style="font-size:12px;padding:8px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="search-quick-btns">
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('today')">오늘</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('week')">이번주</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('month')">이번달</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('3month')">최근3개월</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('year')">올해</button>
+        <button class="btn btn-secondary btn-sm" onclick="setSearchRange('all')">전체</button>
+      </div>
+      <div id="search-result-count" style="font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
+      <div id="search-results" style="padding-bottom:80px;"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 업로드 프로그레스 바 -->
+<div id="upload-progress-bar" style="display:none;position:fixed;bottom:56px;left:0;right:0;z-index:9999;background:var(--bg2);padding:8px 16px;border-top:1px solid var(--border);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <span id="upload-progress-text" style="font-size:12px;color:var(--text1);">사진 업로드 중...</span>
+    <span id="upload-progress-pct" style="font-size:12px;font-weight:600;color:var(--accent);">0%</span>
+  </div>
+  <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
+    <div id="upload-progress-fill" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.3s ease;"></div>
+  </div>
+</div>
+
+</body>
+</html>

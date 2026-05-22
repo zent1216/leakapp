@@ -3025,16 +3025,16 @@ function renderPhotoSlots() {
     const photos = _tempPhotos[type] || [];
     const validPhotos = photos.filter(Boolean);
 
-    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    let html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">';
     // 기존 사진들
     validPhotos.forEach(function(src, idx) {
-      html += '<div style="width:90px;height:90px;background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;flex-shrink:0;">';
+      html += '<div style="aspect-ratio:1;background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;">';
       html += '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;">';
       html += '<button onclick="removePhoto(\'' + type + '\',' + idx + ')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:white;border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>';
       html += '</div>';
     });
     // + 추가 버튼
-    html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="width:90px;height:90px;background:var(--bg3);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:28px;flex-shrink:0;">📷</div>';
+    html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="aspect-ratio:1;background:var(--bg3);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:28px;">📷</div>';
     html += '</div>';
     container.innerHTML = html;
   });

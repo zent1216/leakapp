@@ -3025,7 +3025,7 @@ function renderPhotoSlots() {
     const photos = _tempPhotos[type] || [];
     const validPhotos = photos.filter(Boolean);
 
-    let html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">';
+    let html = '';
     // 기존 사진들
     validPhotos.forEach(function(src, idx) {
       html += '<div style="aspect-ratio:1;background:var(--bg3);border-radius:8px;overflow:hidden;position:relative;">';
@@ -3035,7 +3035,6 @@ function renderPhotoSlots() {
     });
     // + 추가 버튼
     html += '<div onclick="addPhoto(\'' + type + '\',' + validPhotos.length + ')" style="aspect-ratio:1;background:var(--bg3);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:28px;">📷</div>';
-    html += '</div>';
     container.innerHTML = html;
   });
 }

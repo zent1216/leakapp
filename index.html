@@ -1194,24 +1194,24 @@ const storage = firebase.storage();
 // ════════════════════════════════════════
 //  전역 상태
 // ════════════════════════════════════════
-let _uid = null;
-let _jobs = [];
-let _biz = {};
-let _pageHistory = [];
-let _curDocType = 'estimate';
-let _isPreview = false;
-let _editingJobId = null;
-let _extraSpotCount = 0;
-let _curYear = new Date().getFullYear();
-let _curMonth = new Date().getMonth();
-let _photoTarget = null;
-let _tempPhotos = {before:[null,null,null], after:[null,null,null]};
-let _asFilter = 'all';
-let _asEditJobId = null;
-let _asEditIdx = null;
-let _asPhotoTarget = null;
-let _tempAsPhotos = {before:[null,null,null], after:[null,null,null]};
-let _insReceipts = [];
+var _uid = null;
+var _jobs = [];
+var _biz = {};
+var _pageHistory = [];
+var _curDocType = 'estimate';
+var _isPreview = false;
+var _editingJobId = null;
+var _extraSpotCount = 0;
+var _curYear = new Date().getFullYear();
+var _curMonth = new Date().getMonth();
+var _photoTarget = null;
+var _tempPhotos = {before:[null,null,null], after:[null,null,null]};
+var _asFilter = 'all';
+var _asEditJobId = null;
+var _asEditIdx = null;
+var _asPhotoTarget = null;
+var _tempAsPhotos = {before:[null,null,null], after:[null,null,null]};
+var _insReceipts = [];
 
 // ════════════════════════════════════════
 //  페이지 이동
@@ -2341,12 +2341,16 @@ function renderCalendar() {
     const jobs = dayJobMap[d] || [];
     const isToday = (y===todayY && m===todayM && d===todayD);
     const hasJob = jobs.length > 0;
-    const dotColor = jobs.some(j=>j.status==='done') ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
+    const dotColor = jobs.some(function(j){return j.status==='done';}) ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
     const col = (firstDay + d - 1) % 7;
     const textColor = col===0?'var(--red)':col===6?'var(--accent)':'var(--text)';
-    html += '<div data-day="'+(hasJob?d:'')+'" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:'+(hasJob?'pointer':'default')+';background:'+(isToday?'var(--accent)':hasJob?'var(--bg3)':'transparent')+';position:relative;">'
-      + '<span style="font-size:13px;font-weight:'+(isToday||hasJob?'700':'400')+';color:'+(isToday?'white':textColor)+';">'+d+'</span>'
-      + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:'+dotColor+';"></div>' : '')
+    const bg = isToday ? 'var(--accent)' : (hasJob ? 'var(--bg3)' : 'transparent');
+    const cur = hasJob ? 'pointer' : 'default';
+    const fw = (isToday||hasJob) ? '700' : '400';
+    const txt = isToday ? 'white' : textColor;
+    html += '<div class="cal-day-cell" data-day="' + d + '" data-hasjob="' + (hasJob?'1':'0') + '" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:' + cur + ';background:' + bg + ';position:relative;">'
+      + '<span style="font-size:13px;font-weight:' + fw + ';color:' + txt + ';">' + d + '</span>'
+      + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:' + dotColor + ';"></div>' : '')
       + '</div>';
   }
   html += '</div>';
@@ -2374,24 +2378,24 @@ function renderCalendar() {
     html += '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">이번 달 작업이 없습니다</div></div>';
   }
   body.innerHTML = html;
-  // 달력 날짜 클릭 이벤트 위임
-  body.addEventListener('click', function(e) {
-    var cell = e.target.closest('[data-day]');
-    if (cell && cell.getAttribute('data-day')) {
-      filterCalByDay(parseInt(cell.getAttribute('data-day')));
-    }
+  // 날짜 셀 클릭 이벤트 (매 렌더링마다 새로 등록 - innerHTML 교체 후 필요)
+  var cells = body.querySelectorAll('.cal-day-cell[data-hasjob="1"]');
+  cells.forEach(function(cell) {
+    cell.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      var day = parseInt(cell.getAttribute('data-day'));
+      console.log('[달력] 날짜 클릭:', day);
+      if (typeof filterCalByDay === 'function') {
+        filterCalByDay(day);
+      } else {
+        console.error('filterCalByDay 함수 없음!');
+      }
+    });
   });
+  console.log('[달력] 렌더 완료. 클릭 가능 날짜:', cells.length + '개');
 }
 
-function filterCalByDay(d) {
-  const prefix = _curYear + '-' + String(_curMonth + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-  const dayJobs = _jobs.filter(function(j){ return (j.date||'').startsWith(prefix); });
-  const list = document.getElementById('cal-job-list');
-  if (!list || !dayJobs.length) return;
-  // 해당 날짜로 스크롤
-  const cards = list.querySelectorAll('.job-card');
-  if (cards.length) cards[0].scrollIntoView({behavior:'smooth', block:'nearest'});
-}
+
 
 
 function changeMonth(dir) {
@@ -2680,9 +2684,9 @@ function editJob(id) {
 // ══════════════════════════════════════════
 //  의뢰처 관리
 // ══════════════════════════════════════════
-let _clients = [];
-let _editingClientId = null;
-let _materials = [];  // 자재 구매 내역
+var _clients = [];
+var _editingClientId = null;
+var _materials = [];  // 자재 구매 내역
 
 function getNextClientId() {
   return _clients.length ? Math.max.apply(null, _clients.map(function(c){return c.id||0;})) + 1 : 1;
@@ -4289,10 +4293,10 @@ function removeBizReg() {
 // ══════════════════════════════════════════
 //  서명 패드
 // ══════════════════════════════════════════
-let _sigPadDrawing = false;
-let _sigPadCtx = null;
-let _sigPadLastX = 0;
-let _sigPadLastY = 0;
+var _sigPadDrawing = false;
+var _sigPadCtx = null;
+var _sigPadLastX = 0;
+var _sigPadLastY = 0;
 
 function openSigPad() {
   closeModal('sig-pad-modal');
@@ -4630,7 +4634,7 @@ async function restoreAutoBackup(key) {
 // ══════════════════════════════════════════
 //  자재 관리 (회계)
 // ══════════════════════════════════════════
-let _editingMaterialId = null;
+var _editingMaterialId = null;
 
 function getNextMaterialId() {
   return _materials.length ? Math.max.apply(null, _materials.map(function(m){return m.id||0;})) + 1 : 1;

@@ -4971,41 +4971,34 @@ async function uploadJobPhotos(job) {
   await acquireWakeLock();
   showUploadProgress(0, totalNew, '사진 업로드 준비 중...');
 
-  // before 사진
-  if (job.photosBefore && job.photosBefore.length > 0) {
-    var newBefore = [];
-    for (var i = 0; i < job.photosBefore.length; i++) {
-      var ph = job.photosBefore[i];
-      if (ph && !ph.startsWith('http')) {
+  // 병렬 업로드 헬퍼 (동시 4개씩 제한 - 모바일 네트워크 안정성)
+  async function uploadGroup(arr, kind) {
+    if (!arr || arr.length === 0) return arr;
+    var result = new Array(arr.length);
+    var idxs = [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] && !arr[i].startsWith('http')) idxs.push(i);
+      else result[i] = arr[i];
+    }
+    var BATCH = 4;
+    for (var s = 0; s < idxs.length; s += BATCH) {
+      var batch = idxs.slice(s, s + BATCH);
+      await Promise.all(batch.map(async function(i) {
+        var url = await uploadPhotoToStorage(arr[i], job.id, kind, i);
+        result[i] = url || arr[i];
+        if (url) changed = true;
         uploaded++;
         showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
-        var url = await uploadPhotoToStorage(ph, job.id, 'before', i);
-        newBefore.push(url || ph);
-        if (url) changed = true;
-      } else {
-        newBefore.push(ph);
-      }
+      }));
     }
-    job.photosBefore = newBefore.filter(Boolean);
+    return result.filter(Boolean);
   }
 
-  // after 사진
-  if (job.photosAfter && job.photosAfter.length > 0) {
-    var newAfter = [];
-    for (var i = 0; i < job.photosAfter.length; i++) {
-      var ph = job.photosAfter[i];
-      if (ph && !ph.startsWith('http')) {
-        uploaded++;
-        showUploadProgress(uploaded, totalNew, '사진 업로드 중... (' + uploaded + '/' + totalNew + ')');
-        var url = await uploadPhotoToStorage(ph, job.id, 'after', i);
-        newAfter.push(url || ph);
-        if (url) changed = true;
-      } else {
-        newAfter.push(ph);
-      }
-    }
-    job.photosAfter = newAfter.filter(Boolean);
-  }
+  // before/after 동시 진행
+  var beforePromise = uploadGroup(job.photosBefore, 'before');
+  var afterPromise = uploadGroup(job.photosAfter, 'after');
+  job.photosBefore = await beforePromise;
+  job.photosAfter = await afterPromise;
 
   hideUploadProgress();
   releaseWakeLock();

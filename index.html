@@ -704,7 +704,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   </div>
   <div class="cal-nav">
     <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
-    <div class="cal-title" id="cal-title"></div>
+    <div class="cal-title" id="cal-title" onclick="goToday()" style="cursor:pointer;"></div>
+    <button class="cal-nav-btn" onclick="goToday()" style="font-size:13px;padding:0 10px;" title="오늘로">오늘</button>
     <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
   </div>
   <div class="page-body" id="calendar-body"></div>
@@ -2348,7 +2349,7 @@ function renderCalendar() {
     const cur = hasJob ? 'pointer' : 'default';
     const fw = (isToday||hasJob) ? '700' : '400';
     const txt = isToday ? 'white' : textColor;
-    html += '<div class="cal-day-cell" data-day="' + d + '" data-hasjob="' + (hasJob?'1':'0') + '" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:' + cur + ';background:' + bg + ';position:relative;">'
+    html += '<div class="cal-day-cell" data-day="' + d + '" data-hasjob="' + (hasJob||isToday?'1':'0') + '" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:' + ((hasJob||isToday)?'pointer':'default') + ';background:' + bg + ';position:relative;">'
       + '<span style="font-size:13px;font-weight:' + fw + ';color:' + txt + ';">' + d + '</span>'
       + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:' + dotColor + ';"></div>' : '')
       + '</div>';
@@ -2402,6 +2403,14 @@ function changeMonth(dir) {
   _curMonth += dir;
   if (_curMonth < 0) { _curMonth = 11; _curYear--; }
   if (_curMonth > 11) { _curMonth = 0; _curYear++; }
+  renderCalendar();
+}
+
+function goToday() {
+  var t = new Date();
+  _curYear = t.getFullYear();
+  _curMonth = t.getMonth();
+  window._calFilterDate = null;
   renderCalendar();
 }
 

@@ -1250,27 +1250,23 @@ async function downloadAllPhotos() {
 
   var zip = new JSZip();
   var total = beforePhotos.length + afterPhotos.length;
-  var done = 0;
-  var added = 0;
+  showToast('📦 사진 ' + total + '장 동시 처리 중...');
 
-  for (var i = 0; i < beforePhotos.length; i++) {
-    var blob = await getPhotoBlob(beforePhotos[i].data);
-    if (blob && blob.size > 0) {
-      zip.file(docNum + '_작업전_사진' + (i + 1) + '.jpg', blob);
-      added++;
-    }
-    done++;
-    showToast('📦 처리 중... ' + done + '/' + total);
-  }
-  for (var j = 0; j < afterPhotos.length; j++) {
-    var blob2 = await getPhotoBlob(afterPhotos[j].data);
-    if (blob2 && blob2.size > 0) {
-      zip.file(docNum + '_작업후_사진' + (j + 1) + '.jpg', blob2);
-      added++;
-    }
-    done++;
-    showToast('📦 처리 중... ' + done + '/' + total);
-  }
+  // 병렬로 모든 사진 동시 처리
+  var tasks = [];
+  beforePhotos.forEach(function(photo, i) {
+    tasks.push(getPhotoBlob(photo.data).then(function(blob) {
+      if (blob && blob.size > 0) zip.file(docNum + '_작업전_사진' + (i + 1) + '.jpg', blob);
+    }));
+  });
+  afterPhotos.forEach(function(photo, j) {
+    tasks.push(getPhotoBlob(photo.data).then(function(blob) {
+      if (blob && blob.size > 0) zip.file(docNum + '_작업후_사진' + (j + 1) + '.jpg', blob);
+    }));
+  });
+
+  await Promise.all(tasks);
+  var added = Object.keys(zip.files).length;
 
   if (added === 0) {
     showToast('⚠️ 사진을 가져올 수 없습니다. 직접 업로드한 사진만 다운로드 가능해요.');

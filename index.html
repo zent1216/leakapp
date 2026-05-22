@@ -3683,7 +3683,7 @@ function renderDocPreview() {
       + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
       + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
       + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
-      + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+      + '<div style="padding-left:58px;display:flex;align-items:center;line-height:1;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:6px;vertical-align:middle;transform:translateY(-2px);">' : ' (인)') + '</div></div>'
       + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div></div></div>';
     el.innerHTML = rH;
   }
@@ -5201,7 +5201,7 @@ async function doSendAllDocs(mode) {
     + '<div style="font-size:18px;line-height:2.2;margin-bottom:50px;padding:0 20px;color:#333;">' + rB + '</div>'
     + '<div style="background:#f4f7fb;border:1px solid #d0dce8;border-radius:4px;padding:18px 24px;font-size:16px;line-height:2.4;color:#333;margin-bottom:30px;">'
     + '<div>영수인: 주소: ' + (biz.addr||'-') + '</div><div style="padding-left:58px;">사업자번호: ' + (biz.reg||'-') + '</div><div style="padding-left:58px;">전화번호: ' + (biz.tel||'-') + '</div>'
-    + '<div style="padding-left:58px;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:10px;">' : ' (인)') + '</div></div>'
+    + '<div style="padding-left:58px;display:flex;align-items:center;line-height:1;">성명: ' + (biz.ceo||'-') + (biz.stampImg ? '<img src="' + biz.stampImg + '" style="width:44px;height:44px;object-fit:contain;margin-left:6px;vertical-align:middle;transform:translateY(-2px);">' : ' (인)') + '</div></div>'
     + '<div style="font-size:16px;color:#333;margin-top:auto;padding-left:20px;">발행일: ' + today + '</div></div>';
   wrap.appendChild(rcDiv);
 

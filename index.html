@@ -5308,29 +5308,51 @@ async function shareJobPhotos(jobId) {
   (j.photosBefore||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
   (j.photosAfter||[]).filter(Boolean).forEach(function(p){ ap.push(p); });
   if (!ap.length) { showToast('공유할 사진이 없습니다'); return; }
+
+  // 새 창을 먼저 열어두기 (사용자 제스처 컨텍스트 유지)
+  // 모바일에서 await로 시간 끌면 user gesture가 만료되므로 미리 새 창 열어두고 거기에 결과 표시
+  var w = null;
+  
+  // 시스템 공유 시도 (지원되는 경우)
   if (navigator.share && navigator.canShare) {
-    showToast('사진 준비 중...');
     try {
+      showToast('사진 준비 중...');
       var files = [];
       for (var i = 0; i < ap.length; i++) {
         var r = await fetch(ap[i]);
         var b = await r.blob();
-        files.push(new File([b], (j.name||'photo') + '_' + (i+1) + '.jpg', {type: 'image/png'}));
+        files.push(new File([b], (j.name||'photo') + '_' + (i+1) + '.jpg', {type: 'image/jpeg'}));
       }
       if (navigator.canShare({files: files})) {
-        await navigator.share({title: j.name + ' 현장사진', text: j.name + ' ' + ap.length + '장', files: files});
-        return;
+        try {
+          await navigator.share({title: j.name + ' 현장사진', text: j.name + ' ' + ap.length + '장', files: files});
+          return; // 공유 성공
+        } catch(shareErr) {
+          // AbortError: 사용자가 공유 다이얼로그를 닫음 - 종료
+          if (shareErr.name === 'AbortError') return;
+          // NotAllowedError 등 다른 에러는 폴백으로 진행
+          console.log('[사진모아보내기] navigator.share 실패, 새 창 폴백 사용:', shareErr.name);
+        }
       }
-    } catch(e) { if (e.name !== 'AbortError') console.log(e); return; }
+    } catch(e) {
+      console.log('[사진모아보내기] 사진 준비 실패, 새 창 폴백 사용:', e.message);
+    }
   }
-  var w = window.open('', '_blank');
-  if (w) {
-    var h = '<html><head><title>' + j.name + '</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' (' + ap.length + '장)</h2>';
-    ap.forEach(function(p) { h += '<img src="' + p + '" style="width:100%;max-width:600px;margin:8px 0;border-radius:8px;display:block">'; });
-    h += '</body></html>';
-    w.document.write(h);
-    w.document.close();
+
+  // 폴백: 새 탭에 사진 모아 표시 (사용자가 그 화면에서 길게 눌러 저장/공유)
+  showToast('사진을 새 탭에서 엽니다...');
+  w = window.open('', '_blank');
+  if (!w) {
+    showToast('❌ 팝업 차단됨. 브라우저 설정에서 팝업을 허용해주세요');
+    return;
   }
+  var h = '<html><head><title>' + (j.name||'현장') + ' 사진</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px;font-family:sans-serif"><h2 style="color:#fff;">' + (j.name||'현장') + ' (' + ap.length + '장)</h2><p style="color:#aaa;font-size:13px;">사진을 길게 눌러 저장하거나 공유할 수 있습니다.</p>';
+  ap.forEach(function(p, i) {
+    h += '<img src="' + p + '" style="width:100%;max-width:600px;margin:8px 0;border-radius:8px;display:block" alt="사진 ' + (i+1) + '">';
+  });
+  h += '</body></html>';
+  w.document.write(h);
+  w.document.close();
 }
 
 

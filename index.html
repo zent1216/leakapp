@@ -1333,10 +1333,21 @@ async function loadUserData(uid) {
     const doc = await db.collection('users').doc(uid).get();
     if (doc.exists) {
       const d = doc.data();
-      try {
-        const parsed = d.jobs ? JSON.parse(d.jobs) : [];
-        _jobs = Array.isArray(parsed) ? parsed : [];
-      } catch { _jobs = []; }
+      // ── 분리 컬렉션 우선 시도 ──
+      var jobsFromColl = await loadJobsFromCollection();
+      if (jobsFromColl !== null) {
+        _jobs = jobsFromColl;
+      } else {
+        // 폴백: 기존 통합 JSON에서 로드
+        try {
+          const parsed = d.jobs ? JSON.parse(d.jobs) : [];
+          _jobs = Array.isArray(parsed) ? parsed : [];
+        } catch { _jobs = []; }
+        // 통합 JSON에 데이터가 있으면 분리 컬렉션으로 자동 마이그레이션 (백그라운드)
+        if (_jobs.length > 0 && !d.jobsMigrated) {
+          setTimeout(function() { migrateJobsToCollection(); }, 2000);
+        }
+      }
       try {
         const parsedBiz = d.biz ? (typeof d.biz === 'string' ? JSON.parse(d.biz) : d.biz) : {};
         _biz = parsedBiz || {};
@@ -1938,6 +1949,82 @@ function jobsWithoutPhotos() {
   });
 }
 
+// ════════════════════════════════════════════════════════
+//  작업별 분리 저장 (서브컬렉션 방식) - 빠른 개별 저장
+//  - users/{uid}/jobs/{jobId} 구조
+//  - 작업 1건만 수정해도 그 1건만 업로드 (성능 개선)
+//  - 기존 통합 JSON(saveJobs)은 백업 복원/마이그레이션용으로 유지
+// ════════════════════════════════════════════════════════
+
+// 작업 1건을 서브컬렉션에 저장
+async function saveJobToCollection(job) {
+  if (!_uid || !job || !job.id) return false;
+  try {
+    var jobId = String(job.id);
+    await db.collection('users').doc(_uid).collection('jobs').doc(jobId).set(job);
+    console.log('[분리저장] 작업 1건 저장 완료:', jobId);
+    return true;
+  } catch(e) {
+    console.error('saveJobToCollection 실패:', e);
+    showToast('❌ 저장 실패: ' + (e.message || '알 수 없는 오류'));
+    return false;
+  }
+}
+
+// 작업 1건을 서브컬렉션에서 삭제
+async function deleteJobFromCollection(jobId) {
+  if (!_uid || !jobId) return false;
+  try {
+    await db.collection('users').doc(_uid).collection('jobs').doc(String(jobId)).delete();
+    console.log('[분리저장] 작업 1건 삭제 완료:', jobId);
+    return true;
+  } catch(e) {
+    console.error('deleteJobFromCollection 실패:', e);
+    return false;
+  }
+}
+
+// 서브컬렉션에서 모든 작업 로드 (loadUserData에서 사용)
+async function loadJobsFromCollection() {
+  if (!_uid) return null;
+  try {
+    var snap = await db.collection('users').doc(_uid).collection('jobs').get();
+    if (snap.empty) return null;
+    var arr = [];
+    snap.forEach(function(doc) { arr.push(doc.data()); });
+    // id 순으로 정렬 (시간순 일관성)
+    arr.sort(function(a, b) { return (b.id||0) - (a.id||0); });
+    console.log('[분리저장] 서브컬렉션에서 ' + arr.length + '건 로드');
+    return arr;
+  } catch(e) {
+    console.error('loadJobsFromCollection 실패:', e);
+    return null;
+  }
+}
+
+// 통합 JSON → 분리 컬렉션 마이그레이션 (1회성, 자동 실행)
+async function migrateJobsToCollection() {
+  if (!_uid || !_jobs || _jobs.length === 0) return;
+  try {
+    console.log('[마이그레이션] 시작:', _jobs.length + '건');
+    showToast('작업 데이터 최적화 중... (' + _jobs.length + '건)');
+    // 병렬 4개씩
+    var BATCH = 4;
+    for (var i = 0; i < _jobs.length; i += BATCH) {
+      var batch = _jobs.slice(i, i + BATCH);
+      await Promise.all(batch.map(function(j) { return saveJobToCollection(j); }));
+    }
+    console.log('[마이그레이션] 완료');
+    showToast('✅ 데이터 최적화 완료 (' + _jobs.length + '건)');
+    // 마이그레이션 완료 플래그
+    try {
+      await db.collection('users').doc(_uid).set({jobsMigrated: true}, {merge: true});
+    } catch(e) {}
+  } catch(e) {
+    console.error('migrateJobsToCollection 실패:', e);
+  }
+}
+
 async function saveJobs(force) {
   if (!_uid) return false;
   // 안전장치: force=true 이면 무조건 저장 (백업 복원 등)
@@ -2441,7 +2528,9 @@ function doEditAs(jobId, asIdx) {
 function doDeleteJob(id) {
   if (!confirm('이 작업을 삭제하시겠습니까?')) return;
   _jobs = _jobs.filter(function(j){ return j.id !== id; });
-  saveJobs();
+  deleteJobFromCollection(id);
+  // 백그라운드로 통합 JSON도 동기화
+  setTimeout(function() { saveJobs().catch(function(e){ console.error(e); }); }, 100);
   closeModal('detail-modal');
   renderCalendar();
   updateMainStats();
@@ -2595,7 +2684,9 @@ function showDetail(id) {
 function deleteJob(id) {
   if (!confirm('이 작업을 삭제하시겠습니까?')) return;
   _jobs = _jobs.filter(j => j.id !== id);
-  saveJobs();
+  deleteJobFromCollection(id);
+  // 백그라운드로 통합 JSON도 동기화
+  setTimeout(function() { saveJobs().catch(function(e){ console.error(e); }); }, 100);
   closeModal('detail-modal');
   renderCalendar();
   showToast('삭제됐습니다');
@@ -3191,7 +3282,11 @@ async function saveJob() {
     }
   } catch(e) { console.error('사진 업로드 오류:', e); }
   // 저장 결과 확인 후 메시지
-  const ok = await saveJobs();
+  // 분리 컬렉션에 저장 (빠름) + 백그라운드로 통합 JSON도 저장 (안전망)
+  var savedJob = _jobs.find(function(x){ return x.id === job.id; });
+  const ok = await saveJobToCollection(savedJob || job);
+  // 백그라운드로 통합 JSON 동기화 (안전망 유지, 사용자 대기 없음)
+  setTimeout(function() { saveJobs().catch(function(e){ console.error('백그라운드 통합 저장 실패:', e); }); }, 100);
   _isSaving = false;
   var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; }
@@ -4164,7 +4259,9 @@ function saveAs() {
     j.asHistory.push(rec);
   }
   _jobs = _jobs.map(x => x.id === _asEditJobId ? j : x);
-  saveJobs();
+  saveJobToCollection(j);
+  // 백그라운드로 통합 JSON도 동기화
+  setTimeout(function() { saveJobs().catch(function(e){ console.error(e); }); }, 100);
   showToast('저장됐습니다 ✓');
   goBack();
 }
@@ -4485,6 +4582,15 @@ function importBackup(e) {
       savePhotosLocal();
       // Firebase에 강제 저장 (백업 복원이므로 force=true)
       await saveJobs(true);
+      // 분리 컬렉션에도 백업 데이터 적용 (병렬 4개씩)
+      try {
+        var jobsArr = _jobs.slice();
+        var BATCH = 4;
+        for (var i = 0; i < jobsArr.length; i += BATCH) {
+          var batch = jobsArr.slice(i, i + BATCH);
+          await Promise.all(batch.map(function(j){ return saveJobToCollection(j); }));
+        }
+      } catch(e) { console.error('복원 후 분리 저장:', e); }
       await saveBizData();
       // 추가 데이터들도 Firebase에 저장
       try { if (typeof saveClients === 'function' && backup.clients) await saveClients(); } catch(e) { console.error('saveClients:', e); }

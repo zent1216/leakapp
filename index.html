@@ -1956,12 +1956,31 @@ function jobsWithoutPhotos() {
 //  - 기존 통합 JSON(saveJobs)은 백업 복원/마이그레이션용으로 유지
 // ════════════════════════════════════════════════════════
 
+// undefined 값을 제거 (Firestore는 undefined 거부)
+function cleanForFirestore(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(function(v) { return cleanForFirestore(v); }).filter(function(v){ return v !== undefined; });
+  }
+  if (typeof obj === 'object') {
+    var clean = {};
+    Object.keys(obj).forEach(function(k) {
+      var v = obj[k];
+      if (v === undefined) return; // skip
+      clean[k] = cleanForFirestore(v);
+    });
+    return clean;
+  }
+  return obj;
+}
+
 // 작업 1건을 서브컬렉션에 저장
 async function saveJobToCollection(job) {
   if (!_uid || !job || !job.id) return false;
   try {
     var jobId = String(job.id);
-    await db.collection('users').doc(_uid).collection('jobs').doc(jobId).set(job);
+    var cleaned = cleanForFirestore(job);
+    await db.collection('users').doc(_uid).collection('jobs').doc(jobId).set(cleaned);
     console.log('[분리저장] 작업 1건 저장 완료:', jobId);
     return true;
   } catch(e) {

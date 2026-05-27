@@ -1974,21 +1974,23 @@ async function saveJobs(force) {
     // 실제 저장
     await db.collection('users').doc(_uid).set({jobs: jobsJson}, {merge: true});
 
-    // ── 검증: 저장한 걸 다시 읽어서 확인 ──
-    const verify = await db.collection('users').doc(_uid).get();
-    if (verify.exists) {
-      const savedJobs = verify.data().jobs || '';
-      const savedCount = (function(){ try { return JSON.parse(savedJobs).length; } catch { return -1; } })();
-      if (savedCount !== _jobs.length) {
-        console.error('검증 실패:', savedCount, 'vs', _jobs.length);
-        showToast('❌ 저장 검증 실패! 백업을 받으세요');
-        // 실패 시 자동 백업 다운로드 제안
-        if (confirm('⚠️ 데이터가 Firebase에 제대로 저장되지 않았습니다.\n\n지금 백업 파일을 다운로드하시겠습니까?')) {
-          exportBackup();
+    // ── 검증을 백그라운드에서 실행 (저장 시간 단축) ──
+    var expectedCount = _jobs.length;
+    setTimeout(function() {
+      db.collection('users').doc(_uid).get().then(function(verify) {
+        if (!verify.exists) return;
+        var savedJobs = verify.data().jobs || '';
+        var savedCount = -1;
+        try { savedCount = JSON.parse(savedJobs).length; } catch(e) {}
+        if (savedCount !== expectedCount && savedCount !== -1) {
+          console.error('백그라운드 검증 실패:', savedCount, 'vs', expectedCount);
+          showToast('⚠️ 저장 검증 실패 - 백업을 권장합니다');
+          if (confirm('⚠️ 데이터가 Firebase에 제대로 저장되지 않았을 수 있습니다.\n\n안전을 위해 백업 파일을 다운로드하시겠습니까?')) {
+            exportBackup();
+          }
         }
-        return false;
-      }
-    }
+      }).catch(function(e){ console.error('검증 오류:', e); });
+    }, 500);
     return true;
   } catch(e) {
     console.error('saveJobs:', e);
@@ -4414,12 +4416,15 @@ function exportBackup() {
     return copy;
   });
   const backup = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     uid: _uid,
     jobs: jobsWithPhotos,
     biz: Object.assign({}, _biz),
-    materials: _materials || []
+    materials: _materials || [],
+    clients: _clients || [],
+    catalog: _catalog || [],
+    quickEstimates: _quickEstimates || []
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type: 'application/json'});
@@ -4460,6 +4465,9 @@ function importBackup(e) {
       // 데이터 복원
       _jobs = backup.jobs;
       if (backup.materials) _materials = backup.materials;
+      if (backup.clients) _clients = backup.clients;
+      if (backup.catalog) _catalog = backup.catalog;
+      if (backup.quickEstimates) _quickEstimates = backup.quickEstimates;
       if (backup.biz) {
         // biz 이미지 필드는 유지하고 나머지만 덮어씌움
         const keepImg = {
@@ -4478,9 +4486,18 @@ function importBackup(e) {
       // Firebase에 강제 저장 (백업 복원이므로 force=true)
       await saveJobs(true);
       await saveBizData();
+      // 추가 데이터들도 Firebase에 저장
+      try { if (typeof saveClients === 'function' && backup.clients) await saveClients(); } catch(e) { console.error('saveClients:', e); }
+      try { if (typeof saveCatalog === 'function' && backup.catalog) await saveCatalog(); } catch(e) { console.error('saveCatalog:', e); }
+      try { if (typeof saveQuickEstimates === 'function' && backup.quickEstimates) await saveQuickEstimates(); } catch(e) { console.error('saveQE:', e); }
+      try { if (typeof saveMaterials === 'function' && backup.materials) await saveMaterials(); } catch(e) { console.error('saveMat:', e); }
       updateMainStats();
       loadBizForm();
-      showToast('✅ 백업 복원 완료! 작업 ' + jobCount + '건');
+      var detailMsg = '작업 ' + jobCount + '건';
+      if (backup.clients) detailMsg += ', 의뢰처 ' + backup.clients.length + '건';
+      if (backup.quickEstimates) detailMsg += ', 빠른견적 ' + backup.quickEstimates.length + '건';
+      if (backup.catalog) detailMsg += ', 카탈로그 ' + backup.catalog.length + '건';
+      showToast('✅ 백업 복원 완료! ' + detailMsg);
       const st = document.getElementById('backup-status');
       if (st) {
         st.style.display = 'block';

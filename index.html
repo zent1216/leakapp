@@ -1363,20 +1363,42 @@ async function loadUserData(uid) {
     const doc = await db.collection('users').doc(uid).get();
     if (doc.exists) {
       const d = doc.data();
-      // ── 분리 컬렉션 우선 시도 ──
-      var jobsFromColl = await loadJobsFromCollection();
-      if (jobsFromColl !== null) {
-        _jobs = jobsFromColl;
+      // ── 통합 JSON 먼저 로드 (안전 기준) ──
+      var legacyJobs = [];
+      try {
+        var parsed = d.jobs ? JSON.parse(d.jobs) : [];
+        legacyJobs = Array.isArray(parsed) ? parsed : [];
+      } catch(e) { legacyJobs = []; }
+
+      // ── 분리 컬렉션도 로드 ──
+      var collJobs = await loadJobsFromCollection();
+      if (collJobs === null) collJobs = [];
+
+      // ── 안전한 결정 로직 ──
+      var migrated = d.jobsMigrated === true;
+      console.log('[로드 판단] 통합JSON:', legacyJobs.length, '건, 분리컬렉션:', collJobs.length, '건, 마이그레이션 플래그:', migrated);
+
+      if (migrated && collJobs.length >= legacyJobs.length) {
+        // 마이그레이션 완료 + 분리 컬렉션이 더 많거나 같음 → 분리 컬렉션 사용
+        _jobs = collJobs;
+        console.log('[로드] 분리 컬렉션 사용 (' + _jobs.length + '건)');
+      } else if (collJobs.length === 0 && legacyJobs.length > 0) {
+        // 분리 컬렉션 비어있고 통합 JSON에 데이터 있음 → 통합 JSON 사용 후 마이그레이션
+        _jobs = legacyJobs;
+        console.log('[로드] 통합 JSON 사용, 백그라운드 마이그레이션 예약');
+        setTimeout(function() { migrateJobsToCollection(); }, 2000);
+      } else if (collJobs.length < legacyJobs.length) {
+        // 분리 컬렉션 < 통합 JSON → 통합 JSON이 신뢰할 수 있음 → 통합 JSON 사용 + 재마이그레이션
+        _jobs = legacyJobs;
+        console.warn('[로드] 분리 컬렉션 불완전 (' + collJobs.length + '/' + legacyJobs.length + ') → 통합 JSON 사용, 재마이그레이션');
+        showToast('데이터 동기화 중...');
+        setTimeout(function() { migrateJobsToCollection(); }, 2000);
       } else {
-        // 폴백: 기존 통합 JSON에서 로드
-        try {
-          const parsed = d.jobs ? JSON.parse(d.jobs) : [];
-          _jobs = Array.isArray(parsed) ? parsed : [];
-        } catch { _jobs = []; }
-        // 통합 JSON에 데이터가 있으면 분리 컬렉션으로 자동 마이그레이션 (백그라운드)
-        if (_jobs.length > 0 && !d.jobsMigrated) {
-          setTimeout(function() { migrateJobsToCollection(); }, 2000);
-        }
+        // 분리 컬렉션 ≥ 통합 JSON 이지만 플래그 없음 → 분리 컬렉션이 더 최신일 수 있음
+        _jobs = collJobs;
+        console.log('[로드] 분리 컬렉션 사용 (플래그 없으나 더 많음, ' + _jobs.length + '건)');
+        // 플래그만 설정
+        try { db.collection('users').doc(_uid).set({jobsMigrated: true}, {merge: true}); } catch(e) {}
       }
       try {
         const parsedBiz = d.biz ? (typeof d.biz === 'string' ? JSON.parse(d.biz) : d.biz) : {};
@@ -2051,26 +2073,46 @@ async function loadJobsFromCollection() {
   }
 }
 
-// 통합 JSON → 분리 컬렉션 마이그레이션 (1회성, 자동 실행)
+// 통합 JSON → 분리 컬렉션 마이그레이션 (모두 성공해야 완료 플래그 설정)
 async function migrateJobsToCollection() {
-  if (!_uid || !_jobs || _jobs.length === 0) return;
+  if (!_uid || !_jobs || _jobs.length === 0) return false;
   try {
     console.log('[마이그레이션] 시작:', _jobs.length + '건');
-    showToast('작업 데이터 최적화 중... (' + _jobs.length + '건)');
-    // 병렬 4개씩
+    showToast('작업 데이터 동기화 중... (' + _jobs.length + '건)');
+    var total = _jobs.length;
+    var success = 0;
     var BATCH = 4;
     for (var i = 0; i < _jobs.length; i += BATCH) {
       var batch = _jobs.slice(i, i + BATCH);
-      await Promise.all(batch.map(function(j) { return saveJobToCollection(j); }));
+      var results = await Promise.all(batch.map(function(j) {
+        return saveJobToCollection(j).then(function(ok){ if(ok) success++; return ok; }).catch(function(){return false;});
+      }));
     }
-    console.log('[마이그레이션] 완료');
-    showToast('✅ 데이터 최적화 완료 (' + _jobs.length + '건)');
-    // 마이그레이션 완료 플래그
-    try {
-      await db.collection('users').doc(_uid).set({jobsMigrated: true}, {merge: true});
-    } catch(e) {}
+    console.log('[마이그레이션] 결과: ' + success + '/' + total + ' 성공');
+
+    // 검증: 실제 분리 컬렉션에 몇 건 있는지 확인
+    var verifyJobs = await loadJobsFromCollection();
+    var actualCount = verifyJobs ? verifyJobs.length : 0;
+    console.log('[마이그레이션] 검증: 실제 ' + actualCount + '/' + total + '건 저장됨');
+
+    if (actualCount >= total) {
+      // 모두 성공 → 플래그 설정
+      try {
+        await db.collection('users').doc(_uid).set({jobsMigrated: true}, {merge: true});
+        console.log('[마이그레이션] 완료 플래그 설정');
+        showToast('✅ 데이터 동기화 완료 (' + total + '건)');
+      } catch(e) { console.error('플래그 설정 실패:', e); }
+      return true;
+    } else {
+      // 일부 실패 → 플래그 설정 안 함 → 다음 로그인 때 재시도
+      console.warn('[마이그레이션] 일부 실패 - 다음에 재시도');
+      showToast('⚠️ 일부 동기화 실패 (' + actualCount + '/' + total + ') - 다음 로그인 시 재시도');
+      return false;
+    }
   } catch(e) {
     console.error('migrateJobsToCollection 실패:', e);
+    showToast('❌ 동기화 오류: ' + (e.message || '알 수 없음'));
+    return false;
   }
 }
 
@@ -2612,7 +2654,7 @@ function showDetail(id) {
 
   // 사진 (전체 표시)
   if (bPh.length || aPh.length) {
-    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\\\'' + j.id + '\\\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\'+j.id+\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
     if (bPh.length) {
       html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 전 (' + bPh.length + '장)</div>';
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';

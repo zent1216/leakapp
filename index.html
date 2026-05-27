@@ -1191,36 +1191,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-
-// ════════════════════════════════════════════════════════
-//  콘솔 노이즈 필터 (Firebase 내부 통신 에러 숨김)
-//  - 우리 코드의 console.error/log는 그대로 표시됨
-//  - Firestore Listen 스트림 에러처럼 무해한 내부 메시지만 차단
-// ════════════════════════════════════════════════════════
-(function(){
-  var _origError = console.error;
-  var _origWarn = console.warn;
-  function isNoise(args) {
-    try {
-      var msg = Array.prototype.map.call(args, function(a){
-        return (typeof a === 'string') ? a : (a && a.message) ? a.message : '';
-      }).join(' ');
-      // Firestore 내부 WebChannel/Listen 관련 에러는 무시
-      if (msg.indexOf('WebChannelConnection') >= 0) return true;
-      if (msg.indexOf('@firebase/firestore') >= 0 && msg.indexOf("'Listen'") >= 0) return true;
-      if (msg.indexOf('transport errored') >= 0) return true;
-      return false;
-    } catch(e) { return false; }
-  }
-  console.error = function() {
-    if (isNoise(arguments)) return;
-    _origError.apply(console, arguments);
-  };
-  console.warn = function() {
-    if (isNoise(arguments)) return;
-    _origWarn.apply(console, arguments);
-  };
-})();
 const storage = firebase.storage();
 
 // ════════════════════════════════════════

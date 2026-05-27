@@ -2654,7 +2654,7 @@ function showDetail(id) {
 
   // 사진 (전체 표시)
   if (bPh.length || aPh.length) {
-    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(\'+j.id+\')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="shareJobPhotos(' + j.id + ')" style="font-size:11px;">📤 사진 모아 보내기</button></div>';
     if (bPh.length) {
       html += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">조치 전 (' + bPh.length + '장)</div>';
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">';

@@ -5301,7 +5301,8 @@ function releaseWakeLock() {
 
 
 async function shareJobPhotos(jobId) {
-  var j = _jobs.find(function(x){ return x.id === jobId; });
+  var j = _jobs.find(function(x){ return String(x.id) === String(jobId); });
+  console.log('[사진모아보내기] 호출됨 jobId=', jobId, '찾은 작업=', j ? j.name : '없음');
   if (!j) return;
   var ap = [];
   (j.photosBefore||[]).filter(Boolean).forEach(function(p){ ap.push(p); });

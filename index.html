@@ -2614,8 +2614,10 @@ function doEditJob(id) {
   closeModal('detail-modal');
   editJob(id);
 }
-function doGoDoc() {
+function doGoDoc(jobId) {
   closeModal('detail-modal');
+  // 전역 변수로 저장 (initDocs에서 사용)
+  window._pendingDocJobId = jobId;
   goPage('page-docs', 'estimate');
 }
 function doOpenAs(jobId) {
@@ -2754,7 +2756,7 @@ function showDetail(id) {
   // 수정/문서 버튼
   html += '<div class="btn-group">';
   html += '<button class="btn btn-secondary" onclick="doEditJob(' + j.id + ')">✏️ 수정</button>';
-  html += '<button class="btn btn-primary" onclick="doGoDoc()">📋 문서</button>';
+  html += '<button class="btn btn-primary" onclick="doGoDoc(' + j.id + ')">📋 문서</button>';
   html += '</div>';
 
   // AS 내역
@@ -3422,6 +3424,19 @@ function initDocs(type) {
     sel.innerHTML = _jobs.length
       ? _jobs.slice().sort((a,b)=>b.date>a.date?1:-1).map(j => '<option value="'+j.id+'">'+j.date+' · '+j.name+' · '+j.type+'</option>').join('')
       : '<option value="">저장된 작업 없음</option>';
+    // 특정 작업 ID가 지정된 경우 그 작업 선택 (작업 상세 → 문서 진입 시)
+    if (window._pendingDocJobId !== undefined && window._pendingDocJobId !== null) {
+      var targetId = String(window._pendingDocJobId);
+      var opts = sel.querySelectorAll('option');
+      for (var i = 0; i < opts.length; i++) {
+        if (String(opts[i].value) === targetId) {
+          sel.value = opts[i].value;
+          console.log('[문서] 작업 자동 선택:', targetId);
+          break;
+        }
+      }
+      window._pendingDocJobId = null; // 사용 후 정리
+    }
   }
   setDocType(type);
   setTimeout(scaleDocPage, 100);

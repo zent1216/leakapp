@@ -3612,7 +3612,7 @@ function renderDocEdit() {
     return;
   }
   var ce = 'true';
-  var today = new Date().toLocaleDateString('ko-KR');
+  var today = getDocDate(j);
   var co = biz.name || '업체명';
   var insTotal = jobTotal(j);
   var extraCost = (j.extraSpots||0) * 200000;
@@ -3657,8 +3657,53 @@ function syncEstimateEditToPreview() {
   // 항목 정보를 j에 임시 저장
   j._editItems = items;
   j._editTotal = total;
+  // 발행일 편집 내용을 j.docDate에 동기화
+  syncIssueDateFromEdit(j);
 }
 
+// 편집 영역의 발행일(contenteditable .doc-issue-date) → j.docDate로 동기화
+// 사용자가 "발행일: 2026. 5. 25." 처럼 수정하면 j.docDate = "2026-05-25"로 저장
+function syncIssueDateFromEdit(j) {
+  if (!j) return;
+  var editArea = document.getElementById('docs-edit-area');
+  if (!editArea) return;
+  var dateEl = editArea.querySelector('.doc-issue-date');
+  if (!dateEl) return;
+  var text = (dateEl.textContent || '').trim();
+  // "발행일: " 제거
+  text = text.replace(/^발행일\s*[:：]?\s*/, '').trim();
+  // 다양한 한국 날짜 포맷 파싱: "2026. 5. 25.", "2026-5-25", "2026/05/25" 등
+  var m = text.match(/(\d{4})[.\-\/년\s]+(\d{1,2})[.\-\/월\s]+(\d{1,2})/);
+  if (m) {
+    var y = m[1];
+    var mo = String(m[2]).padStart(2, '0');
+    var d = String(m[3]).padStart(2, '0');
+    var iso = y + '-' + mo + '-' + d;
+    // 유효한 날짜인지 검증
+    var test = new Date(iso);
+    if (!isNaN(test.getTime())) {
+      j.docDate = iso;
+      console.log('[발행일 동기화] j.docDate =', iso);
+    }
+  }
+}
+
+
+// 견적서/소견서/영수증의 발행일 결정 (우선순위: docDate > date > 오늘)
+function getDocDate(job) {
+  var dateStr = (job && job.docDate) || (job && job.date) || null;
+  if (!dateStr) {
+    return new Date().toLocaleDateString('ko-KR');
+  }
+  // YYYY-MM-DD → YYYY. MM. DD. (한국어 형식)
+  try {
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return new Date().toLocaleDateString('ko-KR');
+    return d.toLocaleDateString('ko-KR');
+  } catch(e) {
+    return new Date().toLocaleDateString('ko-KR');
+  }
+}
 
 function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
   // 편집에서 동기화된 항목이 있으면 사용, 아니면 기본값
@@ -3723,7 +3768,7 @@ function makeEstimateHTML(j, biz, today, co, insTotal, extraCost, ce) {
     + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">'
     + '<div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
     + '<div style="font-size:12px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
-    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
+    + '<div class="doc-issue-date" style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
     + '<div style="text-align:center;margin-bottom:16px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">견&nbsp;&nbsp;적&nbsp;&nbsp;서</div></div>'
     + '<table class="doc-table" style="margin-bottom:10px;">'
     + '<tr><td style="background:#f0f5ff;font-weight:600;width:22%;font-size:14px;color:#333;">고객명</td><td contenteditable="'+ce+'">'+j.name+'</td></tr>'
@@ -3784,7 +3829,7 @@ function makeOpinionHTML(j, biz, today, co, ce) {
     + '<div style="border-bottom:2px solid #1a3a6e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;">'
     + '<div><div style="font-size:18px;font-weight:700;color:#1a3a6e;" contenteditable="'+ce+'">'+co+'</div>'
     + '<div style="font-size:12px;color:#555;margin-top:2px;" contenteditable="'+ce+'">대표: '+(biz.ceo||'-')+' | 사업자: '+(biz.reg||'-')+' | TEL: '+(biz.tel||'-')+'</div></div>'
-    + '<div style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
+    + '<div class="doc-issue-date" style="font-size:12px;color:#555;" contenteditable="'+ce+'">발행일: '+today+'</div></div>'
     + '<div style="text-align:center;margin-bottom:14px;"><div style="font-size:26px;font-weight:700;color:#1a3a6e;letter-spacing:6px;">소&nbsp;&nbsp;견&nbsp;&nbsp;서</div></div>'
     + '<div style="background:#f0f5ff;border:1px solid #c8d8f0;border-radius:6px;padding:10px;margin-bottom:12px;">'
     + '<table class="doc-table" style="border:none;margin:0;">'
@@ -3841,7 +3886,7 @@ function renderDocPreview() {
     return;
   }
   const biz = _biz;
-  const today = new Date().toLocaleDateString('ko-KR');
+  const today = getDocDate(j);
   const co = biz.name || '업체명';
   const ce = 'false'; // 미리보기: 편집 불가
   const insTotal = jobTotal(j);

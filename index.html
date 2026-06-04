@@ -1401,9 +1401,24 @@ function showToast(msg) {
 }
 function fmtMoney(n) { return (n||0).toLocaleString('ko-KR') + '원'; }
 function fmtShort(n) {
-  if (n >= 10000000) return (n/10000000).toFixed(0) + '천만';
-  if (n >= 10000) return (n/10000).toFixed(0) + '만';
-  return (n||0).toLocaleString();
+  n = n || 0;
+  // 9990만원(=9.99천만) 초과: "X.XX억" (소수점 둘째 자리)
+  if (n > 99900000) {
+    var v = (n / 100000000).toFixed(2);
+    v = v.replace(/\.?0+$/, '');
+    return v + '억';
+  }
+  // 999만원 초과: "X.XX천만" (소수점 둘째 자리)
+  if (n > 9990000) {
+    var v = (n / 10000000).toFixed(2);
+    v = v.replace(/\.?0+$/, '');
+    return v + '천만';
+  }
+  // 1만 이상 ~ 999만 이하: "X,XXX만" (천단위 콤마)
+  if (n >= 10000) {
+    return Math.floor(n / 10000).toLocaleString() + '만';
+  }
+  return n.toLocaleString();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function handleOverlayClick(e, id) { if (e.target.id === id) closeModal(id); }

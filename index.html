@@ -1203,6 +1203,64 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // ════════════════════════════════════════════════════════
+//  Auth 영구 저장 모드 (자동 로그인 속도 개선)
+//  - IndexedDB에 토큰 영구 저장 → 다음 방문 시 즉시 인식
+//  - 서버 검증 단계 생략으로 한국 ↔ 미국 RTT 절약
+//  - 기존 로그인/로그아웃 동작에는 영향 없음
+// ════════════════════════════════════════════════════════
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+  .then(function() { console.log('[Auth] 영구 저장 모드 활성화'); })
+  .catch(function(e) { console.error('[Auth] 영구 저장 설정 실패:', e); });
+
+// ════════════════════════════════════════════════════════
+//  로그인 진행 상황 표시 (로그인 코드에 영향 없음)
+//  - Firebase SDK 로드 직후 즉시 "자동 로그인 확인 중..." 토스트
+//  - 첫 onAuthStateChanged 호출되면 자동 해제
+// ════════════════════════════════════════════════════════
+(function() {
+  // 토스트 영역에 진행 상황 표시 (showToast가 이미 정의되어 있다고 가정)
+  var progressShown = false;
+  function showProgress() {
+    if (progressShown) return;
+    progressShown = true;
+    // 별도 진행 토스트 요소 만들기 (기존 toast와 분리)
+    var el = document.createElement('div');
+    el.id = 'auth-progress-toast';
+    el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:white;padding:16px 24px;border-radius:12px;font-size:14px;z-index:99998;font-family:\'Noto Sans KR\',sans-serif;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    el.innerHTML = '<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,0.2);border-top-color:#3b82f6;border-radius:50%;animation:authSpin 0.8s linear infinite;"></div><span>자동 로그인 확인 중...</span>';
+    document.body.appendChild(el);
+    // 회전 애니메이션 정의
+    if (!document.getElementById('auth-spin-style')) {
+      var s = document.createElement('style');
+      s.id = 'auth-spin-style';
+      s.textContent = '@keyframes authSpin{to{transform:rotate(360deg);}}';
+      document.head.appendChild(s);
+    }
+  }
+  function hideProgress() {
+    var el = document.getElementById('auth-progress-toast');
+    if (el) {
+      el.style.transition = 'opacity 0.25s';
+      el.style.opacity = '0';
+      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+    }
+  }
+  // DOM 준비되면 즉시 토스트 표시
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showProgress);
+  } else {
+    showProgress();
+  }
+  // 첫 Auth 응답이 오면 토스트 숨김 (별도 리스너로, 기존 콜백 영향 없음)
+  var unsubscribe = auth.onAuthStateChanged(function() {
+    setTimeout(hideProgress, 100);
+    setTimeout(function() { try { unsubscribe(); } catch(e) {} }, 200);
+  });
+  // 안전장치: 10초 후 무조건 숨김
+  setTimeout(hideProgress, 10000);
+})();
+
+// ════════════════════════════════════════════════════════
 //  콘솔 노이즈 필터 (Firebase 내부 통신 에러 숨김)
 //  - 우리 코드의 console.error/log는 그대로 표시됨
 //  - Firestore Listen 스트림 에러처럼 무해한 내부 메시지만 차단

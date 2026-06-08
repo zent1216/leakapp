@@ -5636,19 +5636,29 @@ async function doSendAllDocs(mode) {
       var pdfBlob = pdf.output('blob');
       var pdfFile = new File([pdfBlob], j.name + '고객님_문서합본.pdf', {type: 'application/pdf'});
 
+      var pdfShared = false;
       if (navigator.share && navigator.canShare && navigator.canShare({files: [pdfFile]})) {
-        await navigator.share({
-          title: j.name + ' 문서',
-          text: j.name + ' - 견적서, 소견서, 영수증 합본',
-          files: [pdfFile]
-        });
-      } else {
-        // 미지원시 다운로드
+        try {
+          await navigator.share({
+            title: j.name + ' 고객님 - 견적서, 소견서, 영수증',
+            text: j.name + ' 고객님 - 견적서, 소견서, 영수증',
+            files: [pdfFile]
+          });
+          pdfShared = true;
+        } catch(shareErr) {
+          if (shareErr.name === 'AbortError') { return; } // 사용자가 취소 - 조용히 종료
+          console.log('[문서모아보내기] PDF 공유 실패, 다운로드로 전환:', shareErr.name);
+        }
+      }
+      if (!pdfShared) {
+        // 공유 미지원 또는 실패 시 다운로드
         var url = URL.createObjectURL(pdfBlob);
         var a = document.createElement('a');
         a.href = url; a.download = j.name + '고객님_문서합본.pdf';
-        a.click(); URL.revokeObjectURL(url);
-        showToast('PDF 다운로드 완료');
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function(){ if(a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+        showToast('✅ PDF 다운로드 완료');
       }
 
     } else {
@@ -5657,29 +5667,38 @@ async function doSendAllDocs(mode) {
       for (var i = 0; i < divs.length; i++) {
         var canvas = await html2canvas(divs[i], {scale: 2, useCORS: true, backgroundColor: '#ffffff'});
         var blob = await new Promise(function(resolve){ canvas.toBlob(resolve, 'image/jpeg', 0.92); });
-        files.push(new File([blob], j.name + '_' + names[i] + '.jpg', {type: 'image/png'}));
+        files.push(new File([blob], j.name + '고객님_' + names[i] + '.jpg', {type: 'image/png'}));
       }
       document.body.removeChild(wrap);
 
+      var imgShared = false;
       if (navigator.share && navigator.canShare && navigator.canShare({files: files})) {
-        await navigator.share({
-          title: j.name + ' 문서',
-          text: j.name + ' - 견적서, 소견서, 영수증',
-          files: files
-        });
-      } else {
-        var w = window.open('', '_blank');
-        if (w) {
-          var h = '<html><head><title>' + j.name + ' 문서</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#222;margin:0;padding:16px"><h2 style="color:#fff;font-family:sans-serif">' + j.name + ' 문서 모음</h2>';
-          for (var k = 0; k < files.length; k++) {
-            h += '<p style="color:#aaa;font-family:sans-serif;margin:16px 0 4px;">' + names[k] + '</p>';
-            h += '<img src="' + URL.createObjectURL(files[k]) + '" style="width:100%;max-width:600px;border-radius:8px;display:block;">';
-          }
-          h += '</body></html>';
-          w.document.write(h);
-          w.document.close();
+        try {
+          await navigator.share({
+            title: j.name + ' 고객님 - 견적서, 소견서, 영수증',
+            text: j.name + ' 고객님 - 견적서, 소견서, 영수증',
+            files: files
+          });
+          imgShared = true;
+        } catch(shareErr) {
+          if (shareErr.name === 'AbortError') { return; } // 사용자가 취소 - 조용히 종료
+          console.log('[문서모아보내기] 이미지 공유 실패, 다운로드로 전환:', shareErr.name);
         }
       }
+      if (!imgShared) {
+        // 공유 미지원/실패 시: 각 이미지 개별 다운로드
+        for (var di = 0; di < files.length; di++) {
+          var durl = URL.createObjectURL(files[di]);
+          var da = document.createElement('a');
+          da.href = durl; da.download = files[di].name;
+          document.body.appendChild(da);
+          da.click();
+          (function(_a, _u){ setTimeout(function(){ if(_a.parentNode) _a.parentNode.removeChild(_a); URL.revokeObjectURL(_u); }, 1000); })(da, durl);
+        }
+        showToast('✅ 이미지 ' + files.length + '장 다운로드 완료');
+        return;
+      }
+      // (옛 새 창 폴백 제거됨 - 이제 개별 다운로드 사용)
     }
   } catch(e) {
     if (wrap.parentNode) document.body.removeChild(wrap);

@@ -1263,6 +1263,92 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
 })();
 
 // ════════════════════════════════════════════════════════
+//  로그인 워치독 (로그인 코드 영향 없음)
+//  - 로그인은 성공했는데 화면 전환이 안 되는 상황 자동 감지
+//  - 12초 내 메인 화면 전환 실패 시 재시도 UI 표시
+// ════════════════════════════════════════════════════════
+(function() {
+  var watchdogTimer = null;
+
+  function isStuckOnLogin() {
+    var loginPage = document.getElementById('page-login');
+    var verifyPage = document.getElementById('page-verify');
+    // 로그인 화면이 활성 상태이고 이메일 인증 화면도 아니면 "갇힘"
+    return loginPage && loginPage.classList.contains('active') &&
+           (!verifyPage || !verifyPage.classList.contains('active'));
+  }
+
+  function showRecoveryUI() {
+    if (document.getElementById('login-recovery-bar')) return; // 중복 방지
+    var bar = document.createElement('div');
+    bar.id = 'login-recovery-bar';
+    bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #3b82f6;color:white;padding:14px 18px;border-radius:12px;font-size:13px;z-index:99997;font-family:\'Noto Sans KR\',sans-serif;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-width:90vw;';
+    bar.innerHTML = '<span>⚠️ 데이터 로드가 지연되고 있습니다</span><button id="login-retry-btn" style="background:#3b82f6;color:white;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">다시 시도</button>';
+    document.body.appendChild(bar);
+    document.getElementById('login-retry-btn').onclick = async function() {
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = '로드 중...';
+      try {
+        var user = auth.currentUser;
+        if (!user) {
+          // 로그인 자체가 안 된 상태 → 안내 후 바 제거
+          showToast('로그인 정보가 없습니다. 다시 로그인해주세요');
+          removeRecoveryUI();
+          return;
+        }
+        await loadUserData(user.uid);
+        var nameEl = document.getElementById('main-user-name');
+        if (nameEl) nameEl.textContent = user.displayName || user.email.split('@')[0];
+        showPage('page-main');
+        updateMainStats();
+        removeRecoveryUI();
+        showToast('✅ 로드 완료');
+      } catch(e) {
+        console.error('재시도 실패:', e);
+        btn.disabled = false;
+        btn.textContent = '다시 시도';
+        showToast('❌ 재시도 실패: ' + (e.message || '네트워크를 확인해주세요'));
+      }
+    };
+  }
+
+  function removeRecoveryUI() {
+    var bar = document.getElementById('login-recovery-bar');
+    if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+  }
+
+  // 별도 Auth 리스너: 로그인 성공 감지 시 워치독 시작
+  auth.onAuthStateChanged(function(user) {
+    if (watchdogTimer) { clearTimeout(watchdogTimer); watchdogTimer = null; }
+    if (user && user.emailVerified !== false) {
+      // 12초 후에도 로그인 화면에 갇혀 있으면 복구 UI 표시
+      watchdogTimer = setTimeout(function() {
+        if (isStuckOnLogin()) {
+          console.warn('[워치독] 로그인 후 화면 전환 지연 감지 → 복구 UI 표시');
+          showRecoveryUI();
+        }
+      }, 12000);
+    } else {
+      removeRecoveryUI();
+    }
+  });
+
+  // 메인 화면 전환을 감지해서 복구 UI 자동 제거
+  var observer = new MutationObserver(function() {
+    var mainPage = document.getElementById('page-main');
+    if (mainPage && mainPage.classList.contains('active')) {
+      removeRecoveryUI();
+      if (watchdogTimer) { clearTimeout(watchdogTimer); watchdogTimer = null; }
+    }
+  });
+  document.addEventListener('DOMContentLoaded', function() {
+    var mainPage = document.getElementById('page-main');
+    if (mainPage) observer.observe(mainPage, {attributes: true, attributeFilter: ['class']});
+  });
+})();
+
+// ════════════════════════════════════════════════════════
 //  콘솔 노이즈 필터 (Firebase 내부 통신 에러 숨김)
 //  - 우리 코드의 console.error/log는 그대로 표시됨
 //  - Firestore Listen 스트림 에러처럼 무해한 내부 메시지만 차단

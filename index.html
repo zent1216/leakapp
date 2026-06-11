@@ -1528,10 +1528,25 @@ function getSelJob() {
 // ════════════════════════════════════════
 //  데이터 로드/저장
 // ════════════════════════════════════════
+// Promise에 타임아웃 적용 (Firestore hang 방지)
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error((label||'작업') + ' 시간 초과 (' + (ms/1000) + '초)')); }, ms);
+    })
+  ]);
+}
+
 async function loadUserData(uid) {
   _uid = uid;
+  console.log('[로그인 진단] 1/4 loadUserData 시작');
   try {
-    const doc = await db.collection('users').doc(uid).get();
+    const doc = await withTimeout(
+      db.collection('users').doc(uid).get(),
+      15000, '사용자 데이터 로드'
+    );
+    console.log('[로그인 진단] 2/4 메인 문서 로드 완료');
     if (doc.exists) {
       const d = doc.data();
       // ── 통합 JSON 먼저 로드 (안전 기준) ──
@@ -1541,8 +1556,15 @@ async function loadUserData(uid) {
         legacyJobs = Array.isArray(parsed) ? parsed : [];
       } catch(e) { legacyJobs = []; }
 
-      // ── 분리 컬렉션도 로드 ──
-      var collJobs = await loadJobsFromCollection();
+      // ── 분리 컬렉션도 로드 (타임아웃 시 통합 JSON 사용) ──
+      var collJobs = null;
+      try {
+        collJobs = await withTimeout(loadJobsFromCollection(), 15000, '작업 컬렉션 로드');
+      } catch(toErr) {
+        console.warn('[로그인 진단] 분리 컬렉션 로드 타임아웃 → 통합 JSON으로 진행:', toErr.message);
+        collJobs = null;
+      }
+      console.log('[로그인 진단] 3/4 작업 컬렉션 로드 완료');
       if (collJobs === null) collJobs = [];
 
       // ── 안전한 결정 로직 ──
@@ -1608,10 +1630,12 @@ async function loadUserData(uid) {
       _jobs = []; _biz = {};
     }
   } catch(e) {
-    console.error('loadUserData:', e);
+    console.error('[로그인 진단] loadUserData 실패:', e.message);
+    showToast('⚠️ 데이터 로드 실패: ' + (e.message || '네트워크 확인') + ' - 화면은 표시합니다');
     if (!_jobs) _jobs = [];
     if (!_biz) _biz = {};
   }
+  console.log('[로그인 진단] 4/4 loadUserData 종료 (작업 ' + (_jobs ? _jobs.length : 0) + '건)');
 }
 
 // 사진 데이터를 localStorage에 저장

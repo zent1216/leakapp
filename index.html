@@ -1872,8 +1872,13 @@ function openQeAddr() {
       el.removeAttribute('readonly');
       setTimeout(function() {
         el.setAttribute('readonly','');
-        document.getElementById('qe-addr-detail').focus();
-      }, 100);
+        var detail = document.getElementById('qe-addr-detail');
+        if (detail) {
+          detail.scrollIntoView({behavior:'smooth', block:'center'});
+          detail.focus();
+          detail.click();
+        }
+      }, 300);
     },
     popupName: 'qeAddrPopup'
   }).open();
@@ -3266,10 +3271,15 @@ function openAddressSearch() {
         fullAddr += ' (' + data.buildingName + ')';
       }
       document.getElementById('f-addr').value = fullAddr;
-      // 상세주소 입력으로 포커스
+      // 상세주소 입력으로 포커스 (모바일 키보드 확실히 활성화)
       setTimeout(function() {
-        document.getElementById('f-addr-detail').focus();
-      }, 100);
+        var detail = document.getElementById('f-addr-detail');
+        if (detail) {
+          detail.scrollIntoView({behavior:'smooth', block:'center'});
+          detail.focus();
+          detail.click();
+        }
+      }, 300);
     },
     theme: {
       bgColor: '#ffffff',

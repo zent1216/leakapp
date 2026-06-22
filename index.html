@@ -964,9 +964,38 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title">고객 <span>연락처</span></div>
-    <div></div>
+    <button class="topbar-action" onclick="openCustomerForm(null)">+ 메모</button>
   </div>
   <div class="page-body" id="contacts-body"></div>
+</div>
+
+<!-- ════════════ 간단 고객 메모 추가/수정 모달 ════════════ -->
+<div class="modal" id="customer-form-modal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="customer-form-title">고객 메모 추가</div>
+      <button class="modal-close" onclick="closeModal('customer-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">고객명 *</label>
+        <input class="form-input" id="cust-name" placeholder="고객 이름">
+      </div>
+      <div class="form-group">
+        <label class="form-label">전화번호 *</label>
+        <div id="cust-phones-list"></div>
+        <button class="btn btn-secondary btn-sm" onclick="addCustPhoneRow()" style="margin-top:6px;width:100%;">+ 번호 추가</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">내용 / 메모</label>
+        <textarea class="form-textarea" id="cust-memo" placeholder="고객 관련 메모 (예: 단골, 주의사항 등)"></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="cust-delete-btn" onclick="deleteCustomer()" style="display:none;color:var(--red);">🗑️ 삭제</button>
+        <button class="btn btn-primary" onclick="saveCustomer()">💾 저장</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 
@@ -1601,6 +1630,10 @@ async function loadUserData(uid) {
         const parsedClients = d.clients ? JSON.parse(d.clients) : [];
         _clients = Array.isArray(parsedClients) ? parsedClients : [];
       } catch { _clients = []; }
+      try {
+        const parsedCustomers = d.customers ? JSON.parse(d.customers) : [];
+        _customers = Array.isArray(parsedCustomers) ? parsedCustomers : [];
+      } catch { _customers = []; }
       try {
         const parsedMats = d.materials ? JSON.parse(d.materials) : [];
         _materials = Array.isArray(parsedMats) ? parsedMats : [];
@@ -3083,6 +3116,8 @@ function editJob(id) {
 var _clients = [];
 var _editingClientId = null;
 var _materials = [];  // 자재 구매 내역
+var _customers = [];  // 간단 고객 메모 (이름+전화번호 여러개+내용, leakcall 연동용)
+var _editingCustomerId = null;
 
 function getNextClientId() {
   return _clients.length ? Math.max.apply(null, _clients.map(function(c){return c.id||0;})) + 1 : 1;
@@ -3215,6 +3250,19 @@ async function saveClients() {
   try {
     await db.collection('users').doc(_uid).set({clients: JSON.stringify(_clients)}, {merge: true});
   } catch(e) { console.error('saveClients:', e); }
+}
+
+// 간단 고객 메모 저장 (leakcall 연동용)
+async function saveCustomers() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({customers: JSON.stringify(_customers)}, {merge: true});
+    console.log('[고객메모] 저장 완료:', _customers.length + '건');
+  } catch(e) { console.error('saveCustomers:', e); }
+}
+
+function getNextCustomerId() {
+  return _customers.length ? Math.max.apply(null, _customers.map(function(c){return c.id||0;})) + 1 : 1;
 }
 
 // 입력 중 자동완성 제안
@@ -4628,13 +4676,130 @@ function saveAs() {
 function renderContacts() {
   const el = document.getElementById('contacts-body');
   if (!el) return;
-  if (!_jobs.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">등록된 고객이 없습니다</div></div>'; return; }
-  const sorted = _jobs.slice().sort((a,b)=>a.name>b.name?1:-1);
-  el.innerHTML = sorted.map(j => '<div class="contact-card" onclick="showDetail('+j.id+')">'
-    + '<div class="contact-name">'+j.name+'</div>'
-    + '<div class="contact-addr">'+j.addr+'</div>'
-    + (j.phone?'<div class="contact-phone">📞 '+j.phone+'</div>':'')
-    + '</div>').join('');
+  var html = '';
+
+  // ── 간단 고객 메모 섹션 ──
+  if (_customers && _customers.length) {
+    html += '<div style="font-size:12px;color:var(--text2);font-weight:600;margin:4px 0 8px;">📝 고객 메모 (' + _customers.length + ')</div>';
+    var sortedCust = _customers.slice().sort(function(a,b){ return (a.name||'')>(b.name||'')?1:-1; });
+    sortedCust.forEach(function(cust) {
+      var phones = cust.phones || (cust.phone ? [{label:'', number:cust.phone}] : []);
+      var phoneHtml = phones.map(function(p){
+        var lbl = p.label ? '<span style="color:var(--text3);font-size:11px;">('+p.label+') </span>' : '';
+        return '<div class="contact-phone">📞 ' + lbl + p.number + '</div>';
+      }).join('');
+      html += '<div class="contact-card" onclick="openCustomerForm(' + cust.id + ')" style="border-left:3px solid var(--accent);">'
+        + '<div class="contact-name">' + (cust.name||'-') + '</div>'
+        + phoneHtml
+        + (cust.memo ? '<div class="contact-addr" style="margin-top:4px;">' + cust.memo + '</div>' : '')
+        + '</div>';
+    });
+    html += '<div style="height:16px;"></div>';
+  }
+
+  // ── 작업 기반 고객 목록 ──
+  if (_jobs.length) {
+    html += '<div style="font-size:12px;color:var(--text2);font-weight:600;margin:4px 0 8px;">🔧 작업 고객 (' + _jobs.length + ')</div>';
+    var sorted = _jobs.slice().sort(function(a,b){ return a.name>b.name?1:-1; });
+    html += sorted.map(function(j){ return '<div class="contact-card" onclick="showDetail('+j.id+')">'
+      + '<div class="contact-name">'+j.name+'</div>'
+      + '<div class="contact-addr">'+j.addr+'</div>'
+      + (j.phone?'<div class="contact-phone">📞 '+j.phone+'</div>':'')
+      + '</div>'; }).join('');
+  }
+
+  if (!html) {
+    html = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">등록된 고객이 없습니다<br><br>우측 상단 + 메모로 간단 고객을 추가하세요</div></div>';
+  }
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════
+//  간단 고객 메모 (leakcall 연동)
+// ════════════════════════════════════════
+
+// 전화번호 입력 행 추가
+function addCustPhoneRow(label, number) {
+  var list = document.getElementById('cust-phones-list');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'cust-phone-row';
+  row.style.cssText = 'display:grid;grid-template-columns:80px 1fr 36px;gap:6px;margin-bottom:6px;';
+  row.innerHTML =
+    '<input class="form-input cust-phone-label" placeholder="관계" value="' + (label||'') + '" style="padding:8px;font-size:13px;">'
+    + '<input class="form-input cust-phone-number" placeholder="010-0000-0000" type="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
+    + '<button class="btn btn-secondary" onclick="this.parentNode.remove()" style="padding:0;color:var(--red);">✕</button>';
+  list.appendChild(row);
+}
+
+// 고객 메모 폼 열기
+function openCustomerForm(id) {
+  _editingCustomerId = id;
+  var list = document.getElementById('cust-phones-list');
+  if (list) list.innerHTML = '';
+  var delBtn = document.getElementById('cust-delete-btn');
+
+  if (id) {
+    var cust = _customers.find(function(x){ return x.id === id; });
+    if (!cust) return;
+    document.getElementById('customer-form-title').textContent = '고객 메모 수정';
+    document.getElementById('cust-name').value = cust.name || '';
+    document.getElementById('cust-memo').value = cust.memo || '';
+    var phones = cust.phones || (cust.phone ? [{label:'', number:cust.phone}] : []);
+    if (phones.length === 0) phones = [{label:'', number:''}];
+    phones.forEach(function(p){ addCustPhoneRow(p.label, p.number); });
+    if (delBtn) delBtn.style.display = '';
+  } else {
+    document.getElementById('customer-form-title').textContent = '고객 메모 추가';
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-memo').value = '';
+    addCustPhoneRow('', ''); // 기본 1개
+    if (delBtn) delBtn.style.display = 'none';
+  }
+  document.getElementById('customer-form-modal').classList.add('open');
+}
+
+// 고객 메모 저장
+async function saveCustomer() {
+  var name = document.getElementById('cust-name').value.trim();
+  if (!name) { showToast('고객명을 입력해주세요'); return; }
+
+  // 전화번호 수집
+  var phones = [];
+  var rows = document.querySelectorAll('#cust-phones-list .cust-phone-row');
+  rows.forEach(function(row){
+    var label = row.querySelector('.cust-phone-label').value.trim();
+    var number = row.querySelector('.cust-phone-number').value.trim();
+    if (number) phones.push({label: label, number: number});
+  });
+  if (phones.length === 0) { showToast('전화번호를 1개 이상 입력해주세요'); return; }
+
+  var memo = document.getElementById('cust-memo').value.trim();
+
+  if (_editingCustomerId) {
+    var idx = _customers.findIndex(function(x){ return x.id === _editingCustomerId; });
+    if (idx >= 0) {
+      _customers[idx] = {id: _editingCustomerId, name: name, phones: phones, memo: memo, updatedAt: new Date().toISOString()};
+    }
+    showToast('고객 메모가 수정됐습니다 ✓');
+  } else {
+    _customers.push({id: getNextCustomerId(), name: name, phones: phones, memo: memo, createdAt: new Date().toISOString()});
+    showToast('고객 메모가 추가됐습니다 ✓');
+  }
+  await saveCustomers();
+  closeModal('customer-form-modal');
+  renderContacts();
+}
+
+// 고객 메모 삭제
+async function deleteCustomer() {
+  if (!_editingCustomerId) return;
+  if (!confirm('이 고객 메모를 삭제하시겠습니까?')) return;
+  _customers = _customers.filter(function(x){ return x.id !== _editingCustomerId; });
+  await saveCustomers();
+  closeModal('customer-form-modal');
+  renderContacts();
+  showToast('삭제됐습니다');
 }
 
 // ════════════════════════════════════════
@@ -4877,7 +5042,8 @@ function exportBackup() {
     materials: _materials || [],
     clients: _clients || [],
     catalog: _catalog || [],
-    quickEstimates: _quickEstimates || []
+    quickEstimates: _quickEstimates || [],
+    customers: _customers || []
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type: 'application/json'});
@@ -4921,6 +5087,7 @@ function importBackup(e) {
       if (backup.clients) _clients = backup.clients;
       if (backup.catalog) _catalog = backup.catalog;
       if (backup.quickEstimates) _quickEstimates = backup.quickEstimates;
+      if (backup.customers) _customers = backup.customers;
       if (backup.biz) {
         // biz 이미지 필드는 유지하고 나머지만 덮어씌움
         const keepImg = {
@@ -4952,6 +5119,7 @@ function importBackup(e) {
       try { if (typeof saveClients === 'function' && backup.clients) await saveClients(); } catch(e) { console.error('saveClients:', e); }
       try { if (typeof saveCatalog === 'function' && backup.catalog) await saveCatalog(); } catch(e) { console.error('saveCatalog:', e); }
       try { if (typeof saveQuickEstimates === 'function' && backup.quickEstimates) await saveQuickEstimates(); } catch(e) { console.error('saveQE:', e); }
+      try { if (typeof saveCustomers === 'function' && backup.customers) await saveCustomers(); } catch(e) { console.error('saveCustomers:', e); }
       try { if (typeof saveMaterials === 'function' && backup.materials) await saveMaterials(); } catch(e) { console.error('saveMat:', e); }
       updateMainStats();
       loadBizForm();

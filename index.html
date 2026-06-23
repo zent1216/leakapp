@@ -1190,8 +1190,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="form-card">
       <div class="form-card-title">💾 데이터 백업 / 복원</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">작업 데이터와 사업자정보를 파일로 저장하거나 불러올 수 있어요</div>
-      <div class="btn-group" style="margin-bottom:8px;">
-        <button class="btn btn-secondary" onclick="exportBackup()">📥 백업 저장 (.json)</button>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-secondary" onclick="exportBackup()">📥 데이터만 백업 (.json)</button>
+        <button class="btn btn-primary" onclick="exportFullBackup()">🖼️ 사진+데이터 백업 (.json)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('backup-input').click()">📤 백업 불러오기</button>
       </div>
       <button class="btn btn-primary" style="width:100%;margin-bottom:8px;background:var(--purple-bg);color:var(--purple);border:1px solid rgba(168,85,247,0.3);" onclick="openAutoBackupModal()">📅 날짜별 자동 백업 (최근 7일)</button>
@@ -5078,6 +5079,129 @@ function exportBackup() {
   }
 }
 
+
+// 완전 백업: Storage URL 사진을 실제로 다운로드해서 Base64로 포함
+// (다른 Firebase 프로젝트로 이전하거나 사진까지 완전 보관할 때 사용)
+async function exportFullBackup() {
+  if (!_uid) { showToast('로그인이 필요합니다'); return; }
+  if (!confirm('사진까지 포함한 완전 백업을 만듭니다.\n\n사진이 많으면 파일이 크고 시간이 오래 걸릴 수 있습니다. 진행할까요?')) return;
+
+  var btn = document.querySelector('button[onclick="exportFullBackup()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '백업 생성 중...'; }
+
+  // localStorage 사진 먼저 반영
+  savePhotosLocal();
+
+  // URL → Base64 변환 헬퍼
+  async function urlToBase64(url) {
+    if (!url) return url;
+    if (!url.startsWith('http')) return url; // 이미 Base64면 그대로
+    try {
+      var resp = await fetch(url);
+      var blob = await resp.blob();
+      return await new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onloadend = function() { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch(e) {
+      console.error('사진 다운로드 실패:', url, e);
+      return url; // 실패 시 원본 URL 유지
+    }
+  }
+
+  // 전체 사진 개수 카운트 (진행률 표시용)
+  var totalPhotos = 0, donePhotos = 0;
+  _jobs.forEach(function(j) {
+    var photos = localStorage.getItem('photos_' + j.id);
+    if (photos) {
+      try {
+        var p = JSON.parse(photos);
+        totalPhotos += (p.before||[]).filter(Boolean).length + (p.after||[]).filter(Boolean).length;
+      } catch(e) {}
+    }
+  });
+
+  function updateProgress() {
+    donePhotos++;
+    if (btn) btn.textContent = '사진 변환 중... (' + donePhotos + '/' + totalPhotos + ')';
+  }
+
+  try {
+    var jobsWithPhotos = [];
+    for (var i = 0; i < _jobs.length; i++) {
+      var j = _jobs[i];
+      var copy = Object.assign({}, j);
+      var photos = localStorage.getItem('photos_' + j.id);
+      var before = [], after = [];
+      if (photos) {
+        try {
+          var p = JSON.parse(photos);
+          before = (p.before||[]).filter(Boolean);
+          after = (p.after||[]).filter(Boolean);
+        } catch(e) {}
+      } else {
+        before = (j.photosBefore||[]).filter(Boolean);
+        after = (j.photosAfter||[]).filter(Boolean);
+      }
+      // 각 사진을 Base64로 변환
+      var newBefore = [];
+      for (var b = 0; b < before.length; b++) {
+        newBefore.push(await urlToBase64(before[b]));
+        updateProgress();
+      }
+      var newAfter = [];
+      for (var a = 0; a < after.length; a++) {
+        newAfter.push(await urlToBase64(after[a]));
+        updateProgress();
+      }
+      copy.photosBefore = newBefore;
+      copy.photosAfter = newAfter;
+      jobsWithPhotos.push(copy);
+    }
+
+    var backup = {
+      version: 3,
+      fullBackup: true,
+      exportedAt: new Date().toISOString(),
+      uid: _uid,
+      jobs: jobsWithPhotos,
+      biz: Object.assign({}, _biz),
+      materials: _materials || [],
+      clients: _clients || [],
+      catalog: _catalog || [],
+      quickEstimates: _quickEstimates || [],
+      customers: _customers || []
+    };
+    var json = JSON.stringify(backup, null, 2);
+    var blob = new Blob([json], {type: 'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var date = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = '누수설비_완전백업_' + date + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ if(a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+
+    var sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+    showToast('✅ 완전 백업 완료! (' + totalPhotos + '장, ' + sizeMB + 'MB)');
+    var st = document.getElementById('backup-status');
+    if (st) {
+      st.style.display = 'block';
+      st.style.background = 'var(--green-bg)';
+      st.style.color = 'var(--green)';
+      st.style.border = '1px solid rgba(62,207,142,0.3)';
+      st.textContent = '✅ 완전 백업 완료: 작업 ' + _jobs.length + '건, 사진 ' + totalPhotos + '장 (' + sizeMB + 'MB)';
+    }
+  } catch(e) {
+    console.error('exportFullBackup 실패:', e);
+    showToast('❌ 백업 실패: ' + (e.message || '알 수 없음'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🖼️ 사진+데이터 백업 (.json)'; }
+  }
+}
 function importBackup(e) {
   const file = e.target.files[0];
   if (!file) return;

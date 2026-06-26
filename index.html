@@ -743,6 +743,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group" style="margin-top:12px;"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
+      <div class="form-group" style="margin-top:-8px;">
+        <div id="f-phones-extra"></div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addFieldPhoneRow()" style="width:100%;margin-top:4px;">+ 번호 추가 (가족 등)</button>
+      </div>
       <div class="form-group">
         <label class="form-label">주소 *</label>
         <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
@@ -768,7 +772,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">누수 유형</label>
+        <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">누수 유형
+          <button type="button" onclick="openLeakTypeManager()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;">⚙️ 유형 관리</button>
+        </label>
         <select class="form-select" id="f-type">
           <option>배관 누수</option><option>수전 누수</option><option>옥상 방수</option>
           <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>베란다 방수</option><option>메인관 누수</option><option>공용부 누수</option><option>스프링쿨러 누수</option><option>기타</option>
@@ -994,6 +1000,24 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <button class="btn btn-secondary" id="cust-delete-btn" onclick="deleteCustomer()" style="display:none;color:var(--red);">🗑️ 삭제</button>
         <button class="btn btn-primary" onclick="saveCustomer()">💾 저장</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ 누수 유형 관리 모달 ════════════ -->
+<div class="modal-overlay" id="leaktype-modal" onclick="handleOverlayClick(event,'leaktype-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">누수 유형 관리</div>
+      <button class="modal-close" onclick="closeModal('leaktype-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">유형을 추가하거나 삭제할 수 있어요. 순서는 위에서부터 표시됩니다.</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <input class="form-input" id="new-leaktype-input" placeholder="새 유형 입력" style="flex:1;" onkeydown="if(event.key==='Enter')addLeakType()">
+        <button class="btn btn-primary btn-sm" onclick="addLeakType()" style="white-space:nowrap;">+ 추가</button>
+      </div>
+      <div id="leaktype-list"></div>
     </div>
   </div>
 </div>
@@ -1485,6 +1509,7 @@ function goPage(id, extra) {
   else if (id === 'page-as') renderAs();
   else if (id === 'page-docs') initDocs(extra || 'estimate');
   else if (id === 'page-field') {
+    refreshTypeOptions();  // 사용자 정의 누수 유형 반영
     if (!_editingJobId) {
       resetForm();
       document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
@@ -1648,6 +1673,10 @@ async function loadUserData(uid) {
         const parsedCustomers = d.customers ? JSON.parse(d.customers) : [];
         _customers = Array.isArray(parsedCustomers) ? parsedCustomers : [];
       } catch { _customers = []; }
+      try {
+        const parsedTypes = d.leakTypes ? JSON.parse(d.leakTypes) : null;
+        if (Array.isArray(parsedTypes) && parsedTypes.length) _leakTypes = parsedTypes;
+      } catch { /* 기본값 유지 */ }
       try {
         const parsedMats = d.materials ? JSON.parse(d.materials) : [];
         _materials = Array.isArray(parsedMats) ? parsedMats : [];
@@ -2897,6 +2926,13 @@ function showDetail(id) {
   // 기본 정보
   html += '<div class="detail-info-card">';
   html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + (j.date||'-') + '</div></div>';
+  if (j.phones && j.phones.length) {
+    var extraPhonesHtml = j.phones.map(function(p){
+      var lbl = p.label ? '<span style="color:var(--text3);font-size:11px;">('+p.label+') </span>' : '';
+      return '<div>' + lbl + '<a href="tel:' + p.number + '" style="color:var(--accent);text-decoration:none;">' + p.number + '</a></div>';
+    }).join('');
+    html += '<div class="info-row"><div class="info-key">추가 연락처</div><div class="info-val">' + extraPhonesHtml + '</div></div>';
+  }
   html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + (j.addr||'-') + (j.location?' ('+j.location+')':'') + '</div></div>';
   html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + (j.type||'-') + '</div></div>';
   html += '</div>';
@@ -3039,6 +3075,8 @@ function resetForm() {
   _editingJobId = null;
   _extraSpotCount = 0;
   _tempPhotos = {before:[null,null,null], after:[null,null,null]};
+  var fpe = document.getElementById('f-phones-extra');
+  if (fpe) fpe.innerHTML = '';
   document.getElementById('field-title').innerHTML = '새 <span>작업</span>';
   ['f-name','f-phone','f-addr','f-addr-detail','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo','f-client-company'].forEach(id => {
     const el = document.getElementById(id);
@@ -3073,6 +3111,7 @@ function editJob(id) {
   document.getElementById('f-client-company').value = j.clientCompany || '';
   document.getElementById('f-name').value = j.name || '';
   document.getElementById('f-phone').value = j.phone || '';
+  fillFieldPhones(j.phones || []);
   document.getElementById('f-addr').value = j.addrBase || j.addr || '';
   document.getElementById('f-addr-detail').value = j.addrDetail || '';
   document.getElementById('f-location').value = j.location || '';
@@ -3132,6 +3171,7 @@ var _editingClientId = null;
 var _materials = [];  // 자재 구매 내역
 var _customers = [];  // 간단 고객 메모 (이름+전화번호 여러개+내용, leakcall 연동용)
 var _editingCustomerId = null;
+var _leakTypes = ['배관 누수','수전 누수','옥상 방수','외벽 누수','욕실 방수','지하 누수','하수 역류','하수 배관','베란다 방수','메인관 누수','공용부 누수','스프링쿨러 누수','기타'];  // 누수 유형 (사용자 편집 가능)
 
 function getNextClientId() {
   return _clients.length ? Math.max.apply(null, _clients.map(function(c){return c.id||0;})) + 1 : 1;
@@ -3277,6 +3317,133 @@ async function saveCustomers() {
 
 function getNextCustomerId() {
   return _customers.length ? Math.max.apply(null, _customers.map(function(c){return c.id||0;})) + 1 : 1;
+}
+
+// 누수 유형 저장
+async function saveLeakTypes() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({leakTypes: JSON.stringify(_leakTypes)}, {merge: true});
+    console.log('[누수유형] 저장 완료:', _leakTypes.length + '개');
+  } catch(e) { console.error('saveLeakTypes:', e); }
+}
+
+// 유형 select 옵션 다시 그리기 (현재 선택값 유지)
+function refreshTypeOptions() {
+  var sel = document.getElementById('f-type');
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = _leakTypes.map(function(t){ return '<option>' + t + '</option>'; }).join('');
+  // 기존 선택값이 목록에 있으면 유지
+  if (cur && _leakTypes.indexOf(cur) >= 0) sel.value = cur;
+}
+
+// ════════════════════════════════════════
+//  새 작업 - 추가 전화번호 (대표번호 외 가족 등)
+// ════════════════════════════════════════
+function addFieldPhoneRow(label, number) {
+  var list = document.getElementById('f-phones-extra');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'f-phone-row';
+  row.style.cssText = 'display:grid;grid-template-columns:80px 1fr 36px;gap:6px;margin-bottom:6px;';
+  row.innerHTML =
+    '<input class="form-input f-phone-label" placeholder="관계" value="' + (label||'') + '" style="padding:8px;font-size:13px;">'
+    + '<input class="form-input f-phone-number" placeholder="010-0000-0000" type="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
+    + '<button type="button" class="btn btn-secondary" onclick="this.parentNode.remove()" style="padding:0;color:var(--red);">✕</button>';
+  list.appendChild(row);
+}
+
+// 폼에서 추가번호 수집 → 배열 반환
+function collectFieldPhones() {
+  var phones = [];
+  var rows = document.querySelectorAll('#f-phones-extra .f-phone-row');
+  rows.forEach(function(row){
+    var label = row.querySelector('.f-phone-label').value.trim();
+    var number = row.querySelector('.f-phone-number').value.trim();
+    if (number) phones.push({label: label, number: number});
+  });
+  return phones;
+}
+
+// 추가번호 영역 채우기 (편집 시)
+function fillFieldPhones(phones) {
+  var list = document.getElementById('f-phones-extra');
+  if (list) list.innerHTML = '';
+  (phones||[]).forEach(function(p){ addFieldPhoneRow(p.label, p.number); });
+}
+
+// 유형 관리 모달 열기
+function openLeakTypeManager() {
+  renderLeakTypeList();
+  document.getElementById('leaktype-modal').classList.add('open');
+}
+
+// 유형 목록 렌더
+function renderLeakTypeList() {
+  var list = document.getElementById('leaktype-list');
+  if (!list) return;
+  if (!_leakTypes.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px;">등록된 유형이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = _leakTypes.map(function(t, i) {
+    return '<div style="display:flex;align-items:center;gap:6px;padding:8px;background:var(--bg2);border-radius:8px;margin-bottom:6px;">'
+      + '<div style="display:flex;flex-direction:column;gap:2px;">'
+      + '<button type="button" onclick="moveLeakType(' + i + ',-1)" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;line-height:1;"' + (i===0?' disabled':'') + '>▲</button>'
+      + '<button type="button" onclick="moveLeakType(' + i + ',1)" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;line-height:1;"' + (i===_leakTypes.length-1?' disabled':'') + '>▼</button>'
+      + '</div>'
+      + '<input class="form-input leaktype-edit" data-idx="' + i + '" value="' + t.replace(/"/g, '&quot;') + '" style="flex:1;padding:8px;font-size:13px;" onchange="editLeakType(' + i + ',this.value)">'
+      + '<button type="button" onclick="removeLeakType(' + i + ')" class="btn btn-secondary" style="padding:6px 10px;color:var(--red);">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+// 유형 추가
+async function addLeakType() {
+  var input = document.getElementById('new-leaktype-input');
+  var val = input.value.trim();
+  if (!val) { showToast('유형 이름을 입력해주세요'); return; }
+  if (_leakTypes.indexOf(val) >= 0) { showToast('이미 있는 유형입니다'); return; }
+  _leakTypes.push(val);
+  input.value = '';
+  renderLeakTypeList();
+  refreshTypeOptions();
+  await saveLeakTypes();
+  showToast('유형이 추가됐습니다 ✓');
+}
+
+// 유형 이름 수정
+async function editLeakType(idx, val) {
+  val = (val||'').trim();
+  if (!val) { renderLeakTypeList(); return; }
+  if (_leakTypes.indexOf(val) >= 0 && _leakTypes[idx] !== val) { showToast('이미 있는 유형입니다'); renderLeakTypeList(); return; }
+  _leakTypes[idx] = val;
+  refreshTypeOptions();
+  await saveLeakTypes();
+  showToast('수정됐습니다 ✓');
+}
+
+// 유형 삭제
+async function removeLeakType(idx) {
+  if (!confirm('"' + _leakTypes[idx] + '" 유형을 삭제하시겠습니까?')) return;
+  _leakTypes.splice(idx, 1);
+  renderLeakTypeList();
+  refreshTypeOptions();
+  await saveLeakTypes();
+  showToast('삭제됐습니다');
+}
+
+// 유형 순서 이동
+async function moveLeakType(idx, dir) {
+  var ni = idx + dir;
+  if (ni < 0 || ni >= _leakTypes.length) return;
+  var tmp = _leakTypes[idx];
+  _leakTypes[idx] = _leakTypes[ni];
+  _leakTypes[ni] = tmp;
+  renderLeakTypeList();
+  refreshTypeOptions();
+  await saveLeakTypes();
 }
 
 // 입력 중 자동완성 제안
@@ -3599,6 +3766,7 @@ async function saveJob() {
     addrDetail: addrDetail,
     date,
     phone: document.getElementById('f-phone').value.trim(),
+    phones: collectFieldPhones(),
     location: document.getElementById('f-location').value.trim(),
     status: document.getElementById('f-status').value,
     type: document.getElementById('f-type').value,
@@ -5057,7 +5225,8 @@ function exportBackup() {
     clients: _clients || [],
     catalog: _catalog || [],
     quickEstimates: _quickEstimates || [],
-    customers: _customers || []
+    customers: _customers || [],
+    leakTypes: _leakTypes || []
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], {type: 'application/json'});
@@ -5172,7 +5341,8 @@ async function exportFullBackup() {
       clients: _clients || [],
       catalog: _catalog || [],
       quickEstimates: _quickEstimates || [],
-      customers: _customers || []
+      customers: _customers || [],
+      leakTypes: _leakTypes || []
     };
     var json = JSON.stringify(backup, null, 2);
     var blob = new Blob([json], {type: 'application/json'});
@@ -5225,6 +5395,7 @@ function importBackup(e) {
       if (backup.catalog) _catalog = backup.catalog;
       if (backup.quickEstimates) _quickEstimates = backup.quickEstimates;
       if (backup.customers) _customers = backup.customers;
+      if (backup.leakTypes && backup.leakTypes.length) _leakTypes = backup.leakTypes;
       if (backup.biz) {
         // biz 이미지 필드는 유지하고 나머지만 덮어씌움
         const keepImg = {
@@ -5257,6 +5428,7 @@ function importBackup(e) {
       try { if (typeof saveCatalog === 'function' && backup.catalog) await saveCatalog(); } catch(e) { console.error('saveCatalog:', e); }
       try { if (typeof saveQuickEstimates === 'function' && backup.quickEstimates) await saveQuickEstimates(); } catch(e) { console.error('saveQE:', e); }
       try { if (typeof saveCustomers === 'function' && backup.customers) await saveCustomers(); } catch(e) { console.error('saveCustomers:', e); }
+      try { if (typeof saveLeakTypes === 'function' && backup.leakTypes) await saveLeakTypes(); } catch(e) { console.error('saveLeakTypes:', e); }
       try { if (typeof saveMaterials === 'function' && backup.materials) await saveMaterials(); } catch(e) { console.error('saveMat:', e); }
       updateMainStats();
       loadBizForm();

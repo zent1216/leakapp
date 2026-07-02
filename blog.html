@@ -648,21 +648,37 @@ body { padding-bottom: 70px; }
           프롬프트 생성 완료
         </div>
         <div class="card">
-          <div style="background:#F0F9FF;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:#1E40AF;line-height:1.7;">
-            <b>사용법 3단계:</b><br>
-            ① 아래 <b>"프롬프트 복사"</b> 버튼 클릭<br>
-            ② <a href="https://claude.ai" target="_blank" style="color:var(--primary);font-weight:700;">Claude.ai</a> 또는 <a href="https://gemini.google.com" target="_blank" style="color:var(--primary);font-weight:700;">Gemini</a> 또는 <a href="https://chatgpt.com" target="_blank" style="color:var(--primary);font-weight:700;">ChatGPT</a> 에 붙여넣기<br>
-            ③ 생성된 글을 아래 칸에 붙여넣기 → <b>"적용"</b> 클릭
+          <div id="promptGuide" style="background:#ECFDF5;border-radius:10px;padding:14px;margin-bottom:14px;font-size:14px;color:#065F46;line-height:1.7;text-align:center;">
+            ✅ 프롬프트가 <b>자동 복사</b>되었습니다!<br>
+            아래 AI 버튼을 눌러 <b>붙여넣기(Ctrl+V)</b> 하세요
           </div>
-          <label>생성된 프롬프트 <span style="font-size:12px;color:var(--text-sub);font-weight:400;">(내용 확인용)</span></label>
-          <div class="result-box" id="promptBody" style="max-height:200px;font-size:12px;"></div>
-          <button class="btn btn-accent" onclick="copyPromptText()" style="margin-top:12px;">📋 프롬프트 복사하기</button>
-        </div>
 
-        <div class="card" style="margin-top:12px;">
-          <label>AI가 생성한 글을 여기에 붙여넣으세요</label>
-          <textarea id="aiResultPaste" rows="8" placeholder="Claude.ai / Gemini / ChatGPT에서 생성된 블로그 글을 여기에 붙여넣기..." style="width:100%;padding:14px;border:2px solid var(--border);border-radius:12px;font-size:14px;font-family:'Noto Sans KR',sans-serif;resize:vertical;min-height:120px;"></textarea>
-          <button class="btn btn-primary" onclick="applyAiResult()" style="margin-top:10px;">✅ 적용하기</button>
+          <!-- AI 열기 버튼들 -->
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button onclick="openAiPopup('https://claude.ai/new')" style="flex:1;padding:14px;border:2px solid #D4A574;border-radius:12px;background:#FFF8F0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:600;color:#92400E;">
+              🟠 Claude
+            </button>
+            <button onclick="openAiPopup('https://gemini.google.com/app')" style="flex:1;padding:14px;border:2px solid #93C5FD;border-radius:12px;background:#EFF6FF;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:600;color:#1E40AF;">
+              🔵 Gemini
+            </button>
+            <button onclick="openAiPopup('https://chatgpt.com')" style="flex:1;padding:14px;border:2px solid #86EFAC;border-radius:12px;background:#F0FDF4;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:600;color:#166534;">
+              🟢 ChatGPT
+            </button>
+          </div>
+
+          <!-- 결과 붙여넣기 -->
+          <div style="background:#F8FAFC;border:2px dashed var(--primary);border-radius:12px;padding:16px;">
+            <label style="font-size:15px;font-weight:600;color:var(--primary);">② AI가 생성한 글을 여기에 붙여넣기</label>
+            <textarea id="aiResultPaste" rows="8" placeholder="AI 화면에서 결과를 복사(Ctrl+A → Ctrl+C)한 후&#10;여기에 붙여넣기(Ctrl+V) 하세요" style="width:100%;padding:14px;border:2px solid var(--border);border-radius:12px;font-size:14px;font-family:'Noto Sans KR',sans-serif;resize:vertical;min-height:120px;margin-top:8px;"></textarea>
+            <button class="btn btn-primary" onclick="applyAiResult()" style="margin-top:10px;">✅ 적용하기</button>
+          </div>
+
+          <!-- 프롬프트 다시 복사 (접힌 상태) -->
+          <details style="margin-top:12px;">
+            <summary style="font-size:13px;color:var(--text-sub);cursor:pointer;">프롬프트 다시 복사 / 내용 확인 ▾</summary>
+            <div class="result-box" id="promptBody" style="max-height:150px;font-size:11px;margin-top:8px;"></div>
+            <button class="btn btn-outline" onclick="copyPromptText()" style="margin-top:8px;font-size:13px;">📋 프롬프트 다시 복사</button>
+          </details>
         </div>
       </div>
 
@@ -736,15 +752,15 @@ body { padding-bottom: 70px; }
         <input type="text" id="bizKakao" placeholder="카카오톡 채널 URL">
       </div>
       <div class="form-group">
-        <label>🔑 AI API 설정 (글 자동 생성에 필요 - 둘 중 하나만 입력)</label>
+        <label>🤖 AI 열기 방식</label>
         <div style="background:#F0F9FF;border-radius:10px;padding:12px;margin-bottom:10px;font-size:12px;color:#1E40AF;line-height:1.6;">
-          <b>Anthropic (추천):</b> 글 품질이 가장 좋음. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--primary);">API 키 발급</a> (유료, $5 크레딧 제공)<br>
-          <b>Gemini:</b> 무료 사용 가능. <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--primary);">API 키 발급</a>
+          <b>스플릿뷰:</b> 크롬 분할 화면을 직접 쓸 때. 프롬프트만 자동 복사되고 안내가 표시됩니다.<br>
+          <b>팝업창:</b> AI 버튼을 누르면 새 창이 화면 오른쪽 절반에 자동으로 열립니다.
         </div>
-        <label style="font-size:13px;">Anthropic API 키</label>
-        <input type="password" id="bizAnthropicKey" placeholder="sk-ant-..." style="margin-bottom:8px;">
-        <label style="font-size:13px;">Gemini API 키 (Anthropic 키 없을 때 사용)</label>
-        <input type="password" id="bizGeminiKey" placeholder="AI...">
+        <div class="tag-group" id="aiOpenMode">
+          <div class="tag selected" data-val="split">🖥️ 스플릿뷰</div>
+          <div class="tag" data-val="popup">🪟 팝업창</div>
+        </div>
       </div>
       <div class="form-group">
         <label>블로그 하단 문구</label>
@@ -1090,9 +1106,20 @@ function generatePrompt() {
   document.getElementById('promptArea').style.display = 'block';
   document.getElementById('resultArea').style.display = 'none';
 
+  // AI 열기 방식에 따라 안내 문구 조정
+  var settings = loadSettings();
+  var guideEl = document.getElementById('promptGuide');
+  if (guideEl) {
+    if (settings.aiOpenMode === 'popup') {
+      guideEl.innerHTML = '✅ 프롬프트가 <b>자동 복사</b>되었습니다!<br>아래 AI 버튼을 누르면 팝업이 열려요 → <b>붙여넣기(Ctrl+V)</b>';
+    } else {
+      guideEl.innerHTML = '✅ 프롬프트가 <b>자동 복사</b>되었습니다!<br>오른쪽 분할 화면의 AI에 <b>붙여넣기(Ctrl+V)</b> 하세요';
+    }
+  }
+
   // 자동 복사
   navigator.clipboard.writeText(prompt).then(function() {
-    showToast('✅ 프롬프트가 자동 복사되었습니다! AI에 붙여넣기하세요');
+    showToast('✅ 프롬프트가 자동 복사되었습니다!');
   }).catch(function() {
     showToast('프롬프트가 생성되었습니다. 아래에서 복사하세요');
   });
@@ -1475,8 +1502,7 @@ function loadSettings() {
     bizPhone: s.bizPhone || '',
     bizKakao: s.bizKakao || '',
     bizFooter: s.bizFooter || '누수수리 전문 누수프로! 24시간 상담 가능합니다.',
-    geminiApiKey: s.geminiApiKey || '',
-    anthropicApiKey: s.anthropicApiKey || '',
+    aiOpenMode: s.aiOpenMode || 'split',
     stylePreset: s.stylePreset || '전문+친근',
     styleGuide: s.styleGuide || '',
     sampleText: s.sampleText || ''
@@ -1533,8 +1559,7 @@ function saveSettings() {
     bizPhone: document.getElementById('bizPhone').value,
     bizKakao: document.getElementById('bizKakao').value,
     bizFooter: document.getElementById('bizFooter').value,
-    geminiApiKey: document.getElementById('bizGeminiKey').value.trim(),
-    anthropicApiKey: document.getElementById('bizAnthropicKey').value.trim(),
+    aiOpenMode: selectedAiOpenMode || 'split',
     stylePreset: selectedStylePreset || '전문+친근',
     styleGuide: document.getElementById('bizStyleGuide').value,
     sampleText: (document.getElementById('bizSampleText').value || '').substring(0, 2000)
@@ -1562,10 +1587,13 @@ function initSettings() {
   document.getElementById('bizPhone').value = s.bizPhone;
   document.getElementById('bizKakao').value = s.bizKakao;
   document.getElementById('bizFooter').value = s.bizFooter;
-  document.getElementById('bizGeminiKey').value = s.geminiApiKey;
-  document.getElementById('bizAnthropicKey').value = s.anthropicApiKey;
   document.getElementById('bizStyleGuide').value = s.styleGuide;
   document.getElementById('bizSampleText').value = s.sampleText;
+  // AI 열기 방식 복원
+  selectedAiOpenMode = s.aiOpenMode || 'split';
+  document.querySelectorAll('#aiOpenMode .tag').forEach(function(t) {
+    t.classList.toggle('selected', t.dataset.val === selectedAiOpenMode);
+  });
   // 스타일 프리셋 복원
   selectedStylePreset = s.stylePreset || '전문+친근';
   document.querySelectorAll('#stylePreset .tag').forEach(function(t) {
@@ -1576,6 +1604,37 @@ function initSettings() {
 
 // ===== Style Preset =====
 var selectedStylePreset = '전문+친근';
+var selectedAiOpenMode = 'split';
+
+// AI 열기 방식 선택 핸들러
+document.addEventListener('DOMContentLoaded', function() {
+  var modeGroup = document.getElementById('aiOpenMode');
+  if (modeGroup) {
+    modeGroup.addEventListener('click', function(e) {
+      var tag = e.target.closest('.tag');
+      if (!tag) return;
+      modeGroup.querySelectorAll('.tag').forEach(function(t) { t.classList.remove('selected'); });
+      tag.classList.add('selected');
+      selectedAiOpenMode = tag.dataset.val;
+    });
+  }
+});
+
+// AI 팝업 열기 (화면 오른쪽 절반)
+function openAiPopup(url) {
+  var settings = loadSettings();
+  if (settings.aiOpenMode === 'popup') {
+    var w = Math.floor(screen.availWidth / 2);
+    var h = screen.availHeight;
+    var left = screen.availWidth - w;
+    window.open(url, 'ai_popup', 'width=' + w + ',height=' + h + ',left=' + left + ',top=0');
+  } else {
+    // 스플릿뷰 모드 — 새 탭으로 열고 안내
+    window.open(url, '_blank');
+    showToast('💡 크롬 분할 뷰에 이 탭을 놓고 프롬프트를 붙여넣기하세요');
+  }
+}
+
 var styleDescriptions = {
   '전문+친근': '<b>전문+친근:</b> "~이죠", "~하더라고요" 같은 자연스러운 존댓말에 괄호로 부연설명을 넣는 스타일. 전문 용어는 쉽게 풀어서 설명.',
   '전문적': '<b>전문 업체:</b> "~입니다", "~되었습니다" 체의 격식 있는 문체. 신뢰감 있는 업체 이미지. 이모티콘 사용 안 함.',

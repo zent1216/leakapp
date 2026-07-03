@@ -1517,39 +1517,45 @@ function loadSettings() {
 async function loadSettingsFromFirebase() {
   if (!fbUser || !fbDb) return;
   try {
+    console.log('[블로그앱] 클라우드 동기화 시작...');
     var doc = await fbDb.collection('users').doc(fbUser.uid).get();
+    console.log('[블로그앱] 문서 로드 완료');
     if (doc.exists) {
+      var data = doc.data();
       // 설정 동기화
-      if (doc.data().blogSettings) {
-        var cloudSettings = JSON.parse(doc.data().blogSettings);
-        localStorage.setItem('blogSettings', JSON.stringify(cloudSettings));
-        initSettings();
+      if (data.blogSettings) {
+        try {
+          var cloudSettings = JSON.parse(data.blogSettings);
+          localStorage.setItem('blogSettings', JSON.stringify(cloudSettings));
+          initSettings();
+        } catch(e) { console.warn('설정 파싱 실패:', e); }
       }
       // 저장 목록 동기화 (로컬에 없을 때만 클라우드에서 가져옴)
-      if (doc.data().blogPosts) {
-        var localPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
-        var cloudPosts = JSON.parse(doc.data().blogPosts);
-        if (localPosts.length === 0 && cloudPosts.length > 0) {
-          localStorage.setItem('blogPosts', JSON.stringify(cloudPosts));
-          renderSavedList();
-          showToast('☁️ 클라우드에서 저장 목록 ' + cloudPosts.length + '건 불러옴');
-        } else if (localPosts.length > 0 && cloudPosts.length > 0) {
-          // 양쪽 다 있으면 — 로컬에 없는 클라우드 글만 추가 (문서번호 기준)
-          var localDocNums = {};
-          localPosts.forEach(function(p) { if (p.docNumber) localDocNums[p.docNumber] = true; });
-          var added = 0;
-          cloudPosts.forEach(function(cp) {
-            if (cp.docNumber && !localDocNums[cp.docNumber]) {
-              localPosts.push(cp);
-              added++;
-            }
-          });
-          if (added > 0) {
-            localStorage.setItem('blogPosts', JSON.stringify(localPosts));
+      if (data.blogPosts) {
+        try {
+          var localPosts = JSON.parse(localStorage.getItem('blogPosts') || '[]');
+          var cloudPosts = JSON.parse(data.blogPosts);
+          if (localPosts.length === 0 && cloudPosts.length > 0) {
+            localStorage.setItem('blogPosts', JSON.stringify(cloudPosts));
             renderSavedList();
-            showToast('☁️ 클라우드에서 ' + added + '건 추가 동기화');
+            showToast('☁️ 클라우드에서 저장 목록 ' + cloudPosts.length + '건 불러옴');
+          } else if (localPosts.length > 0 && cloudPosts.length > 0) {
+            var localDocNums = {};
+            localPosts.forEach(function(p) { if (p.docNumber) localDocNums[p.docNumber] = true; });
+            var added = 0;
+            cloudPosts.forEach(function(cp) {
+              if (cp.docNumber && !localDocNums[cp.docNumber]) {
+                localPosts.push(cp);
+                added++;
+              }
+            });
+            if (added > 0) {
+              localStorage.setItem('blogPosts', JSON.stringify(localPosts));
+              renderSavedList();
+              showToast('☁️ 클라우드에서 ' + added + '건 추가 동기화');
+            }
           }
-        }
+        } catch(e) { console.warn('목록 파싱 실패:', e); }
       }
       console.log('[블로그앱] 클라우드 동기화 완료');
     }
@@ -1785,6 +1791,17 @@ async function firebaseLogout() {
   showToast('로그아웃 되었습니다');
 }
 
+// 다양한 날짜 형식에서 YYYY-MM 추출 ("2026. 5. 14.", "2026-05-14", "2026/5/14" 등)
+function extractYearMonth(dateStr) {
+  if (!dateStr) return '';
+  var nums = String(dateStr).match(/\d+/g);
+  if (!nums || nums.length < 2) return '';
+  var year = nums[0];
+  var month = nums[1];
+  if (year.length !== 4) return '';
+  return year + '-' + (month.length === 1 ? '0' + month : month);
+}
+
 async function openImportModal() {
   if (!fbUser || !fbDb) {
     showToast('먼저 로그인해주세요');
@@ -1806,20 +1823,21 @@ async function openImportModal() {
     }
 
     importedJobs = JSON.parse(doc.data().jobs);
+    console.log('[블로그앱] 작업 ' + importedJobs.length + '건 로드됨');
 
-    // 월 필터 옵션 채우기
+    // 월 필터 옵션 채우기 (다양한 날짜 형식 지원)
     var months = {};
     importedJobs.forEach(function(job) {
-      var d = job.date || '';
-      var m = d.substring(0, 7); // YYYY-MM
-      if (m) months[m] = true;
+      var ym = extractYearMonth(job.date);
+      if (ym) months[ym] = true;
     });
     var monthSelect = document.getElementById('importMonthFilter');
     monthSelect.innerHTML = '<option value="">전체 기간</option>';
     Object.keys(months).sort().reverse().forEach(function(m) {
       var opt = document.createElement('option');
       opt.value = m;
-      opt.textContent = m.replace('-', '년 ') + '월';
+      var parts = m.split('-');
+      opt.textContent = parts[0] + '년 ' + parseInt(parts[1]) + '월';
       monthSelect.appendChild(opt);
     });
 
@@ -1839,8 +1857,8 @@ function getFilteredJobs() {
   var filtered = importedJobs.filter(function(job) {
     // 월 필터
     if (monthFilter) {
-      var m = (job.date || '').substring(0, 7);
-      if (m !== monthFilter) return false;
+      var ym = extractYearMonth(job.date);
+      if (ym !== monthFilter) return false;
     }
     // 검색 필터
     if (search) {

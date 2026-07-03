@@ -832,7 +832,11 @@ body { padding-bottom: 70px; }
 <div class="modal-overlay" id="importModal">
   <div class="modal-card">
     <h3>📥 누수앱 작업 불러오기</h3>
-    <div id="importJobList">
+    <input type="text" id="importSearch" placeholder="🔍 고객명, 주소, 작업유형 검색..." oninput="renderImportList()" style="width:100%;padding:12px;border:2px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
+    <select id="importMonthFilter" onchange="renderImportList()" style="width:100%;padding:12px;border:2px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:12px;font-family:'Noto Sans KR',sans-serif;background:white;">
+      <option value="">전체 기간</option>
+    </select>
+    <div id="importJobList" style="max-height:45vh;overflow-y:auto;">
       <p style="text-align:center;color:var(--text-sub);">불러오는 중...</p>
     </div>
     <div class="btn-group" style="margin-top:16px;">
@@ -1789,6 +1793,8 @@ async function openImportModal() {
 
   document.getElementById('importModal').classList.add('show');
   document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);">불러오는 중...</p>';
+  document.getElementById('importSearch').value = '';
+  document.getElementById('importMonthFilter').value = '';
   selectedImportJob = null;
   document.getElementById('applyImportBtn').disabled = true;
 
@@ -1801,32 +1807,23 @@ async function openImportModal() {
 
     importedJobs = JSON.parse(doc.data().jobs);
 
-    // 최근 작업 20개만 표시 (완료된 것 우선)
-    var sorted = importedJobs.slice().sort(function(a, b) {
-      return (b.date || '').localeCompare(a.date || '');
-    }).slice(0, 20);
-
-    if (sorted.length === 0) {
-      document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);">저장된 작업이 없습니다.</p>';
-      return;
-    }
-
-    var html = '';
-    sorted.forEach(function(job, idx) {
-      var status = job.status || '진행중';
-      var statusColor = status === '완료' ? 'var(--success)' : (status === '진행중' ? 'var(--primary)' : 'var(--text-sub)');
-      var displayName = job.name || job.customer || '고객';
-      var displayType = job.type || job.workType || '작업';
-      var displayAddr = job.addr || job.address || job.location || '주소 미입력';
-      html += '<div class="job-item" data-idx="' + idx + '" onclick="selectImportJob(this,' + idx + ')">';
-      html += '<h4>' + displayName + ' - ' + displayType + '</h4>';
-      html += '<p>' + displayAddr;
-      html += ' · ' + (job.date || '날짜 미입력');
-      html += ' · <span style="color:' + statusColor + ';font-weight:600;">' + status + '</span></p>';
-      if (job.location || job.spot) html += '<p style="font-size:11px;color:#6B7280;margin-top:2px;">📍 ' + (job.location || job.spot) + '</p>';
-      html += '</div>';
+    // 월 필터 옵션 채우기
+    var months = {};
+    importedJobs.forEach(function(job) {
+      var d = job.date || '';
+      var m = d.substring(0, 7); // YYYY-MM
+      if (m) months[m] = true;
     });
-    document.getElementById('importJobList').innerHTML = html;
+    var monthSelect = document.getElementById('importMonthFilter');
+    monthSelect.innerHTML = '<option value="">전체 기간</option>';
+    Object.keys(months).sort().reverse().forEach(function(m) {
+      var opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m.replace('-', '년 ') + '월';
+      monthSelect.appendChild(opt);
+    });
+
+    renderImportList();
 
   } catch(e) {
     console.error('작업 불러오기 실패:', e);
@@ -1834,14 +1831,78 @@ async function openImportModal() {
   }
 }
 
+// 필터링된 작업 목록 반환
+function getFilteredJobs() {
+  var search = (document.getElementById('importSearch').value || '').toLowerCase().trim();
+  var monthFilter = document.getElementById('importMonthFilter').value;
+
+  var filtered = importedJobs.filter(function(job) {
+    // 월 필터
+    if (monthFilter) {
+      var m = (job.date || '').substring(0, 7);
+      if (m !== monthFilter) return false;
+    }
+    // 검색 필터
+    if (search) {
+      var haystack = [
+        job.name, job.customer, job.addr, job.address,
+        job.type, job.workType, job.location, job.spot
+      ].join(' ').toLowerCase();
+      if (haystack.indexOf(search) < 0) return false;
+    }
+    return true;
+  });
+
+  // 최신순 정렬
+  filtered.sort(function(a, b) {
+    return (b.date || '').localeCompare(a.date || '');
+  });
+  return filtered;
+}
+
+var filteredImportJobs = [];
+
+function renderImportList() {
+  filteredImportJobs = getFilteredJobs();
+  selectedImportJob = null;
+  document.getElementById('applyImportBtn').disabled = true;
+
+  if (filteredImportJobs.length === 0) {
+    document.getElementById('importJobList').innerHTML = '<p style="text-align:center;color:var(--text-sub);padding:20px;">조건에 맞는 작업이 없습니다.</p>';
+    return;
+  }
+
+  var html = '';
+  filteredImportJobs.forEach(function(job, idx) {
+    var status = job.status || '진행중';
+    var statusColor = status === '완료' ? 'var(--success)' : (status === '진행중' ? 'var(--primary)' : 'var(--text-sub)');
+    var displayName = job.name || job.customer || '고객';
+    var displayType = job.type || job.workType || '작업';
+    var displayAddr = job.addr || job.address || '주소 미입력';
+
+    // 사진 유무 체크
+    var photoCount = ((job.photosBefore || []).filter(Boolean).length) + ((job.photosAfter || []).filter(Boolean).length);
+    var photoBadge = photoCount > 0
+      ? '<span style="background:#DCFCE7;color:#166534;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;">📷 ' + photoCount + '장</span>'
+      : '<span style="background:#F3F4F6;color:#9CA3AF;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;">사진 없음</span>';
+
+    html += '<div class="job-item" data-idx="' + idx + '" onclick="selectImportJob(this,' + idx + ')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">';
+    html += '<h4 style="flex:1;">' + displayName + ' - ' + displayType + '</h4>';
+    html += photoBadge;
+    html += '</div>';
+    html += '<p>' + displayAddr + ' · ' + (job.date || '날짜 미입력');
+    html += ' · <span style="color:' + statusColor + ';font-weight:600;">' + status + '</span></p>';
+    if (job.location || job.spot) html += '<p style="font-size:11px;color:#6B7280;margin-top:2px;">📍 ' + (job.location || job.spot) + '</p>';
+    html += '</div>';
+  });
+  document.getElementById('importJobList').innerHTML = html;
+}
+
 function selectImportJob(el, idx) {
   document.querySelectorAll('.job-item').forEach(function(item) { item.classList.remove('selected'); });
   el.classList.add('selected');
-
-  var sorted = importedJobs.slice().sort(function(a, b) {
-    return (b.date || '').localeCompare(a.date || '');
-  }).slice(0, 20);
-  selectedImportJob = sorted[idx];
+  selectedImportJob = filteredImportJobs[idx];
   document.getElementById('applyImportBtn').disabled = false;
 }
 

@@ -1802,45 +1802,70 @@ function updateVatDisplay() {
   }
 }
 
+// 전화번호 입력: 시작 번호에 따라 자릿수 제한 + 실시간 하이픈
+// 형식: 010(3-4-4), 050X(4-4-4), 02(2-3~4-4), 지역번호(3-3~4-4), 1588류(4-4)
 function formatPhoneInput(el) {
   var v = el.value.replace(/[^0-9]/g, '');
-  if (v.length > 12) v = v.slice(0, 12);  // 최대 12자리 (0504-xxxx-xxxx)
 
-  // 0504, 0505 등 안심번호 (4-4-4, 총 12자리)
-  if (v.startsWith('0504') || v.startsWith('0505') || v.startsWith('0503') || v.startsWith('0506') || v.startsWith('0507')) {
-    if (v.length > 8) el.value = v.slice(0,4) + '-' + v.slice(4,8) + '-' + v.slice(8);
-    else if (v.length > 4) el.value = v.slice(0,4) + '-' + v.slice(4);
-    else el.value = v;
-    return;
-  }
+  // 지역번호 목록 (3자리)
+  var areaCodes = ['031','032','033','041','042','043','044','051','052','053','054','055','061','062','063','064','070'];
 
-  // 02 (서울) 지역번호: 2-3-4 또는 2-4-4
-  if (v.startsWith('02')) {
-    if (v.length > 9) el.value = v.slice(0,2) + '-' + v.slice(2,6) + '-' + v.slice(6,10);
-    else if (v.length > 5) el.value = v.slice(0,2) + '-' + v.slice(2,v.length-4) + '-' + v.slice(v.length-4);
-    else if (v.length > 2) el.value = v.slice(0,2) + '-' + v.slice(2);
-    else el.value = v;
-    return;
-  }
-
-  // 1588, 1600 등 대표번호 (4-4, 총 8자리, 하이픈 중간)
-  if ((v.startsWith('15') || v.startsWith('16') || v.startsWith('18')) && v.length <= 8 && !v.startsWith('010')) {
-    if (v.length > 4) el.value = v.slice(0,4) + '-' + v.slice(4);
-    else el.value = v;
-    return;
-  }
-
-  // 그 외 (010 휴대폰, 031/032 등 지역번호): 3-4-4 또는 3-3-4
-  if (v.length > 10) {
-    el.value = v.slice(0,3) + '-' + v.slice(3,7) + '-' + v.slice(7);
-  } else if (v.length > 7) {
-    // 10자리: 3-3-4 (지역번호) 또는 3-4-3
-    el.value = v.slice(0,3) + '-' + v.slice(3,6) + '-' + v.slice(6);
-  } else if (v.length > 3) {
-    el.value = v.slice(0,3) + '-' + v.slice(3);
+  if (/^050[0-9]/.test(v)) {
+    // 안심번호 0504-1234-5678 (4-4-4, 최대 12)
+    el.value = fmtByGroups(v, [4,4,4]);
+  } else if (v.startsWith('010') || v.startsWith('011') || v.startsWith('016') || v.startsWith('017') || v.startsWith('018') || v.startsWith('019')) {
+    // 휴대폰 010-1234-5678 (3-4-4, 최대 11)
+    el.value = fmtByGroups(v, [3,4,4]);
+  } else if (v.startsWith('02')) {
+    // 서울 02: 2 + (3~4) + 4, 최대 10 → 뒤 4자리 고정, 국번은 나머지
+    el.value = fmtAreaCode(v, 2, 10);
+  } else if (areaCodes.indexOf(v.slice(0,3)) >= 0) {
+    // 지역번호 3자리: 3 + (3~4) + 4, 최대 11 → 뒤 4자리 고정
+    el.value = fmtAreaCode(v, 3, 11);
+  } else if (/^1[568]/.test(v)) {
+    // 대표번호 1588-1234 (4-4, 최대 8)
+    el.value = fmtByGroups(v, [4,4]);
   } else {
-    el.value = v;
+    // 기타: 3-4-4 기본
+    el.value = fmtByGroups(v, [3,4,4]);
   }
+}
+
+// 고정 자릿수 그룹으로 하이픈 삽입
+function fmtByGroups(v, groups) {
+  var maxD = groups.reduce(function(a,b){return a+b;}, 0);
+  if (v.length > maxD) v = v.slice(0, maxD);
+  var parts = [], pos = 0;
+  for (var i = 0; i < groups.length; i++) {
+    if (pos >= v.length) break;
+    parts.push(v.slice(pos, pos + groups[i]));
+    pos += groups[i];
+  }
+  return parts.join('-');
+}
+
+// 지역번호용: 지역번호(codeLen) + 국번(가변 3~4) + 끝 4자리
+// 뒤 4자리를 항상 마지막에 고정하고, 가운데를 국번으로
+function fmtAreaCode(v, codeLen, maxD) {
+  if (v.length > maxD) v = v.slice(0, maxD);
+  var code = v.slice(0, codeLen);
+  var rest = v.slice(codeLen);
+  if (rest.length === 0) return code;
+  if (rest.length <= 4) {
+    // 아직 국번 입력 중 (뒤 4자리 구분 전)
+    return code + '-' + rest;
+  }
+  // 뒤 4자리는 항상 마지막, 가운데는 국번
+  var last4 = rest.slice(rest.length - 4);
+  var middle = rest.slice(0, rest.length - 4);
+  return code + '-' + middle + '-' + last4;
+}
+
+// 숫자 문자열 → 하이픈 포맷 (표시/저장 공용, 필요 시 사용)
+function formatPhoneNumber(v) {
+  var el = {value: (v||'')};
+  formatPhoneInput(el);
+  return el.value;
 }
 
 // 금액 입력 콤마 자동 포맷

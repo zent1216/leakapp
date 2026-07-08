@@ -1868,6 +1868,16 @@ function formatPhoneNumber(v) {
   return el.value;
 }
 
+// 카카오톡 스타일 전화 걸기 버튼 HTML 생성 (공용)
+function telButton(phone) {
+  if (!phone) return '';
+  var digits = String(phone).replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  return '<a href="tel:' + digits + '" onclick="event.stopPropagation()" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#2a2a2e;border-radius:9px;vertical-align:middle;">'
+    + '<svg viewBox="0 0 24 24" width="14" height="14" fill="#4ade80"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>'
+    + '</a>';
+}
+
 // 금액 입력 콤마 자동 포맷
 function formatAmountInput(el) {
   var pos = el.selectionStart;
@@ -1930,7 +1940,7 @@ function renderCompaniesPage() {
     html += '<button class="btn-icon" onclick="deleteClientFromPage(' + cl.id + ')" style="font-size:14px;color:var(--danger);">🗑️</button>';
     html += '</div></div>';
     if (cl.contact) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">👤 ' + cl.contact + '</div>';
-    if (cl.phone) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📞 <a href="tel:' + cl.phone + '" style="color:var(--accent);text-decoration:none;">' + cl.phone + '</a></div>';
+    if (cl.phone) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;display:flex;align-items:center;gap:6px;">' + telButton(cl.phone) + '<span>' + cl.phone + '</span></div>';
     if (cl.addr) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📍 ' + cl.addr + '</div>';
     if (cl.commissionRate) html += '<div style="font-size:13px;color:var(--purple);margin-bottom:2px;">💰 수수료 ' + cl.commissionRate + '%</div>';
     if (jobCount > 0) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;">작업 ' + jobCount + '건</div>';
@@ -4933,7 +4943,7 @@ function renderContacts() {
       var phones = cust.phones || (cust.phone ? [{label:'', number:cust.phone}] : []);
       var phoneHtml = phones.map(function(p){
         var lbl = p.label ? '<span style="color:var(--text3);font-size:11px;">('+p.label+') </span>' : '';
-        return '<div class="contact-phone">📞 ' + lbl + p.number + '</div>';
+        return '<div class="contact-phone" style="display:flex;align-items:center;gap:6px;">' + telButton(p.number) + '<span>' + lbl + p.number + '</span></div>';
       }).join('');
       html += '<div class="contact-card" onclick="openCustomerForm(' + cust.id + ')" style="border-left:3px solid var(--accent);">'
         + '<div class="contact-name">' + (cust.name||'-') + '</div>'
@@ -4951,7 +4961,7 @@ function renderContacts() {
     html += sorted.map(function(j){ return '<div class="contact-card" onclick="showDetail('+j.id+')">'
       + '<div class="contact-name">'+j.name+'</div>'
       + '<div class="contact-addr">'+j.addr+'</div>'
-      + (j.phone?'<div class="contact-phone">📞 '+j.phone+'</div>':'')
+      + (j.phone?'<div class="contact-phone" style="display:flex;align-items:center;gap:6px;">'+telButton(j.phone)+'<span>'+j.phone+'</span></div>':'')
       + '</div>'; }).join('');
   }
 

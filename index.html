@@ -666,9 +666,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
     </div>
     <div class="main-stats" style="margin-top:6px;">
-      <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이달 순수익</div></div>
-      <div class="stat-card"><div class="stat-num accent" id="ms-year-revenue" style="font-size:16px;">0</div><div class="stat-label">올해 순수익</div></div>
-      <div class="stat-card"><div class="stat-num" id="ms-total-revenue" style="font-size:16px;color:var(--text1);">0</div><div class="stat-label">전체 순수익</div></div>
+      <div class="stat-card"><div class="stat-num accent" id="ms-week-revenue">0</div><div class="stat-label">이번주 순수익</div></div>
+      <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이번달 순수익</div></div>
+      <div class="stat-card"><div class="stat-num" id="ms-month-sales" style="color:var(--text1);">0</div><div class="stat-label">이번달 매출</div></div>
     </div>
   </div>
   <div class="page-body" style="padding:0;">
@@ -2677,36 +2677,47 @@ function updateMainStats() {
   const commission = doneJobs.reduce((s,j) => s + (j.commission||0), 0);
   const netRevenue = revenue - commission;
 
-  // 1년 누적
-  const yearDone = _jobs.filter(j => (j.date||'').startsWith(yearPrefix) && j.status === 'done');
-  const yearRevenue = yearDone.reduce((s,j) => s + jobTotal(j), 0);
-  const yearComm = yearDone.reduce((s,j) => s + (j.commission||0), 0);
-  const yearNet = yearRevenue - yearComm;
-
-  // 전체 누적
-  const allDone = _jobs.filter(j => j.status === 'done');
-  const totalRevenue = allDone.reduce((s,j) => s + jobTotal(j), 0);
-  const totalComm = allDone.reduce((s,j) => s + (j.commission||0), 0);
-  const totalNet = totalRevenue - totalComm;
+  // 이번주 순수익 (이번주 월요일~일요일 기준)
+  const weekStart = new Date(now);
+  const dayOfWeek = weekStart.getDay(); // 0=일, 1=월...
+  const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 월요일까지 거슬러
+  weekStart.setDate(weekStart.getDate() - diffToMon);
+  weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.getFullYear() + '-' + String(weekStart.getMonth()+1).padStart(2,'0') + '-' + String(weekStart.getDate()).padStart(2,'0');
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekEndStr = weekEnd.getFullYear() + '-' + String(weekEnd.getMonth()+1).padStart(2,'0') + '-' + String(weekEnd.getDate()).padStart(2,'0');
+  const weekDone = _jobs.filter(j => {
+    var d = j.date || '';
+    return j.status === 'done' && d >= weekStartStr && d <= weekEndStr;
+  });
+  const weekRevenue = weekDone.reduce((s,j) => s + jobTotal(j), 0);
+  const weekComm = weekDone.reduce((s,j) => s + (j.commission||0), 0);
+  const weekNet = weekRevenue - weekComm;
 
   // 자재 비용 합계
   const materialTotal = (_materials || []).reduce((s,m) => s + (m.amount||0), 0);
 
   const el1 = document.getElementById('ms-done');
   const el2 = document.getElementById('ms-pending');
-  const el3 = document.getElementById('ms-revenue');
   if (el1) el1.textContent = done;
   if (el2) el2.textContent = pending;
+
+  // 이번주 순수익
+  const elWeek = document.getElementById('ms-week-revenue');
+  if (elWeek) elWeek.textContent = fmtShort(weekComm > 0 ? weekNet : weekRevenue);
+
+  // 이번달 순수익
+  const el3 = document.getElementById('ms-revenue');
   if (el3) el3.textContent = commission > 0 ? fmtShort(netRevenue) : fmtShort(revenue);
   const label3 = document.getElementById('ms-revenue-label');
-  if (label3) label3.textContent = commission > 0 ? '이달 순수익' : '이달 수입';
+  if (label3) label3.textContent = commission > 0 ? '이번달 순수익' : '이번달 수입';
 
-  // 추가 통계
-  const el4 = document.getElementById('ms-year-revenue');
-  const el5 = document.getElementById('ms-total-revenue');
+  // 이번달 매출 (수수료 차감 전 총 매출)
+  const elMonthSales = document.getElementById('ms-month-sales');
+  if (elMonthSales) elMonthSales.textContent = fmtShort(revenue);
+
   const el6 = document.getElementById('ms-material-cost');
-  if (el4) el4.textContent = fmtShort(yearComm > 0 ? yearNet : yearRevenue);
-  if (el5) el5.textContent = fmtShort(totalComm > 0 ? totalNet : totalRevenue);
   if (el6) el6.textContent = materialTotal > 0 ? '-' + fmtShort(materialTotal) : '0';
 }
 
@@ -2801,7 +2812,7 @@ function filterCalByDay(day) {
   filtered.forEach(function(j) {
     var total = jobTotal(j);
     html += '<div class="job-card" onclick="showDetail('+j.id+')">'
-      + '<div class="job-card-top"><span class="job-name">' + j.name + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span>' : '') + '</span>'
+      + '<div class="job-card-top"><span class="job-name">' + j.name + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span> <a href="tel:' + j.phone.replace(/[^0-9]/g,'') + '" onclick="event.stopPropagation()" style="text-decoration:none;font-size:14px;">📞</a>' : '') + '</span>'
       + '<span class="badge '+j.status+'">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수') + '</span></div>'
       + '<div class="job-meta">📅 '+j.date+' · 📍 '+(j.addr||'')+'</div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
@@ -2877,7 +2888,7 @@ function renderCalendar() {
       const asCount = (j.asHistory||[]).length;
       return '<div class="job-card'+(asCount>0?(j.asHistory.slice(-1)[0]?.status==='as-done'?' as-done':' has-as'):'')
         +'" onclick="showDetail('+j.id+')">'
-        +'<div class="job-card-top"><span class="job-name">'+j.name+(j.phone?' <span style="font-size:12px;font-weight:400;color:var(--text2);">'+j.phone+'</span>':'')+'</span>'
+        +'<div class="job-card-top"><span class="job-name">'+j.name+(j.phone?' <span style="font-size:12px;font-weight:400;color:var(--text2);">'+j.phone+'</span> <a href="tel:'+j.phone.replace(/[^0-9]/g,'')+'" onclick="event.stopPropagation()" style="text-decoration:none;font-size:14px;">📞</a>':'')+'</span>'
         +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수')+'</span></div>'
         +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'

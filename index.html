@@ -781,7 +781,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         </select>
       </div>
       <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea></div>
-      <div class="form-group"><label class="form-label">조치 내용</label><textarea class="form-textarea" id="f-action" placeholder="작업 내용 기록" style="min-height:180px;"></textarea></div>
+      <div class="form-group"><label class="form-label">조치 내용</label><textarea class="form-textarea" id="f-action" placeholder="작업 내용 기록" style="min-height:180px;"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeActionBox(60)" style="flex:1;">➕ 칸 늘리기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeActionBox(-60)" style="flex:1;">➖ 칸 줄이기</button>
+        </div>
+      </div>
       <div class="form-group"><label class="form-label">조치 후 상태</label><textarea class="form-textarea" id="f-after-desc" placeholder="완료 후 상태"></textarea></div>
       <div class="form-group"><label class="form-label">전문가 소견</label><textarea class="form-textarea" id="f-expert-opinion" placeholder="기술자 소견"></textarea></div>
     </div>
@@ -1866,6 +1871,17 @@ function formatPhoneNumber(v) {
   var el = {value: (v||'')};
   formatPhoneInput(el);
   return el.value;
+}
+
+// 조치 내용 칸 높이 조절
+function resizeActionBox(delta) {
+  var ta = document.getElementById('f-action');
+  if (!ta) return;
+  var cur = parseInt(ta.style.height || ta.offsetHeight) || 180;
+  var next = cur + delta;
+  if (next < 100) next = 100;   // 최소
+  if (next > 500) next = 500;   // 최대
+  ta.style.height = next + 'px';
 }
 
 // 카카오톡 스타일 전화 걸기 버튼 HTML 생성 (공용)

@@ -3958,10 +3958,13 @@ async function saveJob() {
   _isSaving = true;
   var saveBtn = document.querySelector('#page-field .btn-primary[onclick="saveJob()"]');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중...'; }
-  const name = document.getElementById('f-name').value.trim();
+  var name = document.getElementById('f-name').value.trim();
   const addr = document.getElementById('f-addr').value.trim();
   const date = document.getElementById('f-date').value;
-  if (!name || !addr || !date) { showToast('고객명, 주소, 작업일은 필수입니다'); _isSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; } return; }
+  const statusVal = document.getElementById('f-status').value;
+  // "의뢰" 상태는 아직 고객명을 모를 수 있으므로 이름 없이 저장 허용 (자동으로 "미정")
+  if (!name && statusVal === 'request') { name = '미정'; }
+  if (!name || !addr || !date) { showToast(statusVal === 'request' ? '주소, 작업일은 필수입니다' : '고객명, 주소, 작업일은 필수입니다'); _isSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 저장'; } return; }
   const addrDetail = document.getElementById('f-addr-detail').value.trim();
   const fullAddr = addrDetail ? (addr + ' ' + addrDetail) : addr;
   const costItems = getCostItems();

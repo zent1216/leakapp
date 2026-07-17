@@ -731,6 +731,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <button class="topbar-action" style="color:var(--red);" onclick="resetForm()">초기화</button>
   </div>
   <div class="page-body">
+    <div class="form-card" style="border:1px solid var(--accent);">
+      <div class="form-card-title">⚡ 빠른 입력 (붙여넣기)</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">전화번호 / 주소 / 내용 형식으로 붙여넣고 분류 버튼을 누르세요.<br>예: 010-1234-5678 / 강남구 테헤란로 123 302호 / 화장실 누수</div>
+      <textarea class="form-textarea" id="f-quick-paste" placeholder="아래 형식으로 붙여넣으세요&#10;&#10;010-1234-5678 / 강남구 테헤란로 123 302호 / 화장실 누수&#10;&#10;(순서가 바뀌어도 자동 인식됩니다)" style="min-height:90px;"></textarea>
+      <button type="button" class="btn btn-primary" onclick="parseQuickPaste()" style="width:100%;margin-top:8px;">📋 분류해서 의뢰 만들기</button>
+    </div>
     <div class="form-card">
       <div class="form-card-title">👤 고객 정보</div>
       <div class="form-group">
@@ -780,15 +786,30 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>베란다 방수</option><option>메인관 누수</option><option>공용부 누수</option><option>스프링쿨러 누수</option><option>기타</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea></div>
-      <div class="form-group"><label class="form-label">조치 내용</label><textarea class="form-textarea" id="f-action" placeholder="작업 내용 기록" style="min-height:180px;"></textarea>
+      <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeActionBox(60)" style="flex:1;">➕ 칸 늘리기</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeActionBox(-60)" style="flex:1;">➖ 칸 줄이기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-before',60)" style="flex:1;">➕ 칸 늘리기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-before',-60)" style="flex:1;">➖ 칸 줄이기</button>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">조치 후 상태</label><textarea class="form-textarea" id="f-after-desc" placeholder="완료 후 상태"></textarea></div>
-      <div class="form-group"><label class="form-label">전문가 소견</label><textarea class="form-textarea" id="f-expert-opinion" placeholder="기술자 소견"></textarea></div>
+      <div class="form-group"><label class="form-label">조치 내용</label><textarea class="form-textarea" id="f-action" placeholder="작업 내용 기록" style="min-height:180px;"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-action',60)" style="flex:1;">➕ 칸 늘리기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-action',-60)" style="flex:1;">➖ 칸 줄이기</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">조치 후 상태</label><textarea class="form-textarea" id="f-after-desc" placeholder="완료 후 상태"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-after-desc',60)" style="flex:1;">➕ 칸 늘리기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-after-desc',-60)" style="flex:1;">➖ 칸 줄이기</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">전문가 소견</label><textarea class="form-textarea" id="f-expert-opinion" placeholder="기술자 소견"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-expert-opinion',60)" style="flex:1;">➕ 칸 늘리기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-expert-opinion',-60)" style="flex:1;">➖ 칸 줄이기</button>
+        </div>
+      </div>
     </div>
     <div class="form-card">
       <div class="form-card-title">💰 비용 내역</div>
@@ -1873,13 +1894,81 @@ function formatPhoneNumber(v) {
   return el.value;
 }
 
-// 조치 내용 칸 높이 조절
-function resizeActionBox(delta) {
-  var ta = document.getElementById('f-action');
+// 빠른 입력: "전화번호 / 주소 / 내용" 붙여넣기 → 분류해서 폼 채우기 (의뢰 상태)
+function parseQuickPaste() {
+  var raw = (document.getElementById('f-quick-paste').value || '').trim();
+  if (!raw) { showToast('붙여넣을 내용을 입력해주세요'); return; }
+
+  var phone = '', addr = '', content = '';
+
+  // 슬래시(/)로 구분된 경우 우선 처리
+  if (raw.indexOf('/') >= 0) {
+    var parts = raw.split('/').map(function(s){ return s.trim(); });
+    // 각 조각에서 전화번호/주소/내용 판별
+    parts.forEach(function(p) {
+      if (!p) return;
+      var digits = p.replace(/[^0-9]/g, '');
+      // 전화번호로 보이는 조각 (숫자 9~12개, 다른 글자 거의 없음)
+      if (!phone && digits.length >= 9 && digits.length <= 12 && /^[0-9\s-]+$/.test(p)) {
+        phone = p;
+      } else if (!addr && /(시|구|동|읍|면|리|로|길|번지|아파트|빌라|층|호)/.test(p)) {
+        addr = p;
+      } else {
+        content += (content ? ' ' : '') + p;
+      }
+    });
+    // 주소를 못 찾았으면, 전화번호도 내용도 아닌 걸 주소로
+    if (!addr) {
+      parts.forEach(function(p){
+        if (p && p !== phone && content.indexOf(p) < 0 && !addr) addr = p;
+      });
+    }
+  } else {
+    // 슬래시 없으면: 전체에서 전화번호 패턴 추출, 나머지에서 주소 추정
+    var phoneMatch = raw.match(/01[016789][-\s]?\d{3,4}[-\s]?\d{4}|050[0-9][-\s]?\d{4}[-\s]?\d{4}|0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4}/);
+    if (phoneMatch) phone = phoneMatch[0];
+    var rest = phone ? raw.replace(phone, '').trim() : raw;
+    // 주소 키워드가 있는 부분 찾기 (줄 단위)
+    var lines = rest.split(/[\n,]/).map(function(s){return s.trim();}).filter(Boolean);
+    lines.forEach(function(line){
+      if (!addr && /(시|구|동|읍|면|리|로|길|번지|아파트|빌라|층|호)/.test(line)) {
+        addr = line;
+      } else {
+        content += (content ? ' ' : '') + line;
+      }
+    });
+  }
+
+  // 폼 채우기
+  resetForm();
+  if (phone) document.getElementById('f-phone').value = formatPhoneNumber(phone);
+  if (addr) document.getElementById('f-addr').value = addr;
+  if (content) document.getElementById('f-before').value = content;
+  // 상태를 "의뢰"로
+  var statusSel = document.getElementById('f-status');
+  if (statusSel) statusSel.value = 'request';
+  // 날짜는 오늘로
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+
+  // 빠른입력 칸 비우기
+  document.getElementById('f-quick-paste').value = '';
+
+  var msg = '분류 완료 ✓';
+  var found = [];
+  if (phone) found.push('전화');
+  if (addr) found.push('주소');
+  if (content) found.push('내용');
+  if (found.length) msg = found.join('·') + ' 인식 → 의뢰로 설정됨';
+  showToast(msg);
+}
+
+// textarea 높이 조절 (범용)
+function resizeBox(id, delta) {
+  var ta = document.getElementById(id);
   if (!ta) return;
-  var cur = parseInt(ta.style.height || ta.offsetHeight) || 180;
+  var cur = parseInt(ta.style.height) || ta.offsetHeight || 80;
   var next = cur + delta;
-  if (next < 100) next = 100;   // 최소
+  if (next < 60) next = 60;     // 최소
   if (next > 500) next = 500;   // 최대
   ta.style.height = next + 'px';
 }

@@ -1939,10 +1939,34 @@ function parseQuickPaste() {
     });
   }
 
+  // 주소를 기본주소/상세주소로 분리
+  // "402동 401호", "3층", "B동 201호" 같은 패턴부터 상세주소로
+  var addrBase = addr, addrDetail = '';
+  if (addr) {
+    // 동/호/층 후보를 모두 찾아서, 조건에 맞는 첫 위치에서 분리
+    // (행정동 예: "구월동"은 앞이 지역명이라 조건 불충족 → 건너뜀)
+    var re = /\s((?:[0-9A-Za-z가-힣]{1,6})(?:동|호|층))(?=\s|$)/g;
+    var mm;
+    while ((mm = re.exec(addr)) !== null) {
+      var beforePart = addr.slice(0, mm.index).trim();
+      // 앞부분이 건물번호(숫자) 또는 도로명/건물명으로 끝나면 여기서부터 상세주소
+      if (/\d\s*$/.test(beforePart) || /(로|길|번지|아파트|빌라|빌딩|오피스텔|타워|하이츠|캐슬|팰리스|파크|맨션)$/.test(beforePart)) {
+        // 단, 후보가 숫자/영문+동·호·층 이어야 함 (한글 행정동 배제: 402동 O, 구월동 X)
+        var token = mm[1];
+        if (/^[0-9A-Za-z]+(동|호|층)$/.test(token)) {
+          addrBase = beforePart;
+          addrDetail = addr.slice(mm.index).trim();
+          break;
+        }
+      }
+    }
+  }
+
   // 폼 채우기
   resetForm();
   if (phone) document.getElementById('f-phone').value = formatPhoneNumber(phone);
-  if (addr) document.getElementById('f-addr').value = addr;
+  if (addrBase) document.getElementById('f-addr').value = addrBase;
+  if (addrDetail) document.getElementById('f-addr-detail').value = addrDetail;
   if (content) document.getElementById('f-before').value = content;
   // 상태를 "의뢰"로
   var statusSel = document.getElementById('f-status');
@@ -1971,6 +1995,16 @@ function resizeBox(id, delta) {
   if (next < 60) next = 60;     // 최소
   if (next > 500) next = 500;   // 최대
   ta.style.height = next + 'px';
+}
+
+// 네비게이션 버튼 HTML 생성 (공용) - geo: 링크로 안드로이드 앱 선택 팝업
+function navButton(addr) {
+  if (!addr) return '';
+  var q = encodeURIComponent(String(addr).trim());
+  if (!q) return '';
+  return '<a href="geo:0,0?q=' + q + '" onclick="event.stopPropagation()" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#2a2a2e;border-radius:9px;vertical-align:middle;">'
+    + '<svg viewBox="0 0 24 24" width="14" height="14" fill="#60a5fa"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>'
+    + '</a>';
 }
 
 // 카카오톡 스타일 전화 걸기 버튼 HTML 생성 (공용)
@@ -2929,7 +2963,7 @@ function filterCalByDay(day) {
     html += '<div class="job-card" onclick="showDetail('+j.id+')">'
       + '<div class="job-card-top"><span class="job-name">' + j.name + (j.phone ? ' <span style="font-size:12px;font-weight:400;color:var(--text2);">' + j.phone + '</span> <a href="tel:' + j.phone.replace(/[^0-9]/g,'') + '" onclick="event.stopPropagation()" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#2a2a2e;border-radius:9px;vertical-align:middle;"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"#4ade80\"><path d=\"M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z\"/></svg></a>' : '') + '</span>'
       + '<span class="badge '+j.status+'">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수') + '</span></div>'
-      + '<div class="job-meta">📅 '+j.date+' · 📍 '+(j.addr||'')+'</div>'
+      + '<div class="job-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>📅 '+j.date+' · 📍 '+(j.addr||'')+'</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
       + '<span class="job-amount">' + fmtMoney(total) + ((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'') + '</span>'
       + '</div></div>';
@@ -3005,7 +3039,7 @@ function renderCalendar() {
         +'" onclick="showDetail('+j.id+')">'
         +'<div class="job-card-top"><span class="job-name">'+j.name+(j.phone?' <span style="font-size:12px;font-weight:400;color:var(--text2);">'+j.phone+'</span> <a href="tel:'+j.phone.replace(/[^0-9]/g,'')+'" onclick="event.stopPropagation()" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#2a2a2e;border-radius:9px;vertical-align:middle;"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"#4ade80\"><path d=\"M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z\"/></svg></a>':'')+'</span>'
         +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수')+'</span></div>'
-        +'<div class="job-meta">📅 '+j.date+' · 📍 '+j.addr+'</div>'
+        +'<div class="job-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>📅 '+j.date+' · 📍 '+j.addr+'</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
         +'<span class="job-amount">'+fmtMoney(total)+((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+'</span>'
         +(asCount>0?'<span style="font-size:11px;color:var(--purple);">🔧 AS '+asCount+'건</span>':'')
@@ -3113,7 +3147,7 @@ function showDetail(id) {
     }).join('');
     html += '<div class="info-row"><div class="info-key">추가 연락처</div><div class="info-val">' + extraPhonesHtml + '</div></div>';
   }
-  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val">' + (j.addr||'-') + (j.location?' ('+j.location+')':'') + '</div></div>';
+  html += '<div class="info-row"><div class="info-key">주소</div><div class="info-val" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>' + (j.addr||'-') + (j.location?' ('+j.location+')':'') + '</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div></div>';
   html += '<div class="info-row"><div class="info-key">유형</div><div class="info-val">' + (j.type||'-') + '</div></div>';
   html += '</div>';
 

@@ -2082,6 +2082,7 @@ function renderCompaniesPage() {
     if (cl.phone) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;display:flex;align-items:center;gap:6px;">' + telButton(cl.phone) + '<span>' + cl.phone + '</span></div>';
     if (cl.addr) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📍 ' + cl.addr + '</div>';
     if (cl.commissionRate) html += '<div style="font-size:13px;color:var(--purple);margin-bottom:2px;">💰 수수료 ' + cl.commissionRate + '%</div>';
+    if (cl.account) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;cursor:pointer;" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + cl.account.replace(/'/g,'') + '\').then(function(){showToast(\'계좌번호 복사됨 ✓\');});">🏦 ' + cl.account + ' <span style="font-size:11px;color:var(--accent);">(탭하여 복사)</span></div>';
     if (jobCount > 0) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;">작업 ' + jobCount + '건</div>';
     html += '</div>';
   });
@@ -3457,11 +3458,12 @@ function openClientForm(id) {
     document.getElementById('cf-phone').value = c.phone || '';
     document.getElementById('cf-addr').value = c.addr || '';
     document.getElementById('cf-commission-rate').value = c.commissionRate || '';
+    document.getElementById('cf-account').value = c.account || '';
     document.getElementById('cf-memo').value = c.memo || '';
     if (delBtn) delBtn.style.display = 'block';
   } else {
     titleEl.textContent = '새 의뢰처 추가';
-    ['cf-name','cf-contact','cf-phone','cf-addr','cf-commission-rate','cf-memo'].forEach(function(f){
+    ['cf-name','cf-contact','cf-phone','cf-addr','cf-commission-rate','cf-account','cf-memo'].forEach(function(f){
       const el = document.getElementById(f);
       if (el) el.value = '';
     });
@@ -3485,6 +3487,7 @@ async function saveClient() {
     phone: document.getElementById('cf-phone').value.trim(),
     addr: document.getElementById('cf-addr').value.trim(),
     commissionRate: parseFloat(document.getElementById('cf-commission-rate').value) || 0,
+    account: document.getElementById('cf-account').value.trim(),
     memo: document.getElementById('cf-memo').value.trim(),
   };
   if (_editingClientId) {
@@ -6734,6 +6737,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)"></div>
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
       <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
+      <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="cf-account" placeholder="예: 국민 123-456-789012 (예금주)"></div>
       <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="cf-memo" placeholder="결제 조건, 특이사항 등"></textarea></div>
       <div class="btn-group">
         <button class="btn btn-danger" id="cf-delete-btn" onclick="deleteClient()" style="display:none;">🗑️ 삭제</button>

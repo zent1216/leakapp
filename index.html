@@ -1057,6 +1057,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="topbar-title">의뢰처 <span>관리</span></div>
     <button class="topbar-action" onclick="openClientForm(null)">+ 추가</button>
   </div>
+  <div style="padding:10px 14px 0;">
+    <input class="form-input" id="company-search" placeholder="🔍 의뢰처 검색 (업체명/담당자/전화)" oninput="renderCompaniesPage()" style="width:100%;">
+  </div>
   <div class="page-body" id="companies-body"></div>
 </div>
 
@@ -2067,10 +2070,30 @@ function renderCompaniesPage() {
     body.innerHTML = '<div class="empty-state" style="padding-top:60px;"><div class="empty-icon">🏢</div><div class="empty-text">등록된 의뢰처가 없습니다</div><div class="empty-sub">+ 추가 버튼으로 의뢰처를 등록하세요</div></div>';
     return;
   }
-  var sorted = _clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+  // 검색어 필터
+  var q = (document.getElementById('company-search')?.value || '').trim().toLowerCase();
+  var list = _clients.slice();
+  if (q) {
+    list = list.filter(function(cl){
+      return (cl.name||'').toLowerCase().indexOf(q) >= 0
+        || (cl.contact||'').toLowerCase().indexOf(q) >= 0
+        || (cl.phone||'').replace(/[^0-9]/g,'').indexOf(q.replace(/[^0-9]/g,'')) >= 0 && q.replace(/[^0-9]/g,'') !== ''
+        || (cl.memo||'').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  var sorted = list.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+  if (!sorted.length) {
+    body.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-icon">🔍</div><div class="empty-text">검색 결과가 없습니다</div></div>';
+    return;
+  }
+
   var html = '<div style="padding:4px 0;">';
   sorted.forEach(function(cl) {
-    var jobCount = _jobs.filter(function(j){ return j.clientCompany === cl.name; }).length;
+    var clientJobs = _jobs.filter(function(j){ return j.clientCompany === cl.name; });
+    var jobCount = clientJobs.length;
     html += '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-bottom:8px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
     html += '<span style="font-size:15px;font-weight:700;">' + (cl.name||'') + '</span>';
@@ -2083,11 +2106,40 @@ function renderCompaniesPage() {
     if (cl.addr) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;">📍 ' + cl.addr + '</div>';
     if (cl.commissionRate) html += '<div style="font-size:13px;color:var(--purple);margin-bottom:2px;">💰 수수료 ' + cl.commissionRate + '%</div>';
     if (cl.account) html += '<div style="font-size:13px;color:var(--text2);margin-bottom:2px;cursor:pointer;" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + cl.account.replace(/'/g,'') + '\').then(function(){showToast(\'계좌번호 복사됨 ✓\');});">🏦 ' + cl.account + ' <span style="font-size:11px;color:var(--accent);">(탭하여 복사)</span></div>';
-    if (jobCount > 0) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;">작업 ' + jobCount + '건</div>';
+    // 작업 건수 → 탭하면 하위 목록 펼치기
+    if (jobCount > 0) {
+      html += '<div onclick="toggleClientJobs(' + cl.id + ')" style="font-size:13px;color:var(--accent);margin-top:6px;cursor:pointer;font-weight:600;">📋 작업 ' + jobCount + '건 <span id="cl-arrow-' + cl.id + '">▼</span></div>';
+      html += '<div id="cl-jobs-' + cl.id + '" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">';
+      var sortedJobs = clientJobs.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+      sortedJobs.forEach(function(j){
+        var statusTxt = j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'';
+        html += '<div onclick="event.stopPropagation();showDetail(' + j.id + ')" style="font-size:12px;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px;">'
+          + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (j.date||'') + ' · ' + (j.name||'') + ' · ' + (j.addr||'') + '</span>'
+          + '<span class="badge ' + j.status + '" style="flex-shrink:0;font-size:10px;">' + statusTxt + '</span>'
+          + '</div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;">작업 없음</div>';
+    }
     html += '</div>';
   });
   html += '</div>';
   body.innerHTML = html;
+}
+
+// 의뢰처 작업 하위목록 펼치기/접기
+function toggleClientJobs(clientId) {
+  var el = document.getElementById('cl-jobs-' + clientId);
+  var arrow = document.getElementById('cl-arrow-' + clientId);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (arrow) arrow.textContent = '▲';
+  } else {
+    el.style.display = 'none';
+    if (arrow) arrow.textContent = '▼';
+  }
 }
 
 function deleteClientFromPage(id) {
@@ -6081,12 +6133,42 @@ function doJobSearch() {
     listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색어를 입력하거나 날짜를 선택하세요</div>';
     return;
   }
-  countEl.textContent = '검색 결과: ' + results.length + '건';
-  if (!results.length) {
+  // 의뢰처 검색 (키워드 있을 때만)
+  var clientResults = [];
+  if (kw) {
+    clientResults = _clients.filter(function(cl){
+      var sv = [cl.name, cl.contact, cl.phone, cl.memo, cl.addr].filter(Boolean).join(' ').toLowerCase();
+      var kwDigits = kw.replace(/[^0-9]/g,'');
+      if (sv.indexOf(kw) >= 0) return true;
+      if (kwDigits && (cl.phone||'').replace(/[^0-9]/g,'').indexOf(kwDigits) >= 0) return true;
+      return false;
+    });
+  }
+
+  countEl.textContent = '검색 결과: 작업 ' + results.length + '건' + (clientResults.length ? ' · 의뢰처 ' + clientResults.length + '건' : '');
+
+  if (!results.length && !clientResults.length) {
     listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">검색 결과가 없습니다</div>';
     return;
   }
+
   var html = '';
+
+  // ── 의뢰처 결과 섹션 ──
+  if (clientResults.length) {
+    html += '<div style="font-size:12px;color:var(--text3);font-weight:600;margin:4px 0 6px;">🏢 의뢰처 (' + clientResults.length + ')</div>';
+    clientResults.forEach(function(cl){
+      var jc = _jobs.filter(function(j){ return j.clientCompany === cl.name; }).length;
+      html += '<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;margin-bottom:4px;background:var(--bg3);border-radius:var(--r-sm);" onclick="closeModal(\'search-modal\');goPage(\'page-companies\');">';
+      html += '<div style="font-size:14px;font-weight:700;">🏢 ' + (cl.name||'') + '</div>';
+      if (cl.contact) html += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">👤 ' + cl.contact + '</div>';
+      if (cl.phone) html += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">📞 ' + cl.phone + '</div>';
+      html += '<div style="font-size:11px;color:var(--text3);margin-top:2px;">작업 ' + jc + '건 · 수수료 ' + (cl.commissionRate||0) + '%</div>';
+      html += '</div>';
+    });
+    if (results.length) html += '<div style="font-size:12px;color:var(--text3);font-weight:600;margin:12px 0 6px;">🔧 작업 (' + results.length + ')</div>';
+  }
+
   results.forEach(function(j) {
     var statusColor = j.status==='done'?'var(--green)':j.status==='cancel'?'var(--red)':'var(--orange)';
     var statusText = j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='cancel'?'취소':j.status==='request'?'의뢰':'미수';

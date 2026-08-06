@@ -2145,6 +2145,12 @@ function toggleClientJobs(clientId) {
 function deleteClientFromPage(id) {
   var cl = _clients.find(function(x){ return x.id === id; });
   if (!cl) return;
+  // 등록된 작업(현장)이 있으면 삭제 차단
+  var linkedJobs = _jobs.filter(function(j){ return j.clientCompany === cl.name; });
+  if (linkedJobs.length > 0) {
+    alert('⚠️ "' + cl.name + '" 의뢰처를 삭제할 수 없습니다.\n\n이 의뢰처에 등록된 현장이 ' + linkedJobs.length + '건 있습니다.\n현장을 먼저 삭제하거나 다른 의뢰처로 변경한 후 삭제해주세요.');
+    return;
+  }
   if (!confirm('"' + cl.name + '" 의뢰처를 삭제하시겠습니까?')) return;
   _clients = _clients.filter(function(x){ return x.id !== id; });
   saveClients();
@@ -3452,8 +3458,24 @@ function renderClientList() {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">등록된 의뢰처가 없습니다</div></div>';
     return;
   }
+  // 검색 필터
+  var q = (document.getElementById('client-picker-search')?.value || '').trim().toLowerCase();
+  var filtered = _clients.slice();
+  if (q) {
+    var qDigits = q.replace(/[^0-9]/g,'');
+    filtered = filtered.filter(function(cl){
+      if ((cl.name||'').toLowerCase().indexOf(q) >= 0) return true;
+      if ((cl.contact||'').toLowerCase().indexOf(q) >= 0) return true;
+      if (qDigits && (cl.phone||'').replace(/[^0-9]/g,'').indexOf(qDigits) >= 0) return true;
+      return false;
+    });
+  }
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:30px 0;"><div class="empty-icon">🔍</div><div class="empty-text">검색 결과가 없습니다</div></div>';
+    return;
+  }
   // 가나다순 정렬
-  const sorted = _clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  const sorted = filtered.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
   list.innerHTML = sorted.map(function(c) {
     return '<div class="client-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:8px;cursor:pointer;" onclick="selectClient(' + c.id + ')">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
@@ -3469,6 +3491,8 @@ function renderClientList() {
 
 // 의뢰처 선택 모달 열기
 function openClientPicker() {
+  var s = document.getElementById('client-picker-search');
+  if (s) s.value = '';
   renderClientList();
   document.getElementById('client-picker-modal').classList.add('open');
 }
@@ -3560,6 +3584,15 @@ async function saveClient() {
 // 의뢰처 삭제
 async function deleteClient() {
   if (!_editingClientId) return;
+  var cl = _clients.find(function(x){ return x.id === _editingClientId; });
+  // 등록된 작업(현장)이 있으면 삭제 차단
+  if (cl) {
+    var linkedJobs = _jobs.filter(function(j){ return j.clientCompany === cl.name; });
+    if (linkedJobs.length > 0) {
+      alert('⚠️ "' + cl.name + '" 의뢰처를 삭제할 수 없습니다.\n\n이 의뢰처에 등록된 현장이 ' + linkedJobs.length + '건 있습니다.\n현장을 먼저 삭제하거나 다른 의뢰처로 변경한 후 삭제해주세요.');
+      return;
+    }
+  }
   if (!confirm('이 의뢰처를 삭제하시겠습니까?')) return;
   _clients = _clients.filter(function(c){ return c.id !== _editingClientId; });
   await saveClients();
@@ -6801,6 +6834,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-body">
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">저장된 의뢰처를 선택하거나 새로 추가할 수 있어요</div>
       <button class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="openClientForm(null)">+ 새 의뢰처 추가</button>
+      <input class="form-input" id="client-picker-search" placeholder="🔍 의뢰처 검색 (업체명/담당자/전화)" oninput="renderClientList()" style="width:100%;margin-bottom:12px;">
       <div id="client-list"></div>
     </div>
   </div>

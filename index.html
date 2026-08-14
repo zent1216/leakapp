@@ -760,6 +760,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <button class="btn btn-secondary btn-sm" onclick="openClientPicker()" style="padding:0;">📋 선택</button>
         </div>
         <div id="client-suggestions" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);margin-top:4px;max-height:150px;overflow-y:auto;"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="f-is-trip-fee" onchange="onTripFeeToggle()" style="width:16px;height:16px;">
+          <span>🚗 출장비 (수수료 자동계산 제외)</span>
+        </label>
+      </div>
       <div class="form-group" style="margin-top:12px;"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
@@ -3370,6 +3375,7 @@ function resetForm() {
   _tempPhotos = {before:[null,null,null], after:[null,null,null]};
   var fpe = document.getElementById('f-phones-extra');
   if (fpe) fpe.innerHTML = '';
+  if (document.getElementById('f-is-trip-fee')) document.getElementById('f-is-trip-fee').checked = false;
   document.getElementById('field-title').innerHTML = '새 <span>작업</span>';
   ['f-name','f-phone','f-addr','f-addr-detail','f-location','f-before','f-action','f-after-desc','f-expert-opinion','f-memo','f-client-company'].forEach(id => {
     const el = document.getElementById(id);
@@ -3405,6 +3411,7 @@ function editJob(id) {
   document.getElementById('f-name').value = j.name || '';
   document.getElementById('f-phone').value = j.phone || '';
   fillFieldPhones(j.phones || []);
+  if (document.getElementById('f-is-trip-fee')) document.getElementById('f-is-trip-fee').checked = j.isTripFee || false;
   document.getElementById('f-addr').value = j.addrBase || j.addr || '';
   document.getElementById('f-addr-detail').value = j.addrDetail || '';
   document.getElementById('f-location').value = j.location || '';
@@ -3518,12 +3525,41 @@ function openClientPicker() {
 }
 
 // 의뢰처 선택 → 현장 폼에 반영
+// 출장비 체크 토글: 체크하면 기존 수수료 제거
+function onTripFeeToggle() {
+  var checked = document.getElementById('f-is-trip-fee').checked;
+  if (checked) {
+    // 현재 입력된 수수료 항목 모두 제거
+    var container = document.getElementById('commission-list');
+    if (container) container.innerHTML = '';
+    showToast('출장비로 설정 - 수수료 자동계산이 제외됩니다');
+  } else {
+    // 체크 해제 시, 의뢰처가 선택돼 있으면 다시 자동계산
+    var company = document.getElementById('f-client-company').value.trim();
+    if (company) {
+      var cl = _clients.find(function(x){ return x.name === company; });
+      if (cl && cl.commissionRate) {
+        var total = getCostItemsTotal();
+        var amount = Math.round(total * cl.commissionRate / 100);
+        if (total > 0 && typeof addCommissionRow === 'function') {
+          var comms = getCommissions();
+          if (!comms.some(function(cm){ return cm.name === cl.name; })) {
+            addCommissionRow(cl.name + ' (' + cl.commissionRate + '%)', amount);
+          }
+        }
+      }
+    }
+  }
+}
+
 function selectClient(id) {
   const c = _clients.find(function(x){ return x.id === id; });
   if (!c) return;
   document.getElementById('f-client-company').value = c.name;
-  // 기본 수수료율이 있으면 자동으로 수수료 추가
-  if (c.commissionRate && c.name) {
+  // 출장비면 수수료 자동계산 안 함
+  var isTripFee = document.getElementById('f-is-trip-fee') && document.getElementById('f-is-trip-fee').checked;
+  // 기본 수수료율이 있으면 자동으로 수수료 추가 (출장비 아닐 때만)
+  if (c.commissionRate && c.name && !isTripFee) {
     // 이미 같은 업체 수수료가 있는지 확인
     const comms = getCommissions();
     const exists = comms.some(function(cm){ return cm.name === c.name; });
@@ -4092,6 +4128,7 @@ async function saveJob() {
     date,
     phone: document.getElementById('f-phone').value.trim(),
     phones: collectFieldPhones(),
+    isTripFee: (document.getElementById('f-is-trip-fee') && document.getElementById('f-is-trip-fee').checked) || false,
     location: document.getElementById('f-location').value.trim(),
     status: document.getElementById('f-status').value,
     type: document.getElementById('f-type').value,
@@ -5069,7 +5106,7 @@ function renderStats() {
       const mComm = mDone.reduce((s,j)=>s+(j.commission||0),0);
       const mNet = mRev - mComm;
       return '<div class="month-row">'
-        + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mJobs.length+'건)</span>'
+        + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mDone.length+'건)</span>'
         + '<span class="month-total">'+fmtMoney(mRev)+'</span></div>'
         + '<div class="month-jobs">'
         // 수수료/순수익 요약
@@ -5078,7 +5115,7 @@ function renderStats() {
           + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
-        + mJobs.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
+        + mDone.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
           const hasComm = (j.commission||0) > 0;
           return '<div class="month-job-row">'
             + '<div style="flex:1;">'

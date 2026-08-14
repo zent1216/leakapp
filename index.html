@@ -4677,10 +4677,11 @@ function makeOpinionHTML(j, biz, today, co, ce) {
 
 function renderReceiptEdit(j, el) {
   var insTotal = jobTotal(j);
+  var hasVat = j.payType === 'card' || j.cashReceipt;
   var html = '';
   html += '<div class="form-card">';
   html += '<div class="form-card-title">🧾 영수증 내용</div>';
-  html += '<div class="form-group"><label class="form-label">영수증 금액</label>';
+  html += '<div class="form-group"><label class="form-label">영수증 금액 ' + (hasVat ? '<span style="font-size:11px;color:var(--green);font-weight:400;">(VAT 별도 입력 → 미리보기에 VAT 포함 표시)</span>' : '<span style="font-size:11px;color:var(--text3);font-weight:400;">(VAT 없음)</span>') + '</label>';
   html += '<input class="form-input" id="receipt-amount" type="text" inputmode="numeric" oninput="formatAmountInput(this);calcInsTotal()" value="' + (j._receiptAmount !== undefined && j._receiptAmount !== null ? j._receiptAmount : insTotal).toLocaleString() + '"></div>';
   html += '<div class="form-group"><label class="form-label">수령인 (귀하)</label>';
   html += '<input class="form-input" id="receipt-to" value="' + (j._receiptTo || j.name || '') + '"></div>';
@@ -4688,9 +4689,10 @@ function renderReceiptEdit(j, el) {
   html += '<input class="form-input" id="receipt-addr" value="' + (j._receiptAddr || '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">본문</label>';
   html += '<textarea class="form-textarea" id="receipt-body" rows="3">' + (j._receiptBody || '상기 금액을 누수탐지 및 공사금액 (으)로 정히 영수합니다.') + '</textarea></div>';
-  var hasVat = j.payType === 'card' || j.cashReceipt;
   html += '<div style="margin-top:12px;padding:10px;background:' + (hasVat ? 'rgba(62,207,142,0.1)' : 'rgba(245,158,11,0.1)') + ';border-radius:8px;font-size:13px;color:var(--text1);">';
-  html += hasVat ? '✅ <b>VAT 포함</b> (' + (j.payType==='card' ? '카드결제' : '현금영수증') + ') - 영수증에 VAT 10%가 자동 추가됩니다' : '⚠️ <b>VAT 별도</b> - 영수증에 입력한 금액 그대로 표시됩니다';
+  var _ra = (j._receiptAmount !== undefined && j._receiptAmount !== '') ? Number(String(j._receiptAmount).replace(/[^0-9]/g,'')) : insTotal;
+  var _vat = Math.round(_ra * 0.1);
+  html += hasVat ? '✅ <b>VAT 포함</b> (' + (j.payType==='card' ? '카드결제' : '현금영수증') + ')<br><span style="font-size:12px;color:var(--text2);">입력 ' + _ra.toLocaleString() + '원 + VAT ' + _vat.toLocaleString() + '원 = <b style="color:var(--green);">미리보기 ' + (_ra+_vat).toLocaleString() + '원</b></span>' : '⚠️ <b>VAT 별도</b> - 입력한 금액 그대로 표시됩니다';
   html += '</div>';
   html += '</div>';
   el.innerHTML = html;

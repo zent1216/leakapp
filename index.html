@@ -4218,7 +4218,10 @@ function initDocs(type) {
   const sel = document.getElementById('doc-job-sel');
   if (sel) {
     sel.innerHTML = _jobs.length
-      ? _jobs.slice().sort((a,b)=>b.date>a.date?1:-1).map(j => '<option value="'+j.id+'">'+j.date+' · '+j.name+' · '+j.type+'</option>').join('')
+      ? _jobs.slice().sort((a,b)=>b.date>a.date?1:-1).map(function(j){
+          var tag = j.status==='unpaid' ? '🟠[미수] ' : j.status==='request' ? '🔵[의뢰] ' : j.status==='failed' ? '⚫[실패] ' : '';
+          return '<option value="'+j.id+'">'+tag+j.date+' · '+j.name+' · '+j.type+'</option>';
+        }).join('')
       : '<option value="">저장된 작업 없음</option>';
     // 특정 작업 ID가 지정된 경우 그 작업 선택 (작업 상세 → 문서 진입 시)
     if (window._pendingDocJobId !== undefined && window._pendingDocJobId !== null) {

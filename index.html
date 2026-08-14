@@ -97,8 +97,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   background:var(--bg);
   display:none;flex-direction:column;
   z-index:10;overflow:hidden;
+  visibility:hidden;
 }
-.page.active{display:flex;}
+.page.active{display:flex;visibility:visible;}
 
 /* ── 탑바 ── */
 .topbar{
@@ -683,6 +684,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="stat-card"><div class="stat-num accent" id="ms-week-revenue">0</div><div class="stat-label">이번주 순수익</div></div>
       <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이번달 순수익</div></div>
       <div class="stat-card"><div class="stat-num" id="ms-month-sales" style="color:var(--text1);">0</div><div class="stat-label">이번달 매출</div></div>
+      <div class="stat-card" style="grid-column:1/-1;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);"><div class="stat-num" id="ms-unpaid-total" style="color:#fb923c;">0</div><div class="stat-label" style="color:#fb923c;">💰 미수금 (받을 돈)</div></div>
     </div>
   </div>
   <div class="page-body" style="padding:0;">
@@ -764,7 +766,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <input type="checkbox" id="f-is-trip-fee" onchange="onTripFeeToggle()" style="width:16px;height:16px;">
           <span>🚗 출장비 (수수료 자동계산 제외)</span>
         </label>
-      </div>
       <div class="form-group" style="margin-top:12px;"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
         <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
       </div>
@@ -2944,6 +2945,14 @@ function updateMainStats() {
   const elMonthSales = document.getElementById('ms-month-sales');
   if (elMonthSales) elMonthSales.textContent = fmtShort(revenue);
 
+  // 미수금 총액 (전체 미수 상태 작업의 매출 합계)
+  const unpaidJobs = _jobs.filter(function(j){ return j.status === 'unpaid'; });
+  const unpaidTotal = unpaidJobs.reduce(function(s,j){ return s + jobTotal(j); }, 0);
+  const elUnpaid = document.getElementById('ms-unpaid-total');
+  if (elUnpaid) {
+    elUnpaid.textContent = fmtShort(unpaidTotal) + (unpaidJobs.length ? ' (' + unpaidJobs.length + '건)' : '');
+  }
+
   const el6 = document.getElementById('ms-material-cost');
   if (el6) el6.textContent = materialTotal > 0 ? '-' + fmtShort(materialTotal) : '0';
 }
@@ -3043,7 +3052,7 @@ function filterCalByDay(day) {
       + '<span class="badge '+j.status+'">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수') + '</span></div>'
       + '<div class="job-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>📅 '+j.date+' · 📍 '+(j.addr||'')+'</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
-      + '<span class="job-amount">' + fmtMoney(total) + ((j.commission||0) > 0 ? ' <span style="font-size:12px;color:var(--green);">(' + fmtMoney(total - (j.commission||0)) + ')</span>' : '') + ((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'') + '</span>'
+      + '<span class="job-amount"' + (j.status==='unpaid'?' style="color:#fb923c;"':'') + '>' + fmtMoney(total) + (j.status==='unpaid'?' <span style="font-size:10px;color:#fb923c;">미입금</span>':'') + ((j.commission||0) > 0 ? ' <span style="font-size:12px;color:var(--green);">(' + fmtMoney(total - (j.commission||0)) + ')</span>' : '') + ((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'') + '</span>'
       + '</div></div>';
   });
   list.innerHTML = html;
@@ -3119,7 +3128,7 @@ function renderCalendar() {
         +'<span class="badge '+j.status+'">'+(j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수')+'</span></div>'
         +'<div class="job-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>📅 '+j.date+' · 📍 '+j.addr+'</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        +'<span class="job-amount">'+fmtMoney(total)+((j.commission||0) > 0 ? ' <span style="font-size:12px;color:var(--green);">('+fmtMoney(total-(j.commission||0))+')</span>' : '')+((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+'</span>'
+        +'<span class="job-amount"'+(j.status==='unpaid'?' style="color:#fb923c;"':'')+'>'+fmtMoney(total)+(j.status==='unpaid'?' <span style="font-size:10px;color:#fb923c;">미입금</span>':'')+((j.commission||0) > 0 ? ' <span style="font-size:12px;color:var(--green);">('+fmtMoney(total-(j.commission||0))+')</span>' : '')+((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+'</span>'
         +(asCount>0?'<span style="font-size:11px;color:var(--purple);">🔧 AS '+asCount+'건</span>':'')
         +'</div></div>';
     }).join('');

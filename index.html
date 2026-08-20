@@ -5181,12 +5181,9 @@ function renderStats() {
   const totalRev = doneJobs.reduce((s,j)=>s+jobTotal(j), 0);
   const totalComm = doneJobs.reduce((s,j)=>s+(j.commission||0), 0);
   const netRev = totalRev - totalComm;
-  // VAT 포함 연매출 (VAT 발행 현장은 +10%, 나머지는 그대로)
-  const totalRevWithVat = doneJobs.reduce((s,j)=>{
-    var t = jobTotal(j);
-    var withVat = (j.payType === 'card' || j.cashReceipt) ? Math.round(t * 1.1) : t;
-    return s + withVat;
-  }, 0);
+  // VAT 신고 대상 매출 (VAT 발행 현장의 매출 합계 = 국세청 보고 금액)
+  const vatReportJobs = doneJobs.filter(j=>j.payType === 'card' || j.cashReceipt);
+  const totalRevVatReport = vatReportJobs.reduce((s,j)=>s+jobTotal(j), 0);
 
   // 연간 요약 카드
   el.innerHTML = ''
@@ -5194,7 +5191,7 @@ function renderStats() {
     + '<div class="stat-card" style="grid-column:1/-1;">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출</div>'
     + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
-    + '<div style="font-size:11px;color:var(--purple);margin-top:2px;">VAT 포함 '+fmtMoney(totalRevWithVat)+'</div>'
+    + '<div style="font-size:11px;color:var(--purple);margin-top:2px;">VAT 신고매출 '+fmtMoney(totalRevVatReport)+' ('+vatReportJobs.length+'건)</div>'
     + '</div>'
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 순수익</div>'

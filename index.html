@@ -4697,7 +4697,7 @@ function addEstItem() {
 
 function makeCompletionHTML(j, biz, today, co, ce) {
   var addr = (j.addrBase || j.addr || '') + (j.addrDetail ? ' ' + j.addrDetail : '');
-  var content = (j.after || j.before || '').replace(/\n/g, '<br>');
+  var content = (j.action || j.after || j.before || '').replace(/\n/g, '<br>');
   // 공사명: 유형 + "공사"
   var workName = (j.type ? j.type + ' 공사' : '공사');
   // 사용자: 고객명 없으면 전화번호
@@ -4710,20 +4710,20 @@ function makeCompletionHTML(j, biz, today, co, ce) {
   return ''
     + '<div style="text-align:center;margin-bottom:30px;margin-top:10px;"><div style="font-size:24px;font-weight:700;letter-spacing:8px;">공사완료확인서</div></div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">'
-    + '<tr><td style="width:24%;padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">공 사 명 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+workName+'</td></tr>'
-    + '<tr><td style="padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">발 주 지 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+addr+'</td></tr>'
-    + '<tr><td style="padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">사 용 자 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+userName+'</td></tr>'
-    + '<tr><td style="padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">공사기간 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+(j.date||'')+'</td></tr>'
-    + '<tr><td style="padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">공사금액 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;font-weight:700;" contenteditable="'+ce+'">'+amtLabel+'</td></tr>'
-    + '<tr><td style="padding:12px 6px;color:#333;font-weight:600;vertical-align:top;">내&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;용 :</td><td style="padding:12px 6px;border-bottom:1px solid #ccc;height:70px;vertical-align:top;" contenteditable="'+ce+'">'+content+'</td></tr>'
+    + '<tr><td style="width:15%;padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사명 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+workName+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">발주지 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+addr+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">사용자 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+userName+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사기간 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+(j.date||'')+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사금액 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;font-weight:700;" contenteditable="'+ce+'">'+amtLabel+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">내용 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;height:70px;vertical-align:top;" contenteditable="'+ce+'">'+content+'</td></tr>'
     + '</table>'
     + '<div style="text-align:center;font-size:15px;margin:36px 0;">위와 같이 공사를 완료하였음을 확인합니다.</div>'
     + '<div style="text-align:center;font-size:14px;margin:24px 0;" contenteditable="'+ce+'">'+today+'</div>'
-    + '<div style="text-align:right;margin-top:36px;padding-right:20px;font-size:14px;color:#333;position:relative;">'
-    + '<div style="display:inline-block;text-align:left;position:relative;">'
+    + '<div style="text-align:right;margin-top:36px;padding-right:60px;font-size:14px;color:#333;">'
+    + '<div style="display:inline-block;text-align:right;position:relative;">'
     + '<div style="font-weight:700;font-size:16px;" contenteditable="'+ce+'">'+co+'</div>'
     + '<div style="margin-top:2px;color:#555;" contenteditable="'+ce+'">대표 '+(biz.ceo||'-')+' | TEL '+(biz.tel||'-')+'</div>'
-    + (biz.stampImg ? '<img src="'+biz.stampImg+'" style="width:56px;height:56px;object-fit:contain;position:absolute;right:-64px;top:0;">' : '')
+    + (biz.stampImg ? '<img src="'+biz.stampImg+'" style="width:52px;height:52px;object-fit:contain;position:absolute;right:-58px;top:6px;">' : '')
     + '</div>'
     + '</div>';
 }

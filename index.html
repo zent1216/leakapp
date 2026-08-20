@@ -842,8 +842,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <div class="form-group">
           <label class="form-label">💳 결제유형</label>
           <select class="form-select" id="f-pay-type" onchange="onPayTypeChange()">
+            <option value="transfer" selected>계좌이체</option>
             <option value="cash">현금</option>
-            <option value="transfer">계좌이체</option>
             <option value="card">카드</option>
           </select>
         </div>
@@ -3449,6 +3449,12 @@ function resetForm() {
   addMaterialRow();
   renderPhotoSlots();
   addCostItem('', '');
+  // 결제유형 기본값: 계좌이체
+  var payEl = document.getElementById('f-pay-type');
+  if (payEl) payEl.value = 'transfer';
+  var crEl = document.getElementById('f-cash-receipt');
+  if (crEl) crEl.checked = false;
+  if (typeof onPayTypeChange === 'function') onPayTypeChange();
   calcTotal();
 }
 

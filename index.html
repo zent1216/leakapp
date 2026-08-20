@@ -5098,13 +5098,21 @@ function printDoc() { window.print(); }
 // ════════════════════════════════════════
 
 function calcVatTotal(jobs) {
-  return jobs.filter(function(j) {
-    return j.payType === 'card' || j.cashReceipt;
-  }).reduce(function(s, j) {
-    var total = jobTotal(j);
-    var vat = Math.round(total * 0.1);
-    return s + vat;
-  }, 0);
+  // VAT 발행 현장의 공급가액 합
+  var vatBase = jobs.filter(function(j){ return j.payType === 'card' || j.cashReceipt; })
+    .reduce(function(s, j){ return s + jobTotal(j); }, 0);
+  var vatSum = Math.round(vatBase * 0.1); // 받은 VAT (10%)
+  var taxType = (_biz && _biz['tax-type']) || 'exempt';
+  var payVat;
+  if (taxType === 'exempt') payVat = 0;
+  else if (taxType === 'simple') payVat = Math.round(vatBase * 0.04);
+  else payVat = vatSum;
+  return { base: vatBase, received: vatSum, pay: payVat, type: taxType };
+}
+
+// 카드수수료 합계
+function calcCardFeeTotal(jobs) {
+  return jobs.reduce(function(s, j){ return s + ((typeof cardFeeOf === 'function') ? cardFeeOf(j) : 0); }, 0);
 }
 
 // 세금 + 카드수수료 추정 (참고용) - VAT 발행 현장 기준, 현장별 계산
@@ -5196,10 +5204,23 @@ function renderStats() {
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 수수료</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-'+fmtMoney(totalComm)+'</div>'
     + '</div>'
-    + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 VAT 합계</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--purple);font-family:IBM Plex Mono,monospace;">'+fmtMoney(calcVatTotal(doneJobs))+'</div>'
-    + '</div>'
+    + (function(){
+        var v = calcVatTotal(doneJobs);
+        var typeTxt = v.type === 'exempt' ? '면제' : v.type === 'simple' ? '간이4%' : '일반10%';
+        var payTxt = v.pay > 0 ? fmtMoney(v.pay) : '0원';
+        return '<div class="stat-card">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">납부 VAT ('+typeTxt+')</div>'
+          + '<div style="font-size:18px;font-weight:700;color:'+(v.pay>0?'var(--purple)':'var(--green)')+';font-family:IBM Plex Mono,monospace;">'+payTxt+'</div>'
+          + '<div style="font-size:10px;color:var(--text3);margin-top:2px;">받은VAT '+fmtMoney(v.received)+'</div>'
+          + '</div>';
+      })()
+    + (function(){
+        var cf = calcCardFeeTotal(doneJobs);
+        return '<div class="stat-card">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">카드 수수료</div>'
+          + '<div style="font-size:18px;font-weight:700;color:'+(cf>0?'#a855f7':'var(--text3)')+';font-family:IBM Plex Mono,monospace;">'+(cf>0?'-'+fmtMoney(cf):'0원')+'</div>'
+          + '</div>';
+      })()
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">비용처리 (자재비)</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">'+fmtMoney(doneJobs.reduce(function(s,j){return s+(j.materialCost||0);},0))+'</div>'
@@ -5210,7 +5231,6 @@ function renderStats() {
     + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'
     + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done'&&j.status!=='request').length+'</div><div class="stat-label">미수현장</div></div>'
     + '</div>'
-    + renderTaxEstimate(totalRev, doneJobs)
     // 월별
     + Array.from({length:12},(_,i)=>{
       const m = String(i+1).padStart(2,'0');

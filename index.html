@@ -1219,6 +1219,43 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="biz-account" placeholder="000-0000-0000-00"></div>
     </div>
     <div class="form-card">
+      <div class="form-card-title">🧾 세금 설정</div>
+      <div class="form-group">
+        <label class="form-label">과세 유형</label>
+        <select class="form-select" id="biz-tax-type" onchange="onTaxTypeChange()">
+          <option value="exempt">부가세 면제 (연매출 4,800만 미만)</option>
+          <option value="simple">간이과세자 (4,800만~1억400만)</option>
+          <option value="general">일반과세자 (1억400만 이상)</option>
+        </select>
+      </div>
+      <div class="form-group" id="biz-simple-rate-group" style="display:none;">
+        <label class="form-label">간이과세 업종 부가율 (%)</label>
+        <input class="form-input" id="biz-simple-rate" type="number" step="0.1" placeholder="예: 건설/설비 3.0">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">누수/설비 수리는 보통 3.0% 내외 (정확한 값은 세무사 확인)</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);background:var(--bg3);padding:10px;border-radius:8px;margin-top:4px;">
+        💡 부가세 면제 사업자는 받은 VAT가 실제 이익이 됩니다. 실적관리에서 세금 추정치를 확인하세요.
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="form-card-title">💳 카드 수수료</div>
+      <div class="form-group">
+        <label class="form-label">카드 가맹점 등급</label>
+        <select class="form-select" id="biz-card-type" onchange="onCardTypeChange()">
+          <option value="small">영세가맹점 (연매출 3억 이하) - 0.4%</option>
+          <option value="normal">일반가맹점 (직접 입력)</option>
+        </select>
+      </div>
+      <div class="form-group" id="biz-card-rate-group" style="display:none;">
+        <label class="form-label">신용카드 수수료율 (%)</label>
+        <input class="form-input" id="biz-card-rate" type="number" step="0.01" placeholder="예: 1.5">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">카드사 정산내역에 찍힌 실제 수수료율을 입력하세요</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);background:var(--bg3);padding:10px;border-radius:8px;margin-top:4px;">
+        💳 카드결제는 수수료를 뗀 금액이 입금됩니다. 실적관리에서 연간 카드수수료 추정치를 확인하세요.
+      </div>
+    </div>
+    <div class="form-card">
       <div class="form-card-title">🖊️ 서명 / 도장</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
@@ -5064,6 +5101,76 @@ function calcVatTotal(jobs) {
   }, 0);
 }
 
+// 세금 + 카드수수료 추정 (참고용)
+function renderTaxEstimate(yearRevenue, doneJobs) {
+  var taxType = (_biz && _biz['tax-type']) || 'exempt';
+  var html = '';
+
+  // ── 부가세 추정 ──
+  html += '<div class="stat-card" style="grid-column:1/-1;margin-bottom:8px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);">';
+  html += '<div style="font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:8px;">🧾 예상 부가세 (참고용)</div>';
+  if (taxType === 'exempt') {
+    var limit = 48000000;
+    var remain = limit - yearRevenue;
+    html += '<div style="font-size:13px;color:var(--text1);margin-bottom:4px;">유형: <b>부가세 면제</b> (연매출 4,800만 미만)</div>';
+    if (yearRevenue < limit) {
+      html += '<div style="font-size:14px;color:var(--green);font-weight:700;">납부 부가세: 0원 (면제)</div>';
+      html += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">받으신 VAT는 실제 이익입니다 👍</div>';
+      var pct = Math.min(100, Math.round(yearRevenue/limit*100));
+      html += '<div style="margin-top:8px;font-size:12px;color:var(--text2);">면제 한도까지 여유: <b style="color:' + (remain < 5000000 ? '#fb923c' : 'var(--green)') + ';">' + fmtMoney(remain) + '</b> (' + pct + '% 사용)</div>';
+      html += '<div style="margin-top:4px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + (pct > 85 ? '#fb923c' : '#60a5fa') + ';"></div></div>';
+      if (remain < 5000000 && remain > 0) html += '<div style="font-size:12px;color:#fb923c;margin-top:6px;">⚠️ 면제 한도에 가까워지고 있어요. 초과하면 부가세가 발생합니다.</div>';
+    } else {
+      html += '<div style="font-size:14px;color:#fb923c;font-weight:700;">⚠️ 연매출 4,800만 초과!</div>';
+      html += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">면제 기준을 넘어 부가세가 발생할 수 있어요. 세무사와 상담하세요.</div>';
+    }
+  } else if (taxType === 'simple') {
+    var rate = parseFloat((_biz && _biz['simple-rate']) || 0) || 0;
+    var vat = Math.round(yearRevenue * (rate/100) * 0.1);
+    html += '<div style="font-size:13px;color:var(--text1);margin-bottom:4px;">유형: <b>간이과세자</b> (부가율 ' + rate + '%)</div>';
+    if (rate > 0) {
+      html += '<div style="font-size:14px;color:var(--accent);font-weight:700;">예상 부가세: 약 ' + fmtMoney(vat) + '</div>';
+      html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">계산: 매출 ' + fmtMoney(yearRevenue) + ' × ' + rate + '% × 10%</div>';
+    } else {
+      html += '<div style="font-size:12px;color:#fb923c;">사업자 정보에서 업종 부가율을 입력하세요.</div>';
+    }
+  } else {
+    var vat2 = Math.round(yearRevenue / 11);
+    html += '<div style="font-size:13px;color:var(--text1);margin-bottom:4px;">유형: <b>일반과세자</b></div>';
+    html += '<div style="font-size:14px;color:var(--accent);font-weight:700;">예상 매출부가세: 약 ' + fmtMoney(vat2) + '</div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">매입세액 공제 전 금액이에요. 실제론 매입분을 빼고 납부합니다.</div>';
+  }
+  html += '<div style="font-size:11px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">※ 참고용 추정치입니다. 정확한 세금은 세무사와 상담하세요.</div>';
+  html += '</div>';
+
+  // ── 카드 수수료 추정 ──
+  var cardType = (_biz && _biz['card-type']) || 'small';
+  var cardRate = cardType === 'small' ? 0.4 : (parseFloat((_biz && _biz['card-rate']) || 0) || 0);
+  // 카드결제 작업들의 매출 합계 (VAT 포함 실결제액 기준)
+  var cardJobs = (doneJobs || []).filter(function(j){ return j.payType === 'card'; });
+  var cardSales = cardJobs.reduce(function(s,j){
+    var t = jobTotal(j);
+    // 카드결제는 VAT 포함 금액이 실결제액
+    var withVat = (j.payType === 'card' || j.cashReceipt) ? Math.round(t * 1.1) : t;
+    return s + withVat;
+  }, 0);
+  var cardFee = Math.round(cardSales * cardRate / 100);
+  html += '<div class="stat-card" style="grid-column:1/-1;margin-bottom:8px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);">';
+  html += '<div style="font-size:12px;font-weight:700;color:#a855f7;margin-bottom:8px;">💳 예상 카드 수수료 (참고용)</div>';
+  html += '<div style="font-size:13px;color:var(--text1);margin-bottom:4px;">등급: <b>' + (cardType === 'small' ? '영세가맹점' : '일반가맹점') + '</b> (' + cardRate + '%)</div>';
+  if (cardJobs.length > 0) {
+    html += '<div style="font-size:14px;color:#a855f7;font-weight:700;">예상 수수료: 약 ' + fmtMoney(cardFee) + '</div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">카드매출 ' + fmtMoney(cardSales) + ' × ' + cardRate + '% (' + cardJobs.length + '건)</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">실입금액: 약 <b style="color:var(--green);">' + fmtMoney(cardSales - cardFee) + '</b></div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--text3);">카드결제 완료 건이 없습니다.</div>';
+  }
+  html += '<div style="font-size:11px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">※ 참고용 추정치입니다. 실제 수수료는 카드사 정산내역을 확인하세요.</div>';
+  html += '</div>';
+
+  return html;
+}
+
 function renderStats() {
   const el = document.getElementById('stats-body');
   const yearSel = document.getElementById('stats-year');
@@ -5110,6 +5217,7 @@ function renderStats() {
     + '<div class="stat-card"><div class="stat-num green">'+doneJobs.length+'</div><div class="stat-label">완료</div></div>'
     + '<div class="stat-card"><div class="stat-num orange">'+yearJobs.filter(j=>j.status!=='done'&&j.status!=='request').length+'</div><div class="stat-label">미수현장</div></div>'
     + '</div>'
+    + renderTaxEstimate(totalRev, doneJobs)
     // 월별
     + Array.from({length:12},(_,i)=>{
       const m = String(i+1).padStart(2,'0');
@@ -5368,10 +5476,12 @@ function loadBizForm() {
   // 백업 상태 초기화
   const st = document.getElementById('backup-status');
   if (st) st.style.display = 'none';
-  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
+  ['name','ceo','reg','tel','addr','bank','account','holder','tax-type','simple-rate','card-type','card-rate'].forEach(k => {
     const el = document.getElementById('biz-' + k);
     if (el) el.value = b[k] || '';
   });
+  if (typeof onTaxTypeChange === 'function') onTaxTypeChange();
+  if (typeof onCardTypeChange === 'function') onCardTypeChange();
   document.getElementById('biz-saved-bar').style.display = 'none';
   // 서명
   if (b.signatureImg) {
@@ -5402,8 +5512,22 @@ function loadBizForm() {
   }
 }
 
+// 과세 유형 변경 시 간이과세 부가율 입력칸 표시
+function onTaxTypeChange() {
+  var type = document.getElementById('biz-tax-type').value;
+  var grp = document.getElementById('biz-simple-rate-group');
+  if (grp) grp.style.display = (type === 'simple') ? 'block' : 'none';
+}
+
+// 카드 등급 변경 시 수수료율 입력칸 표시
+function onCardTypeChange() {
+  var type = document.getElementById('biz-card-type').value;
+  var grp = document.getElementById('biz-card-rate-group');
+  if (grp) grp.style.display = (type === 'normal') ? 'block' : 'none';
+}
+
 function saveBizInfo() {
-  ['name','ceo','reg','tel','addr','bank','account','holder'].forEach(k => {
+  ['name','ceo','reg','tel','addr','bank','account','holder','tax-type','simple-rate','card-type','card-rate'].forEach(k => {
     const el = document.getElementById('biz-' + k);
     if (el) _biz[k] = el.value.trim();
   });

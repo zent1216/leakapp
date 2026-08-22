@@ -786,7 +786,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="form-card">
       <div class="form-card-title">📋 작업 정보</div>
       <div class="form-row2">
-        <div class="form-group"><label class="form-label">작업일 *</label><input class="form-input" id="f-date" type="date"></div>
+        <div class="form-group"><label class="form-label">작업일 (시작) *</label><input class="form-input" id="f-date" type="date"></div>
         <div class="form-group">
           <label class="form-label">상태</label>
           <select class="form-select" id="f-status">
@@ -796,6 +796,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
             <option value="failed">실패</option>
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">종료일 (여러 날 공사 시)</label>
+        <input class="form-input" id="f-date-end" type="date">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">하루 공사면 비워두세요. 여러 날이면 마지막 날 지정.</div>
       </div>
       <div class="form-group">
         <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">누수 유형
@@ -1958,6 +1963,34 @@ function formatPhoneNumber(v) {
 }
 
 // 빠른 입력: "전화번호 / 주소 / 내용" 붙여넣기 → 분류해서 폼 채우기 (의뢰 상태)
+// 메모 내용에서 누수 유형 자동 감지
+function detectLeakType(text) {
+  if (!text) return '';
+  var t = String(text);
+  // 우선순위 순서로 키워드 매칭 (구체적인 것 먼저)
+  var rules = [
+    ['하수 역류', ['하수 역류','역류','하수역류']],
+    ['하수 배관', ['하수','오수','정화조']],
+    ['욕실 방수', ['욕실','화장실','샤워']],
+    ['옥상 방수', ['옥상']],
+    ['베란다 방수', ['베란다','발코니']],
+    ['외벽 누수', ['외벽','벽면','벽체']],
+    ['지하 누수', ['지하']],
+    ['수전 누수', ['수전','수도꼭지','싱크','세면대']],
+    ['메인관 누수', ['메인관','메인 배관','인입관']],
+    ['공용부 누수', ['공용부','공용']],
+    ['스프링쿨러 누수', ['스프링쿨러','스프링클러']],
+    ['배관 누수', ['배관','파이프','누수','물샘','물이 새','물이 샌','물샘','새는','샘']]
+  ];
+  for (var i = 0; i < rules.length; i++) {
+    var kws = rules[i][1];
+    for (var k = 0; k < kws.length; k++) {
+      if (t.indexOf(kws[k]) >= 0) return rules[i][0];
+    }
+  }
+  return '';
+}
+
 function parseQuickPaste() {
   var raw = (document.getElementById('f-quick-paste').value || '').trim();
   if (!raw) { showToast('붙여넣을 내용을 입력해주세요'); return; }
@@ -2030,7 +2063,24 @@ function parseQuickPaste() {
   if (phone) document.getElementById('f-phone').value = formatPhoneNumber(phone);
   if (addrBase) document.getElementById('f-addr').value = addrBase;
   if (addrDetail) document.getElementById('f-addr-detail').value = addrDetail;
-  if (content) document.getElementById('f-before').value = content;
+  // 오더 세부내용 → 내부 비밀 메모(f-memo)에 저장
+  if (content) {
+    var memoEl = document.getElementById('f-memo');
+    if (memoEl) memoEl.value = content;
+  }
+  // 메모 내용에서 누수 유형 자동 감지 → 유형(f-type) 설정
+  var detectedType = detectLeakType(content);
+  if (detectedType) {
+    var typeSel = document.getElementById('f-type');
+    if (typeSel) {
+      // 옵션에 있으면 선택
+      for (var oi = 0; oi < typeSel.options.length; oi++) {
+        if (typeSel.options[oi].value === detectedType || typeSel.options[oi].text === detectedType) {
+          typeSel.selectedIndex = oi; break;
+        }
+      }
+    }
+  }
   // 상태를 "의뢰"로
   var statusSel = document.getElementById('f-status');
   if (statusSel) statusSel.value = 'request';
@@ -2044,7 +2094,8 @@ function parseQuickPaste() {
   var found = [];
   if (phone) found.push('전화');
   if (addr) found.push('주소');
-  if (content) found.push('내용');
+  if (content) found.push('메모');
+  if (detectedType) found.push('유형(' + detectedType + ')');
   if (found.length) msg = found.join('·') + ' 인식 → 의뢰로 설정됨';
   showToast(msg);
 }
@@ -3141,6 +3192,7 @@ function renderCalendar() {
     const isToday = (y===todayY && m===todayM && d===todayD);
     const hasJob = jobs.length > 0;
     const dotColor = jobs.some(function(j){return j.status==='done';}) ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
+    const hasMultiDay = jobs.some(function(j){ return j.dateEnd && j.dateEnd !== j.date; });
     const col = (firstDay + d - 1) % 7;
     const textColor = col===0?'var(--red)':col===6?'var(--accent)':'var(--text)';
     const bg = isToday ? 'var(--accent)' : (hasJob ? 'var(--bg3)' : 'transparent');
@@ -3150,6 +3202,7 @@ function renderCalendar() {
     html += '<div class="cal-day-cell" data-day="' + d + '" data-hasjob="' + (hasJob||isToday?'1':'0') + '" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:' + ((hasJob||isToday)?'pointer':'default') + ';background:' + bg + ';position:relative;">'
       + '<span style="font-size:13px;font-weight:' + fw + ';color:' + txt + ';">' + d + '</span>'
       + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:' + dotColor + ';"></div>' : '')
+      + (hasMultiDay ? '<div style="position:absolute;top:1px;right:2px;font-size:8px;color:var(--accent);">📅</div>' : '')
       + '</div>';
   }
   html += '</div>';
@@ -3221,6 +3274,22 @@ function doEditJob(id) {
   closeModal('detail-modal');
   editJob(id);
 }
+
+// 미수 → 완료 (입금완료 처리)
+async function doMarkPaid(id) {
+  var j = _jobs.find(function(x){ return x.id === id; });
+  if (!j) return;
+  if (!confirm('"' + (j.name||'') + '" 작업을 입금완료(완료)로 변경할까요?')) return;
+  j.status = 'done';
+  if (typeof saveJobToCollection === 'function') await saveJobToCollection(j);
+  else if (typeof saveJobs === 'function') await saveJobs();
+  showToast('입금완료 처리됐습니다 ✓');
+  closeModal('detail-modal');
+  // 화면 갱신 (현재 보던 페이지 다시 그리기)
+  if (typeof renderCalendar === 'function') renderCalendar();
+  if (typeof renderStats === 'function') renderStats();
+  if (typeof updateMainStats === 'function') updateMainStats();
+}
 function doGoDoc(jobId) {
   closeModal('detail-modal');
   // 전역 변수로 저장 (initDocs에서 사용)
@@ -3266,7 +3335,14 @@ function showDetail(id) {
 
   // 기본 정보
   html += '<div class="detail-info-card">';
-  html += '<div class="info-row"><div class="info-key">작업일</div><div class="info-val">' + (j.date||'-') + '</div></div>';
+  var _dateShow = (j.date||'-');
+  if (j.dateEnd && j.dateEnd !== j.date) {
+    // 기간 일수 계산
+    var _d1 = new Date(j.date), _d2 = new Date(j.dateEnd);
+    var _days = Math.round((_d2 - _d1) / 86400000) + 1;
+    _dateShow = j.date + ' ~ ' + j.dateEnd + ' <span style="font-size:11px;color:var(--accent);">(' + _days + '일간)</span>';
+  }
+  html += '<div class="info-row"><div class="info-key">작업' + (j.dateEnd && j.dateEnd !== j.date ? '기간' : '일') + '</div><div class="info-val">' + _dateShow + '</div></div>';
   if (j.phones && j.phones.length) {
     var extraPhonesHtml = j.phones.map(function(p){
       var lbl = p.label ? '<span style="color:var(--text3);font-size:11px;">('+p.label+') </span>' : '';
@@ -3401,6 +3477,9 @@ function showDetail(id) {
   }
 
   html += '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;color:var(--purple);border-color:rgba(168,85,247,0.3);" onclick="doOpenAs(' + j.id + ')">🔧 AS 접수</button>';
+  if (j.status === 'unpaid') {
+    html += '<button class="btn" style="width:100%;margin-bottom:8px;background:#fb923c;color:white;" onclick="doMarkPaid(' + j.id + ')">💰 입금완료 (완료로 변경)</button>';
+  }
   html += '<button class="btn btn-danger" onclick="doDeleteJob(' + j.id + ')">🗑️ 삭제</button>';
 
   body.innerHTML = html;
@@ -3449,6 +3528,8 @@ function resetForm() {
   addMaterialRow();
   renderPhotoSlots();
   addCostItem('', '');
+  // 종료일 비우기
+  if (document.getElementById('f-date-end')) document.getElementById('f-date-end').value = '';
   // 결제유형 기본값: 계좌이체
   var payEl = document.getElementById('f-pay-type');
   if (payEl) payEl.value = 'transfer';
@@ -3475,6 +3556,7 @@ function editJob(id) {
   document.getElementById('f-addr-detail').value = j.addrDetail || '';
   document.getElementById('f-location').value = j.location || '';
   document.getElementById('f-date').value = j.date || '';
+  if (document.getElementById('f-date-end')) document.getElementById('f-date-end').value = j.dateEnd || '';
   document.getElementById('f-status').value = j.status || 'done';
   document.getElementById('f-pay-type').value = j.payType || 'cash';
   document.getElementById('f-cash-receipt').checked = j.cashReceipt || false;
@@ -4185,6 +4267,7 @@ async function saveJob() {
     addrBase: addr,
     addrDetail: addrDetail,
     date,
+    dateEnd: (document.getElementById('f-date-end') && document.getElementById('f-date-end').value) || '',
     phone: document.getElementById('f-phone').value.trim(),
     phones: collectFieldPhones(),
     isTripFee: (document.getElementById('f-is-trip-fee') && document.getElementById('f-is-trip-fee').checked) || false,
@@ -4719,7 +4802,7 @@ function makeCompletionHTML(j, biz, today, co, ce) {
     + '<tr><td style="width:15%;padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사명 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+workName+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">발주지 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+addr+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">사용자 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+userName+'</td></tr>'
-    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사기간 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+(j.date||'')+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사기간 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+(j.date||'')+((j.dateEnd && j.dateEnd !== j.date) ? ' ~ ' + j.dateEnd : '')+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사금액 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;font-weight:700;" contenteditable="'+ce+'">'+amtLabel+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">내용 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;height:70px;vertical-align:top;" contenteditable="'+ce+'">'+content+'</td></tr>'
     + '</table>'

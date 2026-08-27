@@ -922,6 +922,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="topbar-title" id="docs-title">문서 <span>생성</span></div>
     <div style="display:flex;gap:6px;">
       <button class="topbar-action" id="docs-send-all-btn" onclick="sendAllDocs()" style="display:none;background:var(--bg3);color:var(--text1);font-size:11px;padding:4px 8px;">📤 모아보내기</button>
+      <button class="topbar-action" id="docs-save-btn" onclick="saveDocEdits()" style="background:var(--green);color:white;font-size:11px;padding:4px 8px;">💾 저장 (원본 반영)</button>
       <button class="topbar-action" id="docs-mode-btn" onclick="toggleDocsMode()">👁️ 미리보기</button>
     </div>
   </div>
@@ -4506,6 +4507,54 @@ function scaleA4() {
   });
 }
 
+// 문서 편집 내용을 실제 작업(원본)에 저장 (DB 반영)
+function collectDocEditsIntoJob(j) {
+  if (!j) return;
+  // ── 영수증 편집칸 (편집 모드에서 DOM에 있을 때) ──
+  var ra = document.getElementById('receipt-amount');
+  var rt = document.getElementById('receipt-to');
+  var rad = document.getElementById('receipt-addr');
+  var rb = document.getElementById('receipt-body');
+  if (ra) j._receiptAmount = parseAmountStr(ra.value);
+  if (rt) j._receiptTo = rt.value;
+  if (rad) j._receiptAddr = rad.value;
+  if (rb) j._receiptBody = rb.value;
+  // ── 견적서 항목 (편집 테이블이 있으면 동기화) ──
+  if (_curDocType === 'estimate' && document.getElementById('est-items-body')) {
+    syncEstimateEditToPreview();
+  }
+  // ── 발행일 ──
+  if (typeof syncIssueDateFromEdit === 'function') syncIssueDateFromEdit(j);
+  // ── 소견서/완료확인서 등 contenteditable 문서 ──
+  // 미리보기 페이지의 contenteditable 내용을 저장
+  var prevPage = document.querySelector('.a4-scale-page[contenteditable], .a4-scale-page');
+  // (완료확인서/소견서는 표시 시점에 j 데이터로 재생성되므로 별도 필드 저장 없음)
+}
+
+async function saveDocEdits() {
+  var j = getSelJob();
+  if (!j) { showToast('저장할 작업을 먼저 선택하세요'); return; }
+  if (!confirm('이 문서에서 수정한 내용을 원본 작업에 저장할까요?\n(견적서 금액/영수증 내용 등이 이 작업에 영구 반영됩니다)')) return;
+  // 편집 내용을 j에 수집
+  collectDocEditsIntoJob(j);
+  // 견적서에서 항목을 수정한 경우: _editItems를 실제 costItems로 반영
+  if (_curDocType === 'estimate' && j._editItems && j._editItems.length) {
+    j.costItems = j._editItems.map(function(it){ return {name: it.name, amount: it.amount}; });
+    // costTotal 재계산 (VAT 포함이면 역산 유지)
+    var newTotal = j._editItems.reduce(function(s,it){ return s + (it.amount||0); }, 0);
+    var _vatApplies = (j.payType === 'card') || j.cashReceipt;
+    if (j.vatIncluded && _vatApplies) newTotal = Math.round(newTotal / 1.1);
+    j.costTotal = newTotal;
+  }
+  // DB 저장
+  var ok = true;
+  if (typeof saveJobToCollection === 'function') ok = await saveJobToCollection(j);
+  else if (typeof saveJobs === 'function') await saveJobs();
+  if (ok !== false) {
+    showToast('✓ 원본 작업에 저장됐습니다');
+  }
+}
+
 function toggleDocsMode() {
   _isPreview = !_isPreview;
   const modeBtn = document.getElementById('docs-mode-btn');
@@ -4581,6 +4630,9 @@ function toggleDocsMode() {
     document.getElementById('share-normal').style.display = 'none';
     document.getElementById('share-insurance').style.display = 'none';
     if (window._scaleHandler) window.removeEventListener('resize', window._scaleHandler);
+    // 편집 복귀 시 미리보기용 임시 항목 제거 (원본 기준으로 다시 그리기)
+    var _jClear = (typeof getSelJob === 'function') ? getSelJob() : null;
+    if (_jClear) { delete _jClear._editItems; delete _jClear._editTotal; }
     renderDocEdit();
     setTimeout(scaleDocPage, 50);
     window._scaleDocHandler = scaleDocPage;
@@ -4645,6 +4697,11 @@ function syncEstimateEditToPreview() {
   // 합계 재계산
   var total = 0;
   items.forEach(function(i){ total += i.amount; });
+  // VAT 포함으로 입력된 작업이면 공급가액으로 역산 (문서에서 ×1.1 하면 원래 입력액이 됨)
+  var _vatApplies = (j.payType === 'card') || j.cashReceipt;
+  if (j.vatIncluded && _vatApplies) {
+    total = Math.round(total / 1.1);
+  }
   // 항목 정보를 j에 임시 저장
   j._editItems = items;
   j._editTotal = total;

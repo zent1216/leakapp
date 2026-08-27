@@ -856,6 +856,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <input type="checkbox" id="f-cash-receipt" onchange="onPayTypeChange()">
           <label for="f-cash-receipt" style="font-size:13px;color:var(--text1);">현금영수증 발행</label>
         </div>
+        <div id="f-vat-included-check" style="display:none;align-items:center;gap:8px;margin-top:8px;">
+          <input type="checkbox" id="f-vat-included" onchange="onPayTypeChange()">
+          <label for="f-vat-included" style="font-size:13px;color:var(--text1);">💡 입력금액이 VAT 포함 (예: 140만 = VAT 포함)</label>
+        </div>
         <div id="f-vat-display" style="display:none;margin-top:8px;padding:10px;background:var(--bg3);border-radius:var(--r-sm);font-size:13px;">
           <div style="display:flex;justify-content:space-between;"><span>공급가액</span><span id="f-supply-amount">0원</span></div>
           <div style="display:flex;justify-content:space-between;margin-top:4px;"><span>VAT (10%)</span><span id="f-vat-amount" style="color:var(--accent);font-weight:600;">0원</span></div>
@@ -1875,6 +1879,10 @@ function onPayTypeChange() {
     receiptCheck.style.display = 'flex';
     vatDisplay.style.display = cashReceipt.checked ? 'block' : 'none';
   }
+  // VAT 발행 상황(카드 or 현금영수증)일 때만 "VAT 포함 입력" 체크박스 표시
+  var vatIncCheck = document.getElementById('f-vat-included-check');
+  var showVatNow = (payType === 'card') || cashReceipt.checked;
+  if (vatIncCheck) vatIncCheck.style.display = showVatNow ? 'flex' : 'none';
   updateVatDisplay();
 }
 
@@ -1885,14 +1893,25 @@ function updateVatDisplay() {
   var showVat = payType === 'card' || cashReceipt;
   
   if (showVat) {
-    var supply = total;
-    var vat = Math.round(total * 0.1);
+    var vatIncluded = (document.getElementById('f-vat-included') || {}).checked;
+    var supply, vat, totalWithVat;
+    if (vatIncluded) {
+      // 입력금액이 VAT 포함 → 역산: 공급가액 = 입력액 / 1.1
+      totalWithVat = total;
+      supply = Math.round(total / 1.1);
+      vat = total - supply;
+    } else {
+      // 입력금액이 공급가액 → VAT 별도 추가
+      supply = total;
+      vat = Math.round(total * 0.1);
+      totalWithVat = total + vat;
+    }
     var el1 = document.getElementById('f-supply-amount');
     var el2 = document.getElementById('f-vat-amount');
     var el3 = document.getElementById('f-total-with-vat');
     if (el1) el1.textContent = supply.toLocaleString() + '원';
     if (el2) el2.textContent = vat.toLocaleString() + '원';
-    if (el3) el3.textContent = (total + vat).toLocaleString() + '원';
+    if (el3) el3.textContent = totalWithVat.toLocaleString() + '원';
   }
 }
 
@@ -3560,6 +3579,9 @@ function editJob(id) {
   document.getElementById('f-status').value = j.status || 'done';
   document.getElementById('f-pay-type').value = j.payType || 'cash';
   document.getElementById('f-cash-receipt').checked = j.cashReceipt || false;
+  // VAT 포함 입력 플래그 복원
+  var _vatIncEl = document.getElementById('f-vat-included');
+  if (_vatIncEl) _vatIncEl.checked = j.vatIncluded || false;
   onPayTypeChange();
   document.getElementById('f-type').value = j.type || '배관 누수';
   document.getElementById('f-before').value = j.before || '';
@@ -4253,7 +4275,15 @@ async function saveJob() {
   const addrDetail = document.getElementById('f-addr-detail').value.trim();
   const fullAddr = addrDetail ? (addr + ' ' + addrDetail) : addr;
   const costItems = getCostItems();
-  const costTotal = getCostItemsTotal();
+  var costTotal = getCostItemsTotal();
+  // VAT 포함으로 입력한 경우: 공급가액으로 역산해서 저장 (기존 계산 로직과 호환)
+  var _vatIncluded = (document.getElementById('f-vat-included') || {}).checked || false;
+  var _payTypeNow = (document.getElementById('f-pay-type') || {}).value;
+  var _cashReceiptNow = (document.getElementById('f-cash-receipt') || {}).checked;
+  var _vatApplies = (_payTypeNow === 'card') || _cashReceiptNow;
+  if (_vatIncluded && _vatApplies) {
+    costTotal = Math.round(costTotal / 1.1);
+  }
   const clientCompany = document.getElementById('f-client-company').value.trim();
   // 새 의뢰처면 자동 저장
   if (clientCompany) autoSaveClient(clientCompany);
@@ -4280,6 +4310,7 @@ async function saveJob() {
     expertOpinion: document.getElementById('f-expert-opinion').value.trim(),
     costItems: costItems,
     costTotal: costTotal,
+    vatIncluded: (_vatIncluded && _vatApplies) || false,
     // 기존 호환용 필드 (계산 결과를 inspect에 모두 몰아넣음)
     inspectCost: costTotal,
     baseCost: 0,

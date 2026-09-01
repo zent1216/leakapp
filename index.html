@@ -3349,7 +3349,7 @@ function showDetail(id) {
   // 고객명 + 상태
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
   html += '<div><span style="font-size:18px;font-weight:700;">' + j.name + '</span>';
-  if (j.phone) html += ' <span style="font-size:12px;color:var(--text2);">' + j.phone + '</span>';
+  if (j.phone) html += ' <span style="font-size:12px;color:var(--text2);">' + j.phone + '</span> ' + telButton(j.phone);
   html += '</div>';
   html += '<span class="badge ' + j.status + '">' + (j.status==='done'?'완료':j.status==='unpaid'?'미수':j.status==='failed'?'실패':j.status==='request'?'의뢰':'미수') + '</span></div>';
 

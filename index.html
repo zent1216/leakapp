@@ -2142,6 +2142,19 @@ function navButton(addr) {
 }
 
 // 카카오톡 스타일 전화 걸기 버튼 HTML 생성 (공용)
+// 목록 카드용 사진 개수 뱃지 (조치 전/후)
+function photoBadge(j) {
+  var before = (j.photosBefore || []).filter(Boolean).length;
+  var after = (j.photosAfter || []).filter(Boolean).length;
+  if (before === 0 && after === 0) {
+    return '<span style="font-size:10px;color:var(--text3);white-space:nowrap;">📷 없음</span>';
+  }
+  var parts = [];
+  if (before > 0) parts.push('<span style="color:#60a5fa;">전 ' + before + '</span>');
+  if (after > 0) parts.push('<span style="color:#4ade80;">후 ' + after + '</span>');
+  return '<span style="font-size:11px;white-space:nowrap;">📷 ' + parts.join(' / ') + '</span>';
+}
+
 function telButton(phone) {
   if (!phone) return '';
   var digits = String(phone).replace(/[^0-9]/g, '');
@@ -3164,6 +3177,7 @@ function filterCalByDay(day) {
       + '<div class="job-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>📅 '+j.date+' · 📍 '+(j.addr||'')+'</span>' + (j.addr ? navButton(j.addrBase || j.addr) : '') + '</div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
       + '<span class="job-amount"' + (j.status==='unpaid'?' style="color:#fb923c;"':'') + '>' + fmtMoney(total) + (j.status==='unpaid'?' <span style="font-size:10px;color:#fb923c;">미입금</span>':'') + ((j.commission||0) > 0 ? ' <span style="font-size:12px;color:var(--green);">(' + fmtMoney(total - (j.commission||0)) + ')</span>' : '') + ((j.payType==='card'||j.cashReceipt)?' <span style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(total*0.1))+'</span>':'')+(j.payType==='card'&&cardFeeOf(j)>0?' <span style="font-size:10px;color:#a855f7;">💳-'+fmtMoney(cardFeeOf(j))+'</span>':'') + '</span>'
+      + photoBadge(j)
       + '</div></div>';
   });
   list.innerHTML = html;

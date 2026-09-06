@@ -715,7 +715,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
-      
+      <button class="bottom-btn" onclick="goPage('page-blacklist')">🚫 블랙리스트</button>
     </div>
   </div>
 </div>
@@ -1030,6 +1030,16 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <button class="topbar-action" onclick="openCustomerForm(null)">+ 메모</button>
   </div>
   <div class="page-body" id="contacts-body"></div>
+</div>
+
+<!-- ════════════ 블랙리스트 ════════════ -->
+<div class="page" id="page-blacklist">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">←</button>
+    <div class="topbar-title">🚫 <span>블랙리스트</span></div>
+    <button class="topbar-action" onclick="openBlacklistForm()">+ 추가</button>
+  </div>
+  <div class="page-body" id="blacklist-body"></div>
 </div>
 
 <!-- ════════════ 간단 고객 메모 추가/수정 모달 ════════════ -->
@@ -1594,6 +1604,7 @@ function goPage(id, extra) {
   else if (id === 'page-quick-est-list') renderQeList();
   else if (id === 'page-companies') renderCompaniesPage();
   else if (id === 'page-contacts') renderContacts();
+  else if (id === 'page-blacklist') renderBlacklist();
   else if (id === 'page-catalog') renderCatalog();
   else if (id === 'page-biz') loadBizForm();
   else if (id === 'page-as') renderAs();
@@ -1772,6 +1783,10 @@ async function loadUserData(uid) {
         const parsedCustomers = d.customers ? JSON.parse(d.customers) : [];
         _customers = Array.isArray(parsedCustomers) ? parsedCustomers : [];
       } catch { _customers = []; }
+      try {
+        const parsedBlacklist = d.blacklist ? JSON.parse(d.blacklist) : [];
+        _blacklist = Array.isArray(parsedBlacklist) ? parsedBlacklist : [];
+      } catch { _blacklist = []; }
       try {
         const parsedTypes = d.leakTypes ? JSON.parse(d.leakTypes) : null;
         if (Array.isArray(parsedTypes) && parsedTypes.length) _leakTypes = parsedTypes;
@@ -3309,6 +3324,29 @@ function doEditJob(id) {
   editJob(id);
 }
 
+// 작업 상세에서 블랙리스트 지정 (고객 전화 / 의뢰처 선택)
+async function doBlacklistFromJob(id) {
+  var j = _jobs.find(function(x){ return x.id === id; });
+  if (!j) return;
+  var hasPhone = !!(j.phone && j.phone.trim());
+  var hasClient = !!(j.clientCompany && j.clientCompany.trim());
+  if (!hasPhone && !hasClient) { showToast('전화번호나 의뢰처 정보가 없습니다'); return; }
+  var type, value;
+  if (hasPhone && hasClient) {
+    var pick = prompt('무엇을 블랙리스트로 지정할까요?\n\n1 = 고객 (' + j.phone + ')\n2 = 의뢰처 (' + j.clientCompany + ')\n\n번호 입력:');
+    if (pick === null) return;
+    if (pick.trim() === '2') { type = 'client'; value = j.clientCompany; }
+    else { type = 'customer'; value = j.phone; }
+  } else if (hasPhone) {
+    type = 'customer'; value = j.phone;
+  } else {
+    type = 'client'; value = j.clientCompany;
+  }
+  var reason = prompt('사유를 입력하세요 (선택):') || '';
+  var ok = await addBlacklist(type, value, reason);
+  if (ok) showToast('🚫 블랙리스트에 추가됐습니다');
+}
+
 // 미수 → 완료 (입금완료 처리)
 async function doMarkPaid(id) {
   var j = _jobs.find(function(x){ return x.id === id; });
@@ -3514,6 +3552,7 @@ function showDetail(id) {
   if (j.status === 'unpaid') {
     html += '<button class="btn" style="width:100%;margin-bottom:8px;background:#fb923c;color:white;" onclick="doMarkPaid(' + j.id + ')">💰 입금완료 (완료로 변경)</button>';
   }
+  html += '<button class="btn" style="width:100%;margin-bottom:8px;background:var(--bg3);color:var(--text1);" onclick="doBlacklistFromJob(' + j.id + ')">🚫 블랙리스트 지정</button>';
   html += '<button class="btn btn-danger" onclick="doDeleteJob(' + j.id + ')">🗑️ 삭제</button>';
 
   body.innerHTML = html;
@@ -3646,6 +3685,7 @@ function editJob(id) {
 // ══════════════════════════════════════════
 var _clients = [];
 var _editingClientId = null;
+var _blacklist = [];  // 블랙리스트 (고객 전화번호 / 의뢰처 업체명)
 var _materials = [];  // 자재 구매 내역
 var _customers = [];  // 간단 고객 메모 (이름+전화번호 여러개+내용, leakcall 연동용)
 var _editingCustomerId = null;
@@ -3840,6 +3880,116 @@ async function saveClients() {
   try {
     await db.collection('users').doc(_uid).set({clients: JSON.stringify(_clients)}, {merge: true});
   } catch(e) { console.error('saveClients:', e); }
+}
+
+async function saveBlacklist() {
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({blacklist: JSON.stringify(_blacklist)}, {merge: true});
+  } catch(e) { console.error('saveBlacklist:', e); }
+}
+
+// 블랙리스트 헬퍼
+// 전화번호 정규화 (숫자만)
+function normalizePhone(p) { return String(p||'').replace(/[^0-9]/g, ''); }
+
+// 블랙리스트에서 항목 찾기 (type: 'customer'=전화번호, 'client'=업체명)
+function findBlacklist(type, value) {
+  if (!value) return null;
+  if (type === 'customer') {
+    var norm = normalizePhone(value);
+    if (!norm) return null;
+    return _blacklist.find(function(b){ return b.type === 'customer' && normalizePhone(b.value) === norm; }) || null;
+  } else {
+    var v = String(value).trim();
+    if (!v) return null;
+    return _blacklist.find(function(b){ return b.type === 'client' && String(b.value).trim() === v; }) || null;
+  }
+}
+
+// 작업(job)이 블랙리스트에 걸리는지 확인 → 걸린 항목 반환(없으면 null)
+function checkJobBlacklist(job) {
+  if (!job) return null;
+  var byPhone = findBlacklist('customer', job.phone);
+  if (byPhone) return byPhone;
+  var byClient = job.clientCompany ? findBlacklist('client', job.clientCompany) : null;
+  return byClient;
+}
+
+// 블랙리스트 추가
+async function addBlacklist(type, value, reason) {
+  value = String(value||'').trim();
+  if (!value) { showToast('전화번호 또는 업체명을 입력하세요'); return false; }
+  if (findBlacklist(type, value)) { showToast('이미 블랙리스트에 있습니다'); return false; }
+  _blacklist.push({
+    id: Date.now(),
+    type: type,
+    value: value,
+    reason: String(reason||'').trim(),
+    date: new Date().toISOString().slice(0,10)
+  });
+  await saveBlacklist();
+  return true;
+}
+
+// 블랙리스트 제거
+async function removeBlacklist(id) {
+  _blacklist = _blacklist.filter(function(b){ return b.id !== id; });
+  await saveBlacklist();
+}
+
+// 블랙리스트 목록 렌더
+function renderBlacklist() {
+  var el = document.getElementById('blacklist-body');
+  if (!el) return;
+  if (!_blacklist.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);padding:40px 20px;font-size:14px;">등록된 블랙리스트가 없습니다.<br><br>우측 상단 <b>+ 추가</b>로 등록하거나,<br>작업 상세에서 지정할 수 있어요.</div>';
+    return;
+  }
+  var html = '';
+  _blacklist.slice().sort(function(a,b){ return (b.date||'') > (a.date||'') ? 1 : -1; }).forEach(function(b) {
+    var typeLabel = b.type === 'customer' ? '고객' : '의뢰처';
+    var typeColor = b.type === 'customer' ? '#fb923c' : '#a855f7';
+    html += '<div style="background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:10px;border-left:3px solid ' + typeColor + ';">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
+    html += '<div style="flex:1;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:11px;color:' + typeColor + ';background:' + typeColor + '22;padding:2px 8px;border-radius:6px;">' + typeLabel + '</span><span style="font-weight:700;font-size:15px;">' + b.value + '</span></div>';
+    if (b.reason) html += '<div style="font-size:13px;color:var(--text2);margin-top:4px;">📝 ' + b.reason + '</div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">등록: ' + (b.date||'-') + '</div>';
+    html += '</div>';
+    html += '<button onclick="doRemoveBlacklist(' + b.id + ')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:4px 8px;">해제</button>';
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+// 블랙리스트 추가 폼 (prompt 방식 - 간단)
+async function openBlacklistForm(presetType, presetValue) {
+  var type = presetType;
+  if (!type) {
+    var t = prompt('블랙리스트 유형을 선택하세요:\n\n1 = 고객 (전화번호)\n2 = 의뢰처 (업체명)\n\n번호 입력:');
+    if (t === null) return;
+    type = (t.trim() === '2') ? 'client' : 'customer';
+  }
+  var label = type === 'customer' ? '전화번호' : '업체명';
+  var value = presetValue || prompt(label + '을(를) 입력하세요:');
+  if (!value || !value.trim()) return;
+  var reason = prompt('사유를 입력하세요 (선택):') || '';
+  var ok = await addBlacklist(type, value, reason);
+  if (ok) {
+    showToast('🚫 블랙리스트에 추가됐습니다');
+    renderBlacklist();
+  }
+}
+
+// 블랙리스트 해제
+async function doRemoveBlacklist(id) {
+  var item = _blacklist.find(function(b){ return b.id === id; });
+  if (!item) return;
+  if (!confirm('"' + item.value + '" 블랙리스트를 해제할까요?')) return;
+  await removeBlacklist(id);
+  showToast('블랙리스트에서 해제됐습니다');
+  renderBlacklist();
 }
 
 // 간단 고객 메모 저장 (leakcall 연동용)
@@ -4338,6 +4488,17 @@ async function saveJob() {
     commissions: getCommissions(),
     commission: getTotalCommission(),
   };
+  // 블랙리스트 경고 (신규 작업 저장 시)
+  if (!_editingJobId) {
+    var blItem = checkJobBlacklist(job);
+    if (blItem) {
+      var blMsg = '⚠️ 블랙리스트 ' + (blItem.type === 'customer' ? '고객' : '의뢰처') + '입니다.\n\n';
+      blMsg += (blItem.type === 'customer' ? '전화: ' : '업체: ') + blItem.value + '\n';
+      if (blItem.reason) blMsg += '사유: ' + blItem.reason + '\n';
+      blMsg += '\n그래도 이 작업을 저장할까요?';
+      if (!confirm(blMsg)) return;
+    }
+  }
   if (_editingJobId) {
     const existing = _jobs.find(j => j.id === _editingJobId);
     if (existing) job.asHistory = existing.asHistory;

@@ -766,7 +766,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <span>🚗 출장비 (수수료 자동계산 제외)</span>
         </label>
       <div class="form-group" style="margin-top:12px;"><label class="form-label">고객명 *</label><input class="form-input" id="f-name" placeholder="홍길동"></div>
-        <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel"></div>
+        <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="f-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)" type="tel" inputmode="tel"></div>
       </div>
       <div class="form-group" style="margin-top:-8px;">
         <div id="f-phones-extra"></div>
@@ -1081,7 +1081,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       </div>
       <div class="form-group">
         <label class="form-label" id="bl-value-label">전화번호 *</label>
-        <input class="form-input" id="bl-value" placeholder="010-0000-0000">
+        <input class="form-input" id="bl-value" placeholder="010-0000-0000" type="tel" inputmode="tel" oninput="onBlacklistValueInput(this)">
       </div>
       <div class="form-group">
         <label class="form-label">사유 / 메모</label>
@@ -1141,7 +1141,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="form-card">
       <div class="form-card-title">👤 고객 정보</div>
       <div class="form-group"><label class="form-label">고객명 *</label><input class="form-input" id="qe-name" placeholder="홍길동"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="qe-phone" placeholder="010-0000-0000" type="tel" oninput="formatPhoneInput(this)"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="qe-phone" placeholder="010-0000-0000" type="tel" inputmode="tel" oninput="formatPhoneInput(this)"></div>
       <div class="form-group">
         <label class="form-label">주소</label>
         <div style="display:grid;grid-template-columns:1fr 90px;gap:6px;">
@@ -1251,7 +1251,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="form-group"><label class="form-label">업체명</label><input class="form-input" id="biz-name" placeholder="누수프로"></div>
       <div class="form-group"><label class="form-label">대표자명</label><input class="form-input" id="biz-ceo" placeholder="홍길동"></div>
       <div class="form-group"><label class="form-label">사업자등록번호</label><input class="form-input" id="biz-reg" placeholder="000-00-00000"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="biz-tel" placeholder="02-0000-0000" type="tel" oninput="formatPhoneInput(this)"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="biz-tel" placeholder="02-0000-0000" type="tel" inputmode="tel" oninput="formatPhoneInput(this)"></div>
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="biz-addr" placeholder="서울시 강남구"></div>
     </div>
     <div class="form-card">
@@ -3985,6 +3985,13 @@ function setBlacklistType(type) {
   }
 }
 
+// 블랙리스트 값 입력 (고객 유형일 때만 전화번호 하이픈 자동)
+function onBlacklistValueInput(el) {
+  if (_blacklistType === 'customer') {
+    formatPhoneInput(el);
+  }
+}
+
 // 블랙리스트 모달에서 저장
 async function saveBlacklistForm() {
   var value = document.getElementById('bl-value').value.trim();
@@ -4050,7 +4057,7 @@ function addFieldPhoneRow(label, number) {
   row.style.cssText = 'display:grid;grid-template-columns:80px 1fr 36px;gap:6px;margin-bottom:6px;';
   row.innerHTML =
     '<input class="form-input f-phone-label" placeholder="관계" value="' + (label||'') + '" style="padding:8px;font-size:13px;">'
-    + '<input class="form-input f-phone-number" placeholder="010-0000-0000" type="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
+    + '<input class="form-input f-phone-number" placeholder="010-0000-0000" type="tel" inputmode="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
     + '<button type="button" class="btn btn-secondary" onclick="this.parentNode.remove()" style="padding:0;color:var(--red);">✕</button>';
   list.appendChild(row);
 }
@@ -5827,7 +5834,7 @@ function addCustPhoneRow(label, number) {
   row.style.cssText = 'display:grid;grid-template-columns:80px 1fr 36px;gap:6px;margin-bottom:6px;';
   row.innerHTML =
     '<input class="form-input cust-phone-label" placeholder="관계" value="' + (label||'') + '" style="padding:8px;font-size:13px;">'
-    + '<input class="form-input cust-phone-number" placeholder="010-0000-0000" type="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
+    + '<input class="form-input cust-phone-number" placeholder="010-0000-0000" type="tel" inputmode="tel" value="' + (number||'') + '" oninput="formatPhoneInput(this)" style="padding:8px;">'
     + '<button class="btn btn-secondary" onclick="this.parentNode.remove()" style="padding:0;color:var(--red);">✕</button>';
   list.appendChild(row);
 }
@@ -7475,7 +7482,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-body">
       <div class="form-group"><label class="form-label">업체명 *</label><input class="form-input" id="cf-name" placeholder="예: OO중개, OO관리단"></div>
       <div class="form-group"><label class="form-label">담당자</label><input class="form-input" id="cf-contact" placeholder="담당자명"></div>
-      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000" oninput="formatPhoneInput(this)"></div>
+      <div class="form-group"><label class="form-label">전화번호</label><input class="form-input" id="cf-phone" placeholder="010-0000-0000" type="tel" inputmode="tel" oninput="formatPhoneInput(this)"></div>
       <div class="form-group"><label class="form-label">주소</label><input class="form-input" id="cf-addr" placeholder="업체 주소"></div>
       <div class="form-group"><label class="form-label">기본 수수료율 (%)</label><input class="form-input" id="cf-commission-rate" type="number" placeholder="30" step="0.1"></div>
       <div class="form-group"><label class="form-label">계좌번호</label><input class="form-input" id="cf-account" placeholder="예: 국민 123-456-789012 (예금주)"></div>

@@ -715,7 +715,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
-      <button class="bottom-btn" onclick="goPage('page-blacklist')">🚫 블랙리스트</button>
     </div>
   </div>
 </div>
@@ -1027,20 +1026,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="topbar">
     <button class="topbar-back" onclick="goBack()">←</button>
     <div class="topbar-title">고객 <span>연락처</span></div>
-    <button class="topbar-action" onclick="openCustomerForm(null)">+ 메모</button>
+    <div style="display:flex;gap:6px;">
+      <button class="topbar-action" onclick="openCustomerForm(null)">+ 메모</button>
+      <button class="topbar-action" onclick="openBlacklistForm()" style="background:var(--bg3);color:var(--text1);">+ 🚫</button>
+    </div>
   </div>
   <div class="page-body" id="contacts-body"></div>
 </div>
 
-<!-- ════════════ 블랙리스트 ════════════ -->
-<div class="page" id="page-blacklist">
-  <div class="topbar">
-    <button class="topbar-back" onclick="goBack()">←</button>
-    <div class="topbar-title">🚫 <span>블랙리스트</span></div>
-    <button class="topbar-action" onclick="openBlacklistForm()">+ 추가</button>
-  </div>
-  <div class="page-body" id="blacklist-body"></div>
-</div>
 
 <!-- ════════════ 간단 고객 메모 추가/수정 모달 ════════════ -->
 <div class="modal-overlay" id="customer-form-modal">
@@ -1604,7 +1597,6 @@ function goPage(id, extra) {
   else if (id === 'page-quick-est-list') renderQeList();
   else if (id === 'page-companies') renderCompaniesPage();
   else if (id === 'page-contacts') renderContacts();
-  else if (id === 'page-blacklist') renderBlacklist();
   else if (id === 'page-catalog') renderCatalog();
   else if (id === 'page-biz') loadBizForm();
   else if (id === 'page-as') renderAs();
@@ -3938,30 +3930,7 @@ async function removeBlacklist(id) {
   await saveBlacklist();
 }
 
-// 블랙리스트 목록 렌더
-function renderBlacklist() {
-  var el = document.getElementById('blacklist-body');
-  if (!el) return;
-  if (!_blacklist.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text3);padding:40px 20px;font-size:14px;">등록된 블랙리스트가 없습니다.<br><br>우측 상단 <b>+ 추가</b>로 등록하거나,<br>작업 상세에서 지정할 수 있어요.</div>';
-    return;
-  }
-  var html = '';
-  _blacklist.slice().sort(function(a,b){ return (b.date||'') > (a.date||'') ? 1 : -1; }).forEach(function(b) {
-    var typeLabel = b.type === 'customer' ? '고객' : '의뢰처';
-    var typeColor = b.type === 'customer' ? '#fb923c' : '#a855f7';
-    html += '<div style="background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:10px;border-left:3px solid ' + typeColor + ';">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
-    html += '<div style="flex:1;">';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:11px;color:' + typeColor + ';background:' + typeColor + '22;padding:2px 8px;border-radius:6px;">' + typeLabel + '</span><span style="font-weight:700;font-size:15px;">' + b.value + '</span></div>';
-    if (b.reason) html += '<div style="font-size:13px;color:var(--text2);margin-top:4px;">📝 ' + b.reason + '</div>';
-    html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">등록: ' + (b.date||'-') + '</div>';
-    html += '</div>';
-    html += '<button onclick="doRemoveBlacklist(' + b.id + ')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:4px 8px;">해제</button>';
-    html += '</div></div>';
-  });
-  el.innerHTML = html;
-}
+
 
 // 블랙리스트 추가 폼 (prompt 방식 - 간단)
 async function openBlacklistForm(presetType, presetValue) {
@@ -3978,7 +3947,7 @@ async function openBlacklistForm(presetType, presetValue) {
   var ok = await addBlacklist(type, value, reason);
   if (ok) {
     showToast('🚫 블랙리스트에 추가됐습니다');
-    renderBlacklist();
+    renderContacts();
   }
 }
 
@@ -3989,7 +3958,7 @@ async function doRemoveBlacklist(id) {
   if (!confirm('"' + item.value + '" 블랙리스트를 해제할까요?')) return;
   await removeBlacklist(id);
   showToast('블랙리스트에서 해제됐습니다');
-  renderBlacklist();
+  renderContacts();
 }
 
 // 간단 고객 메모 저장 (leakcall 연동용)
@@ -5770,10 +5739,33 @@ function renderContacts() {
       + '</div>'; }).join('');
   }
 
-  if (!html) {
-    html = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">등록된 고객이 없습니다<br><br>우측 상단 + 메모로 간단 고객을 추가하세요</div></div>';
+  // ── 블랙리스트 섹션 ──
+  html += renderBlacklistSection();
+
+  if (!html || (!(_customers && _customers.length) && !(_blacklist && _blacklist.length))) {
+    html = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">등록된 고객이 없습니다<br><br>우측 상단 + 메모로 간단 고객을,<br>+ 🚫로 블랙리스트를 추가하세요</div></div>';
   }
   el.innerHTML = html;
+}
+
+// 블랙리스트 섹션 HTML (연락처 페이지 하단)
+function renderBlacklistSection() {
+  if (!_blacklist || !_blacklist.length) return '';
+  var html = '<div style="font-size:12px;color:var(--text2);font-weight:600;margin:18px 0 8px;border-top:1px solid var(--border);padding-top:14px;">🚫 블랙리스트 (' + _blacklist.length + ')</div>';
+  _blacklist.slice().sort(function(a,b){ return (b.date||'') > (a.date||'') ? 1 : -1; }).forEach(function(b) {
+    var typeLabel = b.type === 'customer' ? '고객' : '의뢰처';
+    var typeColor = b.type === 'customer' ? '#fb923c' : '#a855f7';
+    html += '<div class="contact-card" style="border-left:3px solid ' + typeColor + ';">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+      + '<div style="flex:1;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;color:' + typeColor + ';background:' + typeColor + '22;padding:2px 8px;border-radius:6px;">' + typeLabel + '</span><span style="font-weight:700;">' + b.value + '</span></div>'
+      + (b.reason ? '<div style="font-size:13px;color:var(--text2);margin-top:4px;">📝 ' + b.reason + '</div>' : '')
+      + '<div style="font-size:11px;color:var(--text3);margin-top:4px;">등록: ' + (b.date||'-') + '</div>'
+      + '</div>'
+      + '<button onclick="doRemoveBlacklist(' + b.id + ')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:4px 8px;">해제</button>'
+      + '</div></div>';
+  });
+  return html;
 }
 
 // ════════════════════════════════════════

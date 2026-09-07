@@ -1093,8 +1093,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <textarea class="form-textarea" id="bl-reason" placeholder="예: 돈 안 냄, 막말, 노쇼 등"></textarea>
       </div>
       <div class="btn-group">
+        <button class="btn btn-secondary" id="bl-delete-btn" onclick="doRemoveBlacklistFromForm()" style="display:none;color:var(--red);">🗑️ 삭제</button>
         <button class="btn btn-primary" onclick="saveBlacklistForm()">💾 저장</button>
-      </div>
     </div>
   </div>
 </div>
@@ -3974,13 +3974,33 @@ async function removeBlacklist(id) {
 
 // 블랙리스트 모달 열기
 var _blacklistType = 'customer';
+var _editingBlacklistId = null;
 function openBlacklistForm(presetType, presetName, presetPhone) {
+  _editingBlacklistId = null;
   _blacklistType = presetType || 'customer';
   setBlacklistType(_blacklistType);
   document.getElementById('bl-name').value = presetName || '';
   document.getElementById('bl-phone').value = presetPhone || '';
   document.getElementById('bl-reason').value = '';
   document.getElementById('blacklist-form-title').textContent = '블랙리스트 추가';
+  var delBtn = document.getElementById('bl-delete-btn');
+  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('blacklist-form-modal').classList.add('open');
+}
+
+// 블랙리스트 수정 모달 열기
+function editBlacklist(id) {
+  var b = _blacklist.find(function(x){ return x.id === id; });
+  if (!b) return;
+  _editingBlacklistId = id;
+  _blacklistType = b.type || 'customer';
+  setBlacklistType(_blacklistType);
+  document.getElementById('bl-name').value = b.name || '';
+  document.getElementById('bl-phone').value = b.phone || '';
+  document.getElementById('bl-reason').value = b.reason || '';
+  document.getElementById('blacklist-form-title').textContent = '블랙리스트 수정';
+  var delBtn = document.getElementById('bl-delete-btn');
+  if (delBtn) delBtn.style.display = '';
   document.getElementById('blacklist-form-modal').classList.add('open');
 }
 
@@ -4001,19 +4021,50 @@ function setBlacklistType(type) {
   }
 }
 
-// 블랙리스트 모달에서 저장
+// 블랙리스트 모달에서 저장 (신규 추가 또는 수정)
 async function saveBlacklistForm() {
   var name = document.getElementById('bl-name').value.trim();
   var phone = document.getElementById('bl-phone').value.trim();
   if (!name && !phone) { showToast('이름 또는 전화번호를 입력하세요'); return; }
   var reason = document.getElementById('bl-reason').value.trim();
-  var ok = await addBlacklist(_blacklistType, name, phone, reason);
-  if (ok) {
-    showToast('🚫 블랙리스트에 추가됐습니다');
-    closeModal('blacklist-form-modal');
-    renderContacts();
+
+  if (_editingBlacklistId) {
+    // 수정
+    var b = _blacklist.find(function(x){ return x.id === _editingBlacklistId; });
+    if (b) {
+      b.type = _blacklistType;
+      b.name = name;
+      b.phone = phone;
+      b.reason = reason;
+      await saveBlacklist();
+      showToast('✓ 수정됐습니다');
+      _editingBlacklistId = null;
+      closeModal('blacklist-form-modal');
+      renderContacts();
+    }
+  } else {
+    // 신규 추가
+    var ok = await addBlacklist(_blacklistType, name, phone, reason);
+    if (ok) {
+      showToast('🚫 블랙리스트에 추가됐습니다');
+      closeModal('blacklist-form-modal');
+      renderContacts();
+    }
   }
 }
+// 모달 안에서 삭제
+async function doRemoveBlacklistFromForm() {
+  if (!_editingBlacklistId) return;
+  var b = _blacklist.find(function(x){ return x.id === _editingBlacklistId; });
+  if (!b) return;
+  if (!confirm('"' + (b.name || b.phone || '') + '" 블랙리스트를 삭제할까요?')) return;
+  await removeBlacklist(_editingBlacklistId);
+  _editingBlacklistId = null;
+  showToast('블랙리스트에서 삭제됐습니다');
+  closeModal('blacklist-form-modal');
+  renderContacts();
+}
+
 // 블랙리스트 해제
 async function doRemoveBlacklist(id) {
   var item = _blacklist.find(function(b){ return b.id === id; });
@@ -5823,7 +5874,7 @@ function renderBlacklistSection() {
     var title = b.name || '';
     var phoneHtml = b.phone ? '<div class="contact-phone" style="display:flex;align-items:center;gap:6px;margin-top:2px;">' + telButton(b.phone) + '<span>' + b.phone + '</span></div>' : '';
     if (!title && b.phone) title = b.phone;  // 이름 없으면 전화번호를 제목으로
-    html += '<div class="contact-card" style="border-left:3px solid ' + typeColor + ';">'
+    html += '<div class="contact-card" onclick="editBlacklist(' + b.id + ')" style="border-left:3px solid ' + typeColor + ';cursor:pointer;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
       + '<div style="flex:1;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;color:' + typeColor + ';background:' + typeColor + '22;padding:2px 8px;border-radius:6px;">' + typeLabel + '</span><span style="font-weight:700;">' + title + '</span></div>'
@@ -5831,7 +5882,7 @@ function renderBlacklistSection() {
       + (b.reason ? '<div style="font-size:13px;color:var(--text2);margin-top:4px;">📝 ' + b.reason + '</div>' : '')
       + '<div style="font-size:11px;color:var(--text3);margin-top:4px;">등록: ' + (b.date||'-') + '</div>'
       + '</div>'
-      + '<button onclick="doRemoveBlacklist(' + b.id + ')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:4px 8px;">해제</button>'
+      + '<button onclick="event.stopPropagation();doRemoveBlacklist(' + b.id + ')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:4px 8px;">해제</button>'
       + '</div></div>';
   });
   return html;

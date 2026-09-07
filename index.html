@@ -1064,6 +1064,36 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   </div>
 </div>
 
+<!-- ════════════ 블랙리스트 모달 ════════════ -->
+<div class="modal-overlay" id="blacklist-form-modal" onclick="handleOverlayClick(event,'blacklist-form-modal')">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="blacklist-form-title">블랙리스트 추가</div>
+      <button class="modal-close" onclick="closeModal('blacklist-form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">유형 *</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="bl-type-customer" onclick="setBlacklistType('customer')" class="btn" style="flex:1;background:#fb923c;color:white;">고객 (전화번호)</button>
+          <button type="button" id="bl-type-client" onclick="setBlacklistType('client')" class="btn" style="flex:1;background:var(--bg3);color:var(--text2);">의뢰처 (업체명)</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="bl-value-label">전화번호 *</label>
+        <input class="form-input" id="bl-value" placeholder="010-0000-0000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">사유 / 메모</label>
+        <textarea class="form-textarea" id="bl-reason" placeholder="예: 돈 안 냄, 막말, 노쇼 등"></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="saveBlacklistForm()">💾 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════ 누수 유형 관리 모달 ════════════ -->
 <div class="modal-overlay" id="leaktype-modal" onclick="handleOverlayClick(event,'leaktype-modal')">
   <div class="modal-sheet">
@@ -3323,22 +3353,14 @@ async function doBlacklistFromJob(id) {
   var hasPhone = !!(j.phone && j.phone.trim());
   var hasClient = !!(j.clientCompany && j.clientCompany.trim());
   if (!hasPhone && !hasClient) { showToast('전화번호나 의뢰처 정보가 없습니다'); return; }
-  var type, value;
-  if (hasPhone && hasClient) {
-    var pick = prompt('무엇을 블랙리스트로 지정할까요?\n\n1 = 고객 (' + j.phone + ')\n2 = 의뢰처 (' + j.clientCompany + ')\n\n번호 입력:');
-    if (pick === null) return;
-    if (pick.trim() === '2') { type = 'client'; value = j.clientCompany; }
-    else { type = 'customer'; value = j.phone; }
-  } else if (hasPhone) {
-    type = 'customer'; value = j.phone;
+  closeModal('detail-modal');
+  // 전화번호 우선, 없으면 의뢰처로 모달 열기 (모달 안에서 유형 바꿀 수 있음)
+  if (hasPhone) {
+    openBlacklistForm('customer', j.phone);
   } else {
-    type = 'client'; value = j.clientCompany;
+    openBlacklistForm('client', j.clientCompany);
   }
-  var reason = prompt('사유를 입력하세요 (선택):') || '';
-  var ok = await addBlacklist(type, value, reason);
-  if (ok) showToast('🚫 블랙리스트에 추가됐습니다');
 }
-
 // 미수 → 완료 (입금완료 처리)
 async function doMarkPaid(id) {
   var j = _jobs.find(function(x){ return x.id === id; });
@@ -3932,25 +3954,49 @@ async function removeBlacklist(id) {
 
 
 
-// 블랙리스트 추가 폼 (prompt 방식 - 간단)
-async function openBlacklistForm(presetType, presetValue) {
-  var type = presetType;
-  if (!type) {
-    var t = prompt('블랙리스트 유형을 선택하세요:\n\n1 = 고객 (전화번호)\n2 = 의뢰처 (업체명)\n\n번호 입력:');
-    if (t === null) return;
-    type = (t.trim() === '2') ? 'client' : 'customer';
-  }
-  var label = type === 'customer' ? '전화번호' : '업체명';
-  var value = presetValue || prompt(label + '을(를) 입력하세요:');
-  if (!value || !value.trim()) return;
-  var reason = prompt('사유를 입력하세요 (선택):') || '';
-  var ok = await addBlacklist(type, value, reason);
-  if (ok) {
-    showToast('🚫 블랙리스트에 추가됐습니다');
-    renderContacts();
+// 블랙리스트 모달 열기
+var _blacklistType = 'customer';
+function openBlacklistForm(presetType, presetValue) {
+  _blacklistType = presetType || 'customer';
+  setBlacklistType(_blacklistType);
+  document.getElementById('bl-value').value = presetValue || '';
+  document.getElementById('bl-reason').value = '';
+  document.getElementById('blacklist-form-title').textContent = '블랙리스트 추가';
+  document.getElementById('blacklist-form-modal').classList.add('open');
+}
+
+// 유형 선택 (고객/의뢰처 버튼)
+function setBlacklistType(type) {
+  _blacklistType = type;
+  var cBtn = document.getElementById('bl-type-customer');
+  var clBtn = document.getElementById('bl-type-client');
+  var label = document.getElementById('bl-value-label');
+  var input = document.getElementById('bl-value');
+  if (type === 'customer') {
+    cBtn.style.background = '#fb923c'; cBtn.style.color = 'white';
+    clBtn.style.background = 'var(--bg3)'; clBtn.style.color = 'var(--text2)';
+    if (label) label.textContent = '전화번호 *';
+    if (input) input.placeholder = '010-0000-0000';
+  } else {
+    clBtn.style.background = '#a855f7'; clBtn.style.color = 'white';
+    cBtn.style.background = 'var(--bg3)'; cBtn.style.color = 'var(--text2)';
+    if (label) label.textContent = '업체명 *';
+    if (input) input.placeholder = '업체 이름';
   }
 }
 
+// 블랙리스트 모달에서 저장
+async function saveBlacklistForm() {
+  var value = document.getElementById('bl-value').value.trim();
+  if (!value) { showToast(_blacklistType === 'customer' ? '전화번호를 입력하세요' : '업체명을 입력하세요'); return; }
+  var reason = document.getElementById('bl-reason').value.trim();
+  var ok = await addBlacklist(_blacklistType, value, reason);
+  if (ok) {
+    showToast('🚫 블랙리스트에 추가됐습니다');
+    closeModal('blacklist-form-modal');
+    renderContacts();
+  }
+}
 // 블랙리스트 해제
 async function doRemoveBlacklist(id) {
   var item = _blacklist.find(function(b){ return b.id === id; });

@@ -3915,11 +3915,15 @@ async function saveBlacklist() {
 function normalizePhone(p) { return String(p||'').replace(/[^0-9]/g, ''); }
 
 // 블랙리스트에서 항목 찾기 (이름 또는 전화번호로)
+// 이름 매칭에서 제외할 무의미한 값 (미정 작업끼리 잘못 걸리는 것 방지)
+function isGenericName(n) {
+  var s = String(n||'').trim();
+  return !s || s === '미정' || s === '무명' || s === '-' || s === '고객';
+}
 function findBlacklistByName(name) {
-  if (!name) return null;
+  if (isGenericName(name)) return null;
   var n = String(name).trim();
-  if (!n) return null;
-  return _blacklist.find(function(b){ return b.name && String(b.name).trim() === n; }) || null;
+  return _blacklist.find(function(b){ return b.name && !isGenericName(b.name) && String(b.name).trim() === n; }) || null;
 }
 function findBlacklistByPhone(phone) {
   var norm = normalizePhone(phone);
@@ -3951,6 +3955,8 @@ function checkJobBlacklist(job) {
 async function addBlacklist(type, name, phone, reason) {
   name = String(name||'').trim();
   phone = String(phone||'').trim();
+  // "미정" 등 무의미한 이름은 저장 안 함 (다른 미정 작업과 오인 매칭 방지)
+  if (isGenericName(name)) name = '';
   if (!name && !phone) { showToast('이름 또는 전화번호를 입력하세요'); return false; }
   if (findBlacklistDup(name, phone)) { showToast('이미 블랙리스트에 있습니다'); return false; }
   _blacklist.push({
@@ -4687,7 +4693,7 @@ function setDocType(type) {
   } else {
     document.getElementById('share-normal').style.display = 'block';
     document.getElementById('share-insurance').style.display = 'none';
-    document.getElementById('docs-send-all-btn').style.display = 'inline-block';
+    document.getElementById('docs-send-all-btn').style.display = '';
     renderDocPreview();
   }
 }
@@ -4830,11 +4836,12 @@ function toggleDocsMode() {
     if (docsBody) docsBody.classList.add('preview-mode');
     if (_curDocType === 'insurance') {
       document.getElementById('share-normal').style.display = 'none';
-    document.getElementById('docs-send-all-btn').style.display = 'none';
+      document.getElementById('docs-send-all-btn').style.display = 'none';
       document.getElementById('share-insurance').style.display = 'block';
     } else {
       document.getElementById('share-normal').style.display = 'block';
       document.getElementById('share-insurance').style.display = 'none';
+      document.getElementById('docs-send-all-btn').style.display = '';
     }
     // 편집 내용 미리보기에 반영
     if (_curDocType === 'receipt') {
@@ -4889,6 +4896,7 @@ function toggleDocsMode() {
     if (docsBody) docsBody.classList.remove('preview-mode');
     document.getElementById('share-normal').style.display = 'none';
     document.getElementById('share-insurance').style.display = 'none';
+    document.getElementById('docs-send-all-btn').style.display = 'none';
     if (window._scaleHandler) window.removeEventListener('resize', window._scaleHandler);
     // 편집 복귀 시 미리보기용 임시 항목 제거 (원본 기준으로 다시 그리기)
     var _jClear = (typeof getSelJob === 'function') ? getSelJob() : null;

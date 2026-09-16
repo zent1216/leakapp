@@ -5217,6 +5217,22 @@ function addEstItem() {
   tbody.appendChild(tr);
 }
 
+// 공사기간 표기 (하루/연속기간/추가일 모두 반영)
+function formatWorkPeriod(j) {
+  if (!j) return '';
+  var start = j.date || '';
+  // 연속 기간
+  if (j.dateEnd && j.dateEnd !== start) {
+    return start + ' ~ ' + j.dateEnd;
+  }
+  // 추가 작업일 (하루 걸러)
+  if (j.extraDates && j.extraDates.length > 0) {
+    var all = [start].concat(j.extraDates).filter(Boolean).sort();
+    return all.join(', ');
+  }
+  return start;
+}
+
 function makeCompletionHTML(j, biz, today, co, ce) {
   var addr = (j.addrBase || j.addr || '') + (j.addrDetail ? ' ' + j.addrDetail : '');
   var content = (j.action || j.after || j.before || '').replace(/\n/g, '<br>');
@@ -5235,7 +5251,7 @@ function makeCompletionHTML(j, biz, today, co, ce) {
     + '<tr><td style="width:15%;padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사명 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+workName+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">발주지 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+addr+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">사용자 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+userName+'</td></tr>'
-    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사기간 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+(j.date||'')+((j.dateEnd && j.dateEnd !== j.date) ? ' ~ ' + j.dateEnd : '')+'</td></tr>'
+    + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사기간 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;" contenteditable="'+ce+'">'+formatWorkPeriod(j)+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">공사금액 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;font-weight:700;" contenteditable="'+ce+'">'+amtLabel+'</td></tr>'
     + '<tr><td style="padding:11px 4px;color:#333;font-weight:600;vertical-align:top;white-space:nowrap;">내용 :</td><td style="padding:11px 4px;border-bottom:1px solid #ccc;height:70px;vertical-align:top;" contenteditable="'+ce+'">'+content+'</td></tr>'
     + '</table>'

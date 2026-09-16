@@ -797,9 +797,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">종료일 (여러 날 공사 시)</label>
+        <label class="form-label">종료일 (연속 공사 시)</label>
         <input class="form-input" id="f-date-end" type="date">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px;">하루 공사면 비워두세요. 여러 날이면 마지막 날 지정.</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">연속으로 며칠간 하면 마지막 날 지정 (하루면 비움).</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">추가 작업일 (하루 걸러 뛸 때)</label>
+        <div id="extra-dates-list"></div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addExtraDate('')" style="width:100%;margin-top:4px;">+ 날짜 추가</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">시작일 외에 따로 방문하는 날들을 추가하세요 (예: 8/10 시작 → 8/12, 8/15 추가).</div>
       </div>
       <div class="form-group">
         <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">누수 유형
@@ -3204,7 +3210,7 @@ function filterCalByDay(day) {
   if (!list) return;
   // 해당 날짜 현장만 필터
   console.log('filterCalByDay:', dateStr, '_jobs count:', _jobs.length);
-  var filtered = _jobs.filter(function(j) { return (j.date||'').indexOf(dateStr) === 0; });
+  var filtered = _jobs.filter(function(j) { return jobOccursOnDate(j, dateStr); });
   console.log('filtered:', filtered.length);
   if (filtered.length === 0) {
     showToast('해당 날짜에 작업이 없습니다');
@@ -3241,11 +3247,28 @@ function renderCalendar() {
   // 이달 작업 날짜 맵
   const prefix = y + '-' + String(m + 1).padStart(2,'0');
   const dayJobMap = {};
+  function _addToDay(dateStr, j) {
+    if (!dateStr || !dateStr.startsWith(prefix)) return;
+    var d = parseInt(dateStr.slice(8,10));
+    if (!dayJobMap[d]) dayJobMap[d] = [];
+    if (dayJobMap[d].indexOf(j) < 0) dayJobMap[d].push(j);
+  }
   _jobs.forEach(function(j) {
-    if ((j.date||'').startsWith(prefix)) {
-      const d = parseInt((j.date||'').slice(8,10));
-      if (!dayJobMap[d]) dayJobMap[d] = [];
-      dayJobMap[d].push(j);
+    // 시작일
+    _addToDay(j.date||'', j);
+    // 추가 작업일 (하루 걸러 뛰는 날들)
+    (j.extraDates || []).forEach(function(ed){ _addToDay(ed, j); });
+    // 연속 기간 (시작~종료) 사이 날들
+    if (j.dateEnd && j.dateEnd !== j.date && j.date) {
+      var cur = new Date(j.date), end = new Date(j.dateEnd);
+      cur.setDate(cur.getDate() + 1);
+      var guard = 0;
+      while (cur <= end && guard < 366) {
+        var ds = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0');
+        _addToDay(ds, j);
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+      }
     }
   });
 
@@ -3268,8 +3291,17 @@ function renderCalendar() {
     const jobs = dayJobMap[d] || [];
     const isToday = (y===todayY && m===todayM && d===todayD);
     const hasJob = jobs.length > 0;
-    const dotColor = jobs.some(function(j){return j.status==='done';}) ? 'var(--green)' : jobs.length ? 'var(--orange)' : '';
-    const hasMultiDay = jobs.some(function(j){ return j.dateEnd && j.dateEnd !== j.date; });
+    // 그 날 있는 상태별로 점 색상 (의뢰=파랑, 완료=초록, 미수=주황, 드롭=빨강)
+    const statusColors = {request:'#60a5fa', done:'#4ade80', unpaid:'#fb923c', failed:'#ef4444', pending:'#fb923c'};
+    var dotColorsSet = [];
+    jobs.forEach(function(j){
+      var col = statusColors[j.status] || '#fb923c';
+      if (dotColorsSet.indexOf(col) < 0) dotColorsSet.push(col);
+    });
+    var dotsHtml = dotColorsSet.slice(0,4).map(function(col){
+      return '<div style="width:5px;height:5px;border-radius:50%;background:' + col + ';"></div>';
+    }).join('');
+    const hasMultiDay = jobs.some(function(j){ return (j.dateEnd && j.dateEnd !== j.date) || (j.extraDates && j.extraDates.length > 0); });
     const col = (firstDay + d - 1) % 7;
     const textColor = col===0?'var(--red)':col===6?'var(--accent)':'var(--text)';
     const bg = isToday ? 'var(--accent)' : (hasJob ? 'var(--bg3)' : 'transparent');
@@ -3278,7 +3310,7 @@ function renderCalendar() {
     const txt = isToday ? 'white' : textColor;
     html += '<div class="cal-day-cell" data-day="' + d + '" data-hasjob="' + (hasJob||isToday?'1':'0') + '" style="text-align:center;padding:6px 2px;border-radius:8px;cursor:' + ((hasJob||isToday)?'pointer':'default') + ';background:' + bg + ';position:relative;">'
       + '<span style="font-size:13px;font-weight:' + fw + ';color:' + txt + ';">' + d + '</span>'
-      + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:' + dotColor + ';"></div>' : '')
+      + (hasJob ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);display:flex;gap:2px;">' + dotsHtml + '</div>' : '')
       + (hasMultiDay ? '<div style="position:absolute;top:1px;right:2px;font-size:8px;color:var(--accent);">📅</div>' : '')
       + '</div>';
   }
@@ -3429,13 +3461,17 @@ function showDetail(id) {
   // 기본 정보
   html += '<div class="detail-info-card">';
   var _dateShow = (j.date||'-');
+  var _hasExtra = (j.extraDates && j.extraDates.length > 0);
   if (j.dateEnd && j.dateEnd !== j.date) {
     // 기간 일수 계산
     var _d1 = new Date(j.date), _d2 = new Date(j.dateEnd);
     var _days = Math.round((_d2 - _d1) / 86400000) + 1;
     _dateShow = j.date + ' ~ ' + j.dateEnd + ' <span style="font-size:11px;color:var(--accent);">(' + _days + '일간)</span>';
   }
-  html += '<div class="info-row"><div class="info-key">작업' + (j.dateEnd && j.dateEnd !== j.date ? '기간' : '일') + '</div><div class="info-val">' + _dateShow + '</div></div>';
+  if (_hasExtra) {
+    _dateShow += '<div style="font-size:12px;color:var(--accent);margin-top:4px;">+ 추가일: ' + j.extraDates.join(', ') + '</div>';
+  }
+  html += '<div class="info-row"><div class="info-key">작업' + ((j.dateEnd && j.dateEnd !== j.date) || _hasExtra ? '일정' : '일') + '</div><div class="info-val">' + _dateShow + '</div></div>';
   if (j.phones && j.phones.length) {
     var extraPhonesHtml = j.phones.map(function(p){
       var lbl = p.label ? '<span style="color:var(--text3);font-size:11px;">('+p.label+') </span>' : '';
@@ -3624,6 +3660,8 @@ function resetForm() {
   addCostItem('', '');
   // 종료일 비우기
   if (document.getElementById('f-date-end')) document.getElementById('f-date-end').value = '';
+  var _edListReset = document.getElementById('extra-dates-list');
+  if (_edListReset) _edListReset.innerHTML = '';
   // 결제유형 기본값: 계좌이체
   var payEl = document.getElementById('f-pay-type');
   if (payEl) payEl.value = 'transfer';
@@ -3651,6 +3689,12 @@ function editJob(id) {
   document.getElementById('f-location').value = j.location || '';
   document.getElementById('f-date').value = j.date || '';
   if (document.getElementById('f-date-end')) document.getElementById('f-date-end').value = j.dateEnd || '';
+  // 추가 작업일 복원
+  var _edList = document.getElementById('extra-dates-list');
+  if (_edList) {
+    _edList.innerHTML = '';
+    (j.extraDates || []).forEach(function(d){ addExtraDate(d); });
+  }
   document.getElementById('f-status').value = j.status || 'done';
   document.getElementById('f-pay-type').value = j.payType || 'cash';
   document.getElementById('f-cash-receipt').checked = j.cashReceipt || false;
@@ -4374,6 +4418,38 @@ function calcNetProfit() {
   if (el) el.textContent = fmtMoney(net);
 }
 
+// 추가 작업일 행 추가 (하루 걸러 뛰는 날들)
+function addExtraDate(dateVal) {
+  var list = document.getElementById('extra-dates-list');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'extra-date-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+  row.innerHTML =
+    '<input class="form-input extra-date-input" type="date" value="' + (dateVal||'') + '" style="flex:1;">'
+    + '<button type="button" class="btn btn-secondary" onclick="this.parentNode.remove()" style="padding:0 14px;color:var(--red);flex-shrink:0;">✕</button>';
+  list.appendChild(row);
+}
+
+// 작업이 특정 날짜(YYYY-MM-DD)에 해당하는지 (시작일/추가일/연속기간 포함)
+function jobOccursOnDate(j, dateStr) {
+  if (!j || !dateStr) return false;
+  if ((j.date||'') === dateStr) return true;
+  if ((j.extraDates || []).indexOf(dateStr) >= 0) return true;
+  if (j.dateEnd && j.date && j.dateEnd !== j.date) {
+    if (dateStr >= j.date && dateStr <= j.dateEnd) return true;
+  }
+  return false;
+}
+
+// 추가 작업일 값들 수집 (빈 값 제외, 정렬)
+function collectExtraDates() {
+  var inputs = document.querySelectorAll('#extra-dates-list .extra-date-input');
+  var dates = [];
+  inputs.forEach(function(inp){ if (inp.value) dates.push(inp.value); });
+  return dates.sort();
+}
+
 function addMaterialRow(name='', qty='') {
   const list = document.getElementById('material-list');
   if (!list) return;
@@ -4553,6 +4629,7 @@ async function saveJob() {
     addrDetail: addrDetail,
     date,
     dateEnd: (document.getElementById('f-date-end') && document.getElementById('f-date-end').value) || '',
+    extraDates: collectExtraDates(),
     phone: document.getElementById('f-phone').value.trim(),
     phones: collectFieldPhones(),
     isTripFee: (document.getElementById('f-is-trip-fee') && document.getElementById('f-is-trip-fee').checked) || false,

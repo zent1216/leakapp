@@ -2075,11 +2075,49 @@ function detectLeakType(text) {
   return '';
 }
 
+// 빠른입력: 텍스트에서 전화번호를 모두 찾기 (관계 라벨 포함)
+// 예) "세입자 010-1111-2222 / 집주인: 010-3333-4444 / 02-555-6666(관리실)"
+function extractQuickPhones(text) {
+  var src = String(text || '');
+  var rels = '세입자|집주인|임대인|임차인|주인|관리실|관리사무소|관리소|경비실|소장|반장|담당자|담당|사장님|사장|사모님|대표|실장|과장|팀장|기사|본인|고객|남편|부인|아내|와이프|아들|딸|어머니|아버지|엄마|아빠|할머니|할아버지|아랫집|윗집|옆집|위층|아래층|사무실|현장|직장|회사|집|자택|휴대폰|핸드폰|폰|연락처|비상';
+  var re = /(01[016789]|050\d|0\d{1,2})[-\s.)]?\d{3,4}[-\s.]?\d{4}(?!\d)/g;
+  var list = [], seen = {}, cuts = [], m;
+  while ((m = re.exec(src)) !== null) {
+    if (m.index > 0 && /\d/.test(src.charAt(m.index - 1))) continue;  // 긴 숫자 중간은 제외
+    var num = m[0], digits = num.replace(/[^0-9]/g, '');
+    if (digits.length < 9 || digits.length > 12) continue;
+    var start = m.index, end = m.index + num.length, label = '';
+    // 앞쪽 관계: "세입자 010..." / "집주인: 010..."
+    var before = src.slice(Math.max(0, start - 12), start);
+    var bm = before.match(new RegExp('(' + rels + ')\\s*(?:님)?\\s*[:：\\-]?\\s*$'));
+    if (bm) { label = bm[1]; start -= bm[0].length; }
+    // 뒤쪽 괄호 관계: "010...(관리실)"
+    var after = src.slice(end, end + 12);
+    var am = after.match(/^\s*[\(\[]([^\)\]]{1,8})[\)\]]/);
+    if (am) { if (!label) label = am[1].trim(); end += am[0].length; }
+    cuts.push([start, end]);
+    if (seen[digits]) continue;
+    seen[digits] = true;
+    list.push({ number: num.trim(), label: label });
+  }
+  // 원문에서 번호(+라벨) 제거
+  var rest = src;
+  for (var i = cuts.length - 1; i >= 0; i--) rest = rest.slice(0, cuts[i][0]) + ' ' + rest.slice(cuts[i][1]);
+  rest = rest.replace(/[ \t]{2,}/g, ' ').trim();
+  return { list: list, rest: rest };
+}
+
 function parseQuickPaste() {
   var raw = (document.getElementById('f-quick-paste').value || '').trim();
   if (!raw) { showToast('붙여넣을 내용을 입력해주세요'); return; }
 
   var phone = '', addr = '', content = '';
+
+  // 전화번호를 먼저 전부 추출 (여러 개면 순서대로), 원문에서는 제거
+  var _qp = extractQuickPhones(raw);
+  raw = _qp.rest;
+  if (_qp.list.length) phone = _qp.list[0].number;
+  var _qpFirstLabel = _qp.list.length ? _qp.list[0].label : '';
 
   // 슬래시(/)로 구분된 경우 우선 처리
   if (raw.indexOf('/') >= 0) {
@@ -2145,12 +2183,16 @@ function parseQuickPaste() {
   // 폼 채우기
   resetForm();
   if (phone) document.getElementById('f-phone').value = formatPhoneNumber(phone);
+  // 두 번째 번호부터 추가 번호 칸에 차례대로
+  _qp.list.slice(1).forEach(function(p){ addFieldPhoneRow(p.label, formatPhoneNumber(p.number)); });
   if (addrBase) document.getElementById('f-addr').value = addrBase;
   if (addrDetail) document.getElementById('f-addr-detail').value = addrDetail;
   // 오더 세부내용 → 내부 비밀 메모(f-memo)에 저장
+  // 대표 번호의 관계(예: 세입자)는 기본 전화칸에 넣을 곳이 없어 메모 앞에 남김
+  if (_qpFirstLabel) content = '[대표번호: ' + _qpFirstLabel + '] ' + content;
   if (content) {
     var memoEl = document.getElementById('f-memo');
-    if (memoEl) memoEl.value = content;
+    if (memoEl) memoEl.value = content.trim();
   }
   // 메모 내용에서 누수 유형 자동 감지 → 유형(f-type) 설정
   var detectedType = detectLeakType(content);
@@ -2176,7 +2218,7 @@ function parseQuickPaste() {
 
   var msg = '분류 완료 ✓';
   var found = [];
-  if (phone) found.push('전화');
+  if (phone) found.push('전화' + (_qp.list.length > 1 ? ' ' + _qp.list.length + '개' : ''));
   if (addr) found.push('주소');
   if (content) found.push('메모');
   if (detectedType) found.push('유형(' + detectedType + ')');

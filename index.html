@@ -719,7 +719,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.143 · 2026.09.29</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.145 · 2026.09.29</div>
   </div>
 </div>
 
@@ -3164,6 +3164,10 @@ function updateMainStats() {
   const weekRevenue = weekDone.reduce((s,j) => s + jobTotal(j), 0);
   const weekComm = weekDone.reduce((s,j) => s + (j.commission||0), 0);
   const weekNet = weekRevenue - weekComm;
+  // 체크 시 자재 구매비도 차감
+  const dm = deductMatOn();
+  const weekMat = dm ? matSumRange(weekStartStr, weekEndStr) : 0;
+  const monthMat = dm ? matSumPrefix(prefix) : 0;
 
   // 자재 비용 합계
   const materialTotal = (_materials || []).reduce((s,m) => s + (m.amount||0), 0);
@@ -3175,13 +3179,13 @@ function updateMainStats() {
 
   // 이번주 순수익
   const elWeek = document.getElementById('ms-week-revenue');
-  if (elWeek) elWeek.textContent = fmtShort(weekComm > 0 ? weekNet : weekRevenue);
+  if (elWeek) elWeek.textContent = fmtShort((weekComm > 0 ? weekNet : weekRevenue) - weekMat);
 
   // 이번달 순수익
   const el3 = document.getElementById('ms-revenue');
-  if (el3) el3.textContent = commission > 0 ? fmtShort(netRevenue) : fmtShort(revenue);
+  if (el3) el3.textContent = fmtShort((commission > 0 ? netRevenue : revenue) - monthMat);
   const label3 = document.getElementById('ms-revenue-label');
-  if (label3) label3.textContent = commission > 0 ? '이번달 순수익' : '이번달 수입';
+  if (label3) label3.textContent = (commission > 0 || dm) ? '이번달 순수익' : '이번달 수입';
 
   // 이번달 매출 (수수료 차감 전 총 매출)
   const elMonthSales = document.getElementById('ms-month-sales');
@@ -4028,6 +4032,20 @@ function applyMoneyStatsCollapse() {
 async function toggleMoneyStats() {
   _uiPrefs.moneyCollapsed = !_uiPrefs.moneyCollapsed;
   applyMoneyStatsCollapse();
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({uiPrefs: JSON.stringify(_uiPrefs)}, {merge: true});
+  } catch(e) { console.error('saveUiPrefs:', e); }
+}
+
+// 순수익에서 자재 구매비 빼기 (실적관리 체크박스, 계정에 저장)
+function deductMatOn() { return !!(_uiPrefs && _uiPrefs.deductMaterial); }
+function matSumPrefix(prefix) { return (_materials || []).filter(function(m){ return (m.date||'').startsWith(prefix); }).reduce(function(s,m){ return s + (m.amount||0); }, 0); }
+function matSumRange(from, to) { return (_materials || []).filter(function(m){ var d = m.date||''; return d >= from && d <= to; }).reduce(function(s,m){ return s + (m.amount||0); }, 0); }
+async function toggleDeductMaterial(on) {
+  _uiPrefs.deductMaterial = !!on;
+  renderStats();
+  updateMainStats();
   if (!_uid) return;
   try {
     await db.collection('users').doc(_uid).set({uiPrefs: JSON.stringify(_uiPrefs)}, {merge: true});
@@ -5851,18 +5869,28 @@ function renderStats() {
   // VAT 신고 대상 매출 (VAT 발행 현장의 매출 합계 = 국세청 보고 금액)
   const vatReportJobs = doneJobs.filter(j=>j.payType === 'card' || j.cashReceipt);
   const totalRevVatReport = vatReportJobs.reduce((s,j)=>s+jobTotal(j), 0);
+  // 자재 구매비 (자재관리에 등록한 영수증 기준, 구매일로 집계)
+  const _nowD = new Date(), _curY = String(_nowD.getFullYear()), _curM = _curY + '-' + String(_nowD.getMonth()+1).padStart(2,'0');
+  const matSumBy = function(prefix){ return (_materials || []).filter(function(m){ return (m.date||'').startsWith(prefix); }).reduce(function(s,m){ return s + (m.amount||0); }, 0); };
+  const matYear = matSumBy(selYear);
+  const dMat = deductMatOn();
+  const matMonth = selYear === _curY ? matSumBy(_curM) : null;
 
   // 연간 요약 카드
   el.innerHTML = ''
+    + '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);font-size:13px;cursor:pointer;">'
+    + '<input type="checkbox" ' + (dMat ? 'checked ' : '') + 'onchange="toggleDeductMaterial(this.checked)" style="width:18px;height:18px;">'
+    + '<span>순수익에서 <b>자재 구매비</b> 빼기</span><span style="margin-left:auto;font-size:10px;color:var(--text3);">메인 화면에도 적용</span></label>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
-    + '<div class="stat-card" style="grid-column:1/-1;">'
+    + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출</div>'
-    + '<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
     + '<div style="font-size:11px;color:var(--purple);margin-top:2px;">VAT 신고매출 '+fmtMoney(totalRevVatReport)+' ('+vatReportJobs.length+'건)</div>'
     + '</div>'
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 순수익</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev - totalComm)+'</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev - totalComm - (dMat ? matYear : 0))+'</div>'
+    + '<div style="font-size:10px;color:var(--text3);margin-top:2px;">' + (dMat ? '수수료·자재비 차감' : '수수료 차감') + '</div>'
     + '</div>'
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 수수료</div>'
@@ -5877,10 +5905,14 @@ function renderStats() {
           + '<div style="font-size:10px;color:'+(v.pay>0?'var(--text2)':'var(--green)')+';margin-top:2px;">실제 납부: '+typeTxt+'</div>'
           + '</div>';
       })()
-    + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">비용처리 (자재비)</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">'+fmtMoney(doneJobs.reduce(function(s,j){return s+(j.materialCost||0);},0))+'</div>'
-    + '</div>'
+    + '<div class="stat-card" style="grid-column:1/-1;">'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">비용처리 (자재 구매) <span style="font-size:10px;color:var(--text3);">· 자재관리 영수증 기준</span></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    + '<div><div style="font-size:10px;color:var(--text2);">' + (matMonth !== null ? '이번 달 (' + (_nowD.getMonth()+1) + '월)' : '이번 달') + '</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">' + (matMonth !== null ? '-' + fmtMoney(matMonth) : '-') + '</div></div>'
+    + '<div><div style="font-size:10px;color:var(--text2);">' + selYear + '년 누적</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(matYear) + '</div></div>'
+    + '</div></div>'
         + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
     + '<div class="stat-card"><div class="stat-num accent">'+yearJobs.length+'</div><div class="stat-label">전체 건수</div></div>'
@@ -5895,17 +5927,21 @@ function renderStats() {
       const mDone = mJobs.filter(j=>j.status==='done');
       const mRev = mDone.reduce((s,j)=>s+jobTotal(j),0);
       const mComm = mDone.reduce((s,j)=>s+(j.commission||0),0);
-      const mNet = mRev - mComm;
+      const mMat = matSumBy(selYear+'-'+m);
+      const mNet = mRev - mComm - (dMat ? mMat : 0);
       return '<div class="month-row">'
         + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mDone.length+'건)</span>'
         + '<span class="month-total">'+fmtMoney(mRev)+'</span></div>'
         + '<div class="month-jobs">'
         // 수수료/순수익 요약
         + (mComm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
-          + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>'
-          + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
+          + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>' : '')
+        + ((dMat && mMat > 0) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
+          + '<span style="color:var(--text2);">자재 구매</span><span style="color:var(--orange);">-'+fmtMoney(mMat)+'</span></div>' : '')
+        + ((mComm > 0 || (dMat && mMat > 0)) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
+        + (function(){ var mm = dMat ? 0 : mMat; return mm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">자재 구매</span><span style="color:var(--orange);">-'+fmtMoney(mm)+'</span></div>' : ''; })()
         + mDone.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
           const hasComm = (j.commission||0) > 0;
           return '<div class="month-job-row">'

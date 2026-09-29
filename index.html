@@ -680,7 +680,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <div class="stat-card"><div class="stat-num orange" id="ms-pending">0</div><div class="stat-label">미수현장</div></div>
       <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
     </div>
-    <div class="main-stats" style="margin-top:6px;">
+    <div id="ms-money-toggle" onclick="toggleMoneyStats()" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:6px 10px;border-radius:8px;background:var(--bg3);cursor:pointer;font-size:12px;color:var(--text2);user-select:none;">
+      <span>💰 금액 보기</span><span id="ms-money-arrow">▲ 접기</span>
+    </div>
+    <div class="main-stats" id="ms-money-stats" style="margin-top:6px;">
       <div class="stat-card"><div class="stat-num accent" id="ms-week-revenue">0</div><div class="stat-label">이번주 순수익</div></div>
       <div class="stat-card"><div class="stat-num accent" id="ms-revenue">0</div><div class="stat-label" id="ms-revenue-label">이번달 순수익</div></div>
       <div class="stat-card"><div class="stat-num" id="ms-month-sales" style="color:var(--text1);">0</div><div class="stat-label">이번달 매출</div></div>
@@ -1828,6 +1831,11 @@ async function loadUserData(uid) {
         const parsedBlacklist = d.blacklist ? JSON.parse(d.blacklist) : [];
         _blacklist = Array.isArray(parsedBlacklist) ? parsedBlacklist : [];
       } catch { _blacklist = []; }
+      try {
+        const parsedUi = d.uiPrefs ? JSON.parse(d.uiPrefs) : {};
+        _uiPrefs = (parsedUi && typeof parsedUi === 'object') ? parsedUi : {};
+      } catch { _uiPrefs = {}; }
+      applyMoneyStatsCollapse();
       try {
         const parsedTypes = d.leakTypes ? JSON.parse(d.leakTypes) : null;
         if (Array.isArray(parsedTypes) && parsedTypes.length) _leakTypes = parsedTypes;
@@ -3952,6 +3960,24 @@ async function saveClients() {
   try {
     await db.collection('users').doc(_uid).set({clients: JSON.stringify(_clients)}, {merge: true});
   } catch(e) { console.error('saveClients:', e); }
+}
+
+// ── 메인 금액 칸 접기/펼치기 (계정에 저장) ──
+var _uiPrefs = {};
+function applyMoneyStatsCollapse() {
+  var box = document.getElementById('ms-money-stats');
+  var arrow = document.getElementById('ms-money-arrow');
+  var collapsed = !!(_uiPrefs && _uiPrefs.moneyCollapsed);
+  if (box) box.style.display = collapsed ? 'none' : '';
+  if (arrow) arrow.textContent = collapsed ? '▼ 펼치기' : '▲ 접기';
+}
+async function toggleMoneyStats() {
+  _uiPrefs.moneyCollapsed = !_uiPrefs.moneyCollapsed;
+  applyMoneyStatsCollapse();
+  if (!_uid) return;
+  try {
+    await db.collection('users').doc(_uid).set({uiPrefs: JSON.stringify(_uiPrefs)}, {merge: true});
+  } catch(e) { console.error('saveUiPrefs:', e); }
 }
 
 async function saveBlacklist() {

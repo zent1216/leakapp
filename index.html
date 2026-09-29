@@ -84,6 +84,7 @@ input, textarea, select, button {
   --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
   --orange:#f59e0b;--orange-bg:rgba(245,158,11,0.1);
   --purple:#a855f7;--purple-bg:rgba(168,85,247,0.1);
+  --mat:#f472b6;--mat-bg:rgba(244,114,182,0.1);   /* 자재비 전용 색 (핑크: 나가는 돈, 수수료 빨강과 구분) */
   --r:12px;--r-sm:8px;--r-xs:6px;
   --shadow:0 4px 20px rgba(0,0,0,0.4);
 }
@@ -678,7 +679,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     <div class="main-stats">
       <div class="stat-card"><div class="stat-num green" id="ms-done">0</div><div class="stat-label">이달 완료</div></div>
       <div class="stat-card"><div class="stat-num orange" id="ms-pending">0</div><div class="stat-label">미수현장</div></div>
-      <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--red);">0</div><div class="stat-label">자재 비용</div></div>
+      <div class="stat-card"><div class="stat-num" id="ms-material-cost" style="font-size:16px;color:var(--mat);">0</div><div class="stat-label">자재 비용</div></div>
     </div>
     <div id="ms-money-toggle" onclick="toggleMoneyStats()" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:6px 10px;border-radius:8px;background:var(--bg3);cursor:pointer;font-size:12px;color:var(--text2);user-select:none;">
       <span>💰 금액 보기</span><span id="ms-money-arrow">▲ 접기</span>
@@ -719,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.145 · 2026.09.29</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.147 · 2026.09.29</div>
   </div>
 </div>
 
@@ -1223,8 +1224,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   </div>
   <div class="page-body">
     <div class="main-stats" style="margin-bottom:12px;">
-      <div class="stat-card"><div class="stat-num red" id="mat-total-cost">0</div><div class="stat-label">총 자재비용</div></div>
-      <div class="stat-card"><div class="stat-num accent" id="mat-year-cost">0</div><div class="stat-label">올해 자재비</div></div>
+      <div class="stat-card"><div class="stat-num" id="mat-total-cost" style="color:var(--mat);">0</div><div class="stat-label">총 자재비용</div></div>
+      <div class="stat-card"><div class="stat-num" id="mat-year-cost" style="color:var(--mat);">0</div><div class="stat-label">올해 자재비</div></div>
       <div class="stat-card"><div class="stat-num green" id="mat-count">0</div><div class="stat-label">등록 건수</div></div>
     </div>
     <button class="btn btn-primary" style="width:100%;padding:16px;font-size:16px;margin-bottom:8px;" onclick="document.getElementById('mat-quick-receipt-input').click()">📷 영수증 찍어서 등록</button>
@@ -5909,9 +5910,9 @@ function renderStats() {
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">비용처리 (자재 구매) <span style="font-size:10px;color:var(--text3);">· 자재관리 영수증 기준</span></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
     + '<div><div style="font-size:10px;color:var(--text2);">' + (matMonth !== null ? '이번 달 (' + (_nowD.getMonth()+1) + '월)' : '이번 달') + '</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">' + (matMonth !== null ? '-' + fmtMoney(matMonth) : '-') + '</div></div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--mat);font-family:IBM Plex Mono,monospace;">' + (matMonth !== null ? '-' + fmtMoney(matMonth) : '-') + '</div></div>'
     + '<div><div style="font-size:10px;color:var(--text2);">' + selYear + '년 누적</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--orange);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(matYear) + '</div></div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--mat);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(matYear) + '</div></div>'
     + '</div></div>'
         + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">'
@@ -5937,11 +5938,11 @@ function renderStats() {
         + (mComm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
           + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>' : '')
         + ((dMat && mMat > 0) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
-          + '<span style="color:var(--text2);">자재 구매</span><span style="color:var(--orange);">-'+fmtMoney(mMat)+'</span></div>' : '')
+          + '<span style="color:var(--text2);">자재 구매</span><span style="color:var(--mat);">-'+fmtMoney(mMat)+'</span></div>' : '')
         + ((mComm > 0 || (dMat && mMat > 0)) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
-        + (function(){ var mm = dMat ? 0 : mMat; return mm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">자재 구매</span><span style="color:var(--orange);">-'+fmtMoney(mm)+'</span></div>' : ''; })()
+        + (function(){ var mm = dMat ? 0 : mMat; return mm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">자재 구매</span><span style="color:var(--mat);">-'+fmtMoney(mm)+'</span></div>' : ''; })()
         + mDone.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
           const hasComm = (j.commission||0) > 0;
           return '<div class="month-job-row">'
@@ -8924,7 +8925,7 @@ function renderMaterialList() {
     var monthTotal = items.reduce(function(s,m){ return s + (m.amount||0); }, 0);
     var label = ym.replace('-','년 ') + '월';
     html += '<div class="month-row">';
-    html += '<div class="month-header"><span class="month-name">' + label + ' (' + items.length + '건)</span><span class="month-total" style="color:var(--red);">-' + fmtMoney(monthTotal) + '</span></div>';
+    html += '<div class="month-header"><span class="month-name">' + label + ' (' + items.length + '건)</span><span class="month-total" style="color:var(--mat);">-' + fmtMoney(monthTotal) + '</span></div>';
     html += '<div class="month-jobs">';
     items.forEach(function(m) {
       html += '<div class="month-job-row" onclick="openMaterialPurchaseForm(' + m.id + ')" style="cursor:pointer;">';
@@ -8932,7 +8933,7 @@ function renderMaterialList() {
       html += '<div style="font-size:13px;font-weight:600;">' + (m.name||'-') + ((m.receiptImgs && m.receiptImgs.length) ? ' <span style="font-size:11px;color:var(--accent);">🧾' + (m.receiptImgs.length > 1 ? m.receiptImgs.length : '') + '</span>' : '') + '</div>';
       html += '<div style="font-size:11px;color:var(--text2);">' + (m.date||'') + (m.vendor ? ' · ' + m.vendor : '') + (m.qty ? ' · ' + m.qty : '') + '</div>';
       html += '</div>';
-      html += '<div style="font-size:14px;font-weight:700;color:var(--red);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(m.amount||0) + '</div>';
+      html += '<div style="font-size:14px;font-weight:700;color:var(--mat);font-family:IBM Plex Mono,monospace;">-' + fmtMoney(m.amount||0) + '</div>';
       html += '</div>';
     });
     html += '</div></div>';

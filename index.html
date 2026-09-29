@@ -1232,6 +1232,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="btn btn-secondary" style="flex:1;" onclick="openMaterialPurchaseForm()">➕ 직접 등록</button>
       <button class="btn btn-secondary" style="flex:1;" onclick="goPage('page-catalog')">🗂️ 자재 카탈로그</button>
     </div>
+    <button type="button" onclick="openOcrLearnList()" style="width:100%;background:none;border:none;color:var(--text2);font-size:12px;padding:2px 0 10px;cursor:pointer;">📚 영수증 인식 학습 목록 (고친 단어·품목명 관리)</button>
     <div id="material-purchase-list"></div>
   </div>
 </div>
@@ -1854,6 +1855,10 @@ async function loadUserData(uid) {
         var parsedOd = d.ocrDict ? JSON.parse(d.ocrDict) : {};
         _ocrDict = (parsedOd && typeof parsedOd === 'object' && !Array.isArray(parsedOd)) ? parsedOd : {};
       } catch { _ocrDict = {}; }
+      try {
+        var parsedOw = d.ocrWords ? JSON.parse(d.ocrWords) : {};
+        _ocrWords = (parsedOw && typeof parsedOw === 'object' && !Array.isArray(parsedOw)) ? parsedOw : {};
+      } catch { _ocrWords = {}; }
       try {
         var parsedQe = d.quickEstimates ? JSON.parse(d.quickEstimates) : [];
         _quickEstimates = Array.isArray(parsedQe) ? parsedQe : [];
@@ -7633,6 +7638,7 @@ function parseReceiptText(text, todayStr) {
     s = fixOcrName(s);
     // 앞 품번 코드(PB15, PBCP15., 80015) 제거 — 'PB', 'PPR' 같은 순수 영문 약어는 유지
     s = s.replace(/^(?:(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{3,}|\d{2,}|[A-Z]{4,})[.]?\s+(?=[^가-힣]{0,12}[가-힣])/, '');
+    s = s.replace(/^[A-Z]{2,}\d+[A-Z]?[.]?(?=[가-힣]{2})/, '');                      // 붙어 있는 품번(PBCP15소켓, SS3서비스소켓)
     s = fixOcrName(s);
     s = s.replace(/(\s+([\d,.]{3,}|[A-Za-z~=*|"“”']{1,2}|[^\s가-힣A-Za-z0-9()]+))+$/, ''); // 뒤 잡문자
     return s.trim();
@@ -7674,7 +7680,9 @@ function parseReceiptText(text, todayStr) {
     var line = lines[L];
     if (HEAD.test(line) || /^[-=_~.\s]+$/.test(line)) continue;
     if (isNumLine(line)) {
-      if (!cur || cur.nums.length) { cur = { name: '', nums: [] }; blocks.push(cur); }
+      // 숫자 줄이 둘로 쪼개져 읽힌 경우("50 *" / "600 30,000")는 같은 품목으로 이어 붙임
+      var curDone = cur && cur.nums.length && (cur.nums.length >= 3 || ((solve(cur.nums) || {}).ok && cur.nums.length >= 2));
+      if (!cur || curDone) { cur = { name: '', nums: [] }; blocks.push(cur); }
       cur.nums = cur.nums.concat(numsOf(line));
       continue;
     }
@@ -7688,9 +7696,10 @@ function parseReceiptText(text, todayStr) {
       }
       // 한 줄형(상품명 수량 금액): 다음 줄이 숫자 줄이 아닐 때만 (두 줄형 영수증과 구분)
       var nextIsNum = L + 1 < end && isNumLine(lines[L + 1]);
-      var tail2 = !nextIsNum && normNums(line).match(/(?:\s|[x×X*]\s*)(\d{1,3})\s+(\d{1,3}(?:,\d{3})+|\d{3,8})\s*원?\s*$/);
+      var line2 = normNums(line).replace(/([가-힣])(\d{1,2})(\s+(?:\d{1,3}(?:,\d{3})+|\d{3,8})\s*원?\s*)$/, '$1 $2$3');   // "백색2 9,000" → "백색 2 9,000"
+      var tail2 = !nextIsNum && line2.match(/(?:\s|[x×X*]\s*)(\d{1,3})\s+(\d{1,3}(?:,\d{3})+|\d{3,8})\s*원?\s*$/);
       if (tail2) {
-        var q2 = +tail2[1], a2 = parseInt(tail2[2].replace(/,/g, ''), 10), nm2 = cleanName(normNums(line).slice(0, tail2.index));
+        var q2 = +tail2[1], a2 = parseInt(tail2[2].replace(/,/g, ''), 10), nm2 = cleanName(line2.slice(0, tail2.index));
         if (q2 >= 1 && a2 >= 100 && (korCount(nm2) >= 1 || /[A-Za-z]{2,}/.test(nm2))) {
           blocks.push({ name: nm2, nums: [q2, a2], solved: { qty: q2, price: a2 % q2 === 0 ? a2 / q2 : a2, amount: a2, ok: a2 % q2 === 0 } });
           if (a2 % q2 !== 0) blocks[blocks.length - 1].solved.qty = q2;
@@ -7955,6 +7964,301 @@ function setOcrProgress(pct, sub) {
 }
 function hideOcrOverlay() { var ov = document.getElementById('ocr-overlay'); if (ov) ov.remove(); }
 
+// ══════════════════════════════════════════
+//  PaddleOCR (PP-OCRv5 한국어) — 폰 안에서 처리, 무료
+//  처음 한 번 인식 데이터(약 30MB)를 받아 기기에 저장해 두고 이후엔 바로 사용
+// ══════════════════════════════════════════
+var _pdOrt = null, _pdDet = null, _pdRec = null, _pdChars = null, _pdLoading = null;
+var PD_ORT_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
+var PD_DET_URL = 'https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/main/inference.onnx';
+var PD_REC_URL = 'https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec_onnx/resolve/main/inference.onnx';
+var PD_DICT_URL = 'https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec_onnx/resolve/main/inference.yml';
+var PD_CACHE = 'paddle-ocr-v5-kor-1';
+
+// 파일 받기 (진행률 표시 + 기기 캐시 저장)
+async function pdFetch(url, onProg) {
+  var cache = null;
+  try { cache = await caches.open(PD_CACHE); var hit = await cache.match(url); if (hit) { if (onProg) onProg(1); return hit; } } catch(e) { cache = null; }
+  var res = await fetch(url);
+  if (!res.ok) throw new Error('인식 데이터 다운로드 실패 (' + res.status + ')');
+  var total = +res.headers.get('content-length') || 0;
+  var buf;
+  if (res.body && res.body.getReader && total) {
+    var reader = res.body.getReader(), parts = [], got = 0;
+    while (true) { var r = await reader.read(); if (r.done) break; parts.push(r.value); got += r.value.length; if (onProg) onProg(got / total); }
+    buf = new Blob(parts);
+  } else { buf = await res.blob(); if (onProg) onProg(1); }
+  var resp = new Response(buf);
+  if (cache) { try { await cache.put(url, resp.clone()); } catch(e) {} }
+  return resp;
+}
+function pdLoadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = resolve; s.onerror = function(){ reject(new Error('OCR 엔진을 불러오지 못했어요 (인터넷 확인)')); };
+    document.head.appendChild(s);
+  });
+}
+function pdLoad(onProg) {
+  if (_pdLoading) return _pdLoading;
+  _pdLoading = (async function() {
+    if (!window.ort) await pdLoadScript(PD_ORT_URL + 'ort.wasm.min.js');
+    _pdOrt = window.ort;
+    _pdOrt.env.wasm.wasmPaths = PD_ORT_URL;
+    _pdOrt.env.wasm.numThreads = (self.crossOriginIsolated && navigator.hardwareConcurrency) ? Math.min(4, navigator.hardwareConcurrency) : 1;
+    var pDet = 0, pRec = 0, pDict = 0;
+    function prog() { if (onProg) onProg(pDet * 0.2 + pRec * 0.75 + pDict * 0.05); }
+    var files = await Promise.all([
+      pdFetch(PD_DET_URL, function(p){ pDet = p; prog(); }).then(function(r){ return r.arrayBuffer(); }),
+      pdFetch(PD_REC_URL, function(p){ pRec = p; prog(); }).then(function(r){ return r.arrayBuffer(); }),
+      pdFetch(PD_DICT_URL, function(p){ pDict = p; prog(); }).then(function(r){ return r.text(); })
+    ]);
+    // inference.yml 안의 character_dict 목록 읽기
+    var lines = files[2].split(/\r?\n/), chars = [], inDict = false;
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (/^\s*character_dict:\s*$/.test(ln)) { inDict = true; continue; }
+      if (inDict) {
+        var m = ln.match(/^\s*-\s?(.*)$/);
+        if (!m) { if (/^\s*[A-Za-z_]+:/.test(ln)) break; continue; }
+        var v = m[1];
+        if (/^'.*'$/.test(v)) v = v.slice(1, -1).replace(/''/g, "'");
+        else if (/^".*"$/.test(v)) { try { v = JSON.parse(v); } catch(e) { v = v.slice(1, -1); } }
+        chars.push(v);
+      }
+    }
+    if (chars.length < 1000) throw new Error('인식 사전을 읽지 못했어요');
+    _pdChars = [''].concat(chars, [' ']);
+    try { _pdOrt.env.logLevel = 'error'; } catch(e) {}
+    var opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all', logSeverityLevel: 3 };
+    _pdDet = await _pdOrt.InferenceSession.create(new Uint8Array(files[0]), opt);
+    _pdRec = await _pdOrt.InferenceSession.create(new Uint8Array(files[1]), opt);
+    return true;
+  })();
+  _pdLoading.catch(function(){ _pdLoading = null; });
+  return _pdLoading;
+}
+function pdLoadImage(dataUrl) {
+  return new Promise(function(resolve, reject) { var im = new Image(); im.onload = function(){ resolve(im); }; im.onerror = function(){ reject(new Error('사진을 열 수 없어요')); }; im.src = dataUrl; });
+}
+// 사진 → 텍스트(줄 단위). maxSide: 글자 영역 찾기용 크기
+async function paddleRecognize(dataUrl, maxSide, onProg) {
+  var ort = _pdOrt, img = await pdLoadImage(dataUrl);
+  var box = findReceiptBox(img);
+  // 원본(영수증 부분) 캔버스: 긴 변 최대 2400
+  var sc0 = Math.min(1, 2400 / Math.max(box.w, box.h));
+  var W = Math.max(1, Math.round(box.w * sc0)), H = Math.max(1, Math.round(box.h * sc0));
+  var src = document.createElement('canvas'); src.width = W; src.height = H;
+  var sctx = src.getContext('2d'); sctx.imageSmoothingQuality = 'high';
+  sctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, W, H);
+  // 1) 글자 영역 찾기 (det)
+  var r = Math.min(1, maxSide / Math.max(W, H));
+  var nw = Math.max(32, Math.round(W * r / 32) * 32), nh = Math.max(32, Math.round(H * r / 32) * 32);
+  var dc = document.createElement('canvas'); dc.width = nw; dc.height = nh;
+  var dctx = dc.getContext('2d'); dctx.drawImage(src, 0, 0, nw, nh);
+  var px = dctx.getImageData(0, 0, nw, nh).data, N = nw * nh, inp = new Float32Array(3 * N);
+  // BGR 순서 + 평균/표준편차 정규화
+  for (var i = 0; i < N; i++) {
+    inp[i] = (px[i*4+2] / 255 - 0.485) / 0.229;
+    inp[N + i] = (px[i*4+1] / 255 - 0.456) / 0.224;
+    inp[2*N + i] = (px[i*4] / 255 - 0.406) / 0.225;
+  }
+  var dout = await _pdDet.run({ [_pdDet.inputNames[0]]: new ort.Tensor('float32', inp, [1, 3, nh, nw]) });
+  var prob = dout[_pdDet.outputNames[0]].data;
+  if (onProg) onProg(0.15);
+  // 2) 글자 덩어리 나누기 (연결 요소) + 기울기(주성분)로 회전 상자 계산
+  var lab = new Int32Array(N), stack = new Int32Array(N), boxes = [], sx = W / nw, sy = H / nh, nl = 0;
+  for (var s = 0; s < N; s++) {
+    if (lab[s] || prob[s] <= 0.3) continue;
+    nl++; var sp = 0, pix = [], sumP = 0; stack[sp++] = s; lab[s] = nl;
+    while (sp) {
+      var q = stack[--sp]; pix.push(q); sumP += prob[q];
+      var qx = q % nw, qy = (q / nw) | 0;
+      if (qx > 0 && !lab[q-1] && prob[q-1] > 0.3) { lab[q-1] = nl; stack[sp++] = q - 1; }
+      if (qx < nw - 1 && !lab[q+1] && prob[q+1] > 0.3) { lab[q+1] = nl; stack[sp++] = q + 1; }
+      if (qy > 0 && !lab[q-nw] && prob[q-nw] > 0.3) { lab[q-nw] = nl; stack[sp++] = q - nw; }
+      if (qy < nh - 1 && !lab[q+nw] && prob[q+nw] > 0.3) { lab[q+nw] = nl; stack[sp++] = q + nw; }
+    }
+    if (pix.length < 9 || sumP / pix.length < 0.6) continue;
+    var mx = 0, my = 0, k;
+    for (k = 0; k < pix.length; k++) { mx += (pix[k] % nw + 0.5) * sx; my += (((pix[k] / nw) | 0) + 0.5) * sy; }
+    mx /= pix.length; my /= pix.length;
+    var cxx = 0, cyy = 0, cxy = 0;
+    for (k = 0; k < pix.length; k++) { var X = (pix[k] % nw + 0.5) * sx - mx, Y = (((pix[k] / nw) | 0) + 0.5) * sy - my; cxx += X*X; cyy += Y*Y; cxy += X*Y; }
+    var th = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+    if (Math.abs(th) > 20 * Math.PI / 180) th = 0;
+    var ux = Math.cos(th), uy = Math.sin(th), vx = -uy, vy = ux, umin = 1e9, umax = -1e9, vmin = 1e9, vmax = -1e9;
+    for (k = 0; k < pix.length; k++) {
+      var X2 = (pix[k] % nw + 0.5) * sx - mx, Y2 = (((pix[k] / nw) | 0) + 0.5) * sy - my;
+      var pu = X2 * ux + Y2 * uy, pv = X2 * vx + Y2 * vy;
+      if (pu < umin) umin = pu; if (pu > umax) umax = pu; if (pv < vmin) vmin = pv; if (pv > vmax) vmax = pv;
+    }
+    var L = umax - umin + sx, Hh = vmax - vmin + sy;
+    if (L < 3 * sx || Hh < 3 * sy) continue;
+    var mu = (umax + umin) / 2, mv = (vmax + vmin) / 2;
+    var cx = mx + mu * ux + mv * vx, cy = my + mu * uy + mv * vy;
+    var d = (L * Hh) * 1.5 / (2 * (L + Hh)); L += 2 * d; Hh += 2 * d;
+    boxes.push({ cx: cx, cy: cy, L: L, H: Hh, th: th });
+  }
+  // 3) 글자 읽기 (rec)
+  var items = [], rc = document.createElement('canvas'), rctx = rc.getContext('2d');
+  for (var b = 0; b < boxes.length; b++) {
+    var bx = boxes[b], rw = Math.max(16, Math.min(3200, Math.ceil(48 * bx.L / bx.H))), scl = 48 / bx.H;
+    rc.width = rw; rc.height = 48;
+    rctx.setTransform(1, 0, 0, 1, 0, 0);
+    rctx.fillStyle = '#fff'; rctx.fillRect(0, 0, rw, 48);
+    rctx.setTransform(scl * (rw / (bx.L * scl)), 0, 0, scl, rw / 2, 24);
+    rctx.rotate(-bx.th);
+    rctx.drawImage(src, -bx.cx, -bx.cy);
+    var rp = rctx.getImageData(0, 0, rw, 48).data, M = rw * 48, rin = new Float32Array(3 * M);
+    for (var j = 0; j < M; j++) {
+      rin[j] = (rp[j*4+2] / 255 - 0.5) / 0.5;
+      rin[M + j] = (rp[j*4+1] / 255 - 0.5) / 0.5;
+      rin[2*M + j] = (rp[j*4] / 255 - 0.5) / 0.5;
+    }
+    var ro = await _pdRec.run({ [_pdRec.inputNames[0]]: new ort.Tensor('float32', rin, [1, 3, 48, rw]) });
+    var ot = ro[_pdRec.outputNames[0]], T = ot.dims[1], C = ot.dims[2], od = ot.data, str = '', last = 0;
+    for (var t = 0; t < T; t++) {
+      var best = 0, bv = -1e9;
+      for (var c = 0; c < C; c++) { var vv = od[t*C + c]; if (vv > bv) { bv = vv; best = c; } }
+      if (best !== last && best !== 0 && best < _pdChars.length) str += _pdChars[best];
+      last = best;
+    }
+    if (str.trim()) items.push({ cx: bx.cx, cy: bx.cy, L: bx.L, H: bx.H, th: bx.th, x0: bx.cx - bx.L / 2, s: str });
+    if (onProg && b % 8 === 0) onProg(0.15 + 0.85 * (b + 1) / boxes.length);
+  }
+  // 4) 같은 줄끼리 묶기: 왼쪽→오른쪽, 줄의 기울기로 연장한 높이와 비교 (종이가 휘어도 줄이 섞이지 않게)
+  items.sort(function(a, c){ return a.x0 - c.x0; });
+  var lines = [];
+  items.forEach(function(it) {
+    var bestL = null, bd = 1e9;
+    lines.forEach(function(Ln) {
+      var lastB = Ln[Ln.length - 1], wide = Ln[0];
+      Ln.forEach(function(z){ if (z.L / z.H > wide.L / wide.H) wide = z; });
+      var ang = wide.L > 2 * wide.H ? wide.th : 0;
+      var yext = lastB.cy + Math.tan(ang) * (it.cx - lastB.cx), dy = Math.abs(it.cy - yext);
+      if (it.x0 >= lastB.x0 && dy < 0.5 * Math.max(it.H, lastB.H) && dy < bd) { bestL = Ln; bd = dy; }
+    });
+    if (bestL) bestL.push(it); else lines.push([it]);
+  });
+  lines.sort(function(a, c){ return a[0].cy - c[0].cy; });
+  return lines.map(function(Ln){ return Ln.map(function(z){ return z.s; }).join('  '); }).join('\n');
+}
+
+// ══════════════════════════════════════════
+//  ✨ AI 정밀 인식 (Gemini · Firebase AI Logic)
+//  사진을 AI에 보내 구매처/날짜/품목(수량·단가·금액)을 바로 정리해서 받음
+//  ※ Firebase 콘솔 > AI Logic 에서 'Gemini Developer API'를 한 번 켜야 동작
+// ══════════════════════════════════════════
+var _gmModel = null, _gmMods = null;
+var GM_SDK = 'https://www.gstatic.com/firebasejs/12.12.0/';
+var GM_MODELS = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+async function gmModules() {
+  if (_gmMods) return _gmMods;
+  var appMod = await import(GM_SDK + 'firebase-app.js');
+  var aiMod = await import(GM_SDK + 'firebase-ai.js');
+  var app;
+  try { app = appMod.getApp('ai-receipt'); } catch(e) { app = appMod.initializeApp(firebaseConfig, 'ai-receipt'); }
+  var ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend() });
+  _gmMods = { ai: ai, aiMod: aiMod };
+  return _gmMods;
+}
+function gmSchema(S) {
+  return S.object({
+    properties: {
+      vendor: S.string({ description: '판매처(상호) 이름. 주소·대표자명·사업자번호 제외' }),
+      date: S.string({ description: '구매일 YYYY-MM-DD' }),
+      total: S.integer({ description: '영수증 합계 금액(원)' }),
+      items: S.array({ items: S.object({
+        properties: {
+          name: S.string({ description: '상품명 (앞의 품번 코드는 빼고 영수증 글자 그대로)' }),
+          qty: S.number(),
+          price: S.integer({ description: '단가(원)' }),
+          amount: S.integer({ description: '금액(원)' })
+        }
+      }) })
+    },
+    optionalProperties: ['date', 'total']
+  });
+}
+// 영수증 부분만 잘라 JPEG로 (글자가 잘 보이게 긴 변 2000px)
+async function gmReceiptJpeg(dataUrl) {
+  var img = await pdLoadImage(dataUrl), box = findReceiptBox(img);
+  var sc = Math.min(1, 2000 / Math.max(box.w, box.h));
+  var c = document.createElement('canvas'); c.width = Math.round(box.w * sc); c.height = Math.round(box.h * sc);
+  var cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high';
+  cx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.88);
+}
+async function geminiReadReceipt(dataUrl) {
+  var m = await gmModules(), S = m.aiMod.Schema;
+  var jpg = await gmReceiptJpeg(dataUrl);
+  var prompt = '이 사진은 한국 설비·배관 자재 가게의 영수증(거래명세)입니다. 사진에 보이는 그대로 읽어서 JSON으로 정리하세요.\n'
+    + '- vendor: 가게 이름(상호)만. 괄호 안 대표자 이름, 주소, 전화번호는 빼기\n'
+    + '- date: 거래/등록 날짜 (YYYY-MM-DD)\n'
+    + '- items: 품목 표의 모든 줄을 순서대로. name은 상품명(맨 앞 *품번 코드 제외, 규격 15A·15/15 등은 유지), qty 수량, price 단가, amount 금액\n'
+    + '- total: 합계금액\n'
+    + '숫자는 쉼표 없이 정수로. 글자가 흐리면 설비 자재 용어(PB, PPR, 엘보, 소켓, 밸브, 니플, 캡, 티 등)로 가장 그럴듯하게 읽기. 없는 품목을 지어내지 말 것.';
+  var lastErr = null, list = _gmModel ? [_gmModel] : GM_MODELS;
+  for (var i = 0; i < list.length; i++) {
+    try {
+      var model = m.aiMod.getGenerativeModel(m.ai, { model: list[i], generationConfig: { responseMimeType: 'application/json', responseSchema: gmSchema(S), temperature: 0 } });
+      var r = await model.generateContent([prompt, { inlineData: { data: jpg.split(',')[1], mimeType: 'image/jpeg' } }]);
+      var txt = r.response.text();
+      var j = JSON.parse(txt);
+      _gmModel = list[i];
+      return j;
+    } catch(e) {
+      lastErr = e;
+      var msg = String(e && (e.message || e));
+      if (!/not.?found|404|not supported|unsupported|is not available/i.test(msg)) break;   // 모델 이름 문제일 때만 다음 모델 시도
+    }
+  }
+  throw lastErr || new Error('AI 인식 실패');
+}
+// 확인창의 "✨ AI로 다시 읽기"
+async function receiptAiRead() {
+  if (!_rcPhotoSrc) { showToast('사진이 없어요'); return; }
+  if (!navigator.onLine) { showToast('인터넷 연결이 필요해요'); return; }
+  showOcrOverlay('✨ AI가 영수증 읽는 중...');
+  setOcrProgress(30, '보통 5~15초 걸려요');
+  var tick = setInterval(function(){ var b = document.getElementById('ocr-overlay-bar'); if (b) { var w = parseFloat(b.style.width) || 30; setOcrProgress(Math.min(92, w + 3)); } }, 700);
+  try {
+    var j = await geminiReadReceipt(_rcPhotoSrc);
+    clearInterval(tick); hideOcrOverlay();
+    var items = (j.items || []).map(function(it) {
+      var q = Math.max(1, Number(it.qty) || 1), p = Math.round(Number(it.price) || 0), a = Math.round(Number(it.amount) || 0);
+      if (!a && p) a = Math.round(q * p);
+      if (!p && a) p = Math.round(a / q);
+      return { name: String(it.name || '').trim(), qty: q, price: p, amount: a, ok: !(p && a && Math.abs(q * p - a) > 1) };
+    }).filter(function(it){ return it.name || it.amount; });
+    if (!items.length) { showToast('AI도 품목을 찾지 못했어요'); return; }
+    var sum = items.reduce(function(s, x){ return s + x.amount; }, 0);
+    var old = _rcParsed || {};
+    var p2 = Object.assign({}, old, {
+      vendor: String(j.vendor || '').trim() || (document.getElementById('rc-vendor') || {}).value || old.vendor || '',
+      date: /^\d{4}-\d{2}-\d{2}$/.test(j.date || '') ? j.date : ((document.getElementById('rc-date') || {}).value || old.date || ''),
+      items: items, itemsSum: sum,
+      total: Number(j.total) || old.total || sum
+    });
+    p2.sumMatch = p2.total === sum;
+    p2.aiRead = true;
+    openReceiptReview(p2, _rcPhoto, _rcPhotoSrc);
+    showToast(p2.sumMatch ? '✨ AI 인식 완료 · 합계 일치' : '✨ AI 인식 완료 · 합계를 확인해주세요');
+  } catch(e) {
+    clearInterval(tick); hideOcrOverlay();
+    console.error('Gemini OCR:', e);
+    var msg = String(e && (e.message || e));
+    if (/api.?not.?enabled|firebasevertexai|firebaseml|AI Logic|PERMISSION_DENIED|403|api-not-enabled/i.test(msg)) {
+      alert('AI 인식을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.');
+    } else if (/quota|429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
+      showToast('⚠️ AI 무료 사용량을 잠시 초과했어요. 잠시 후 다시 시도해주세요');
+    } else {
+      showToast('⚠️ AI 인식 실패: ' + msg.slice(0, 60));
+    }
+  }
+}
+
 // 두 번 읽은 결과 중 더 나은 것 고르기 (합계 일치 > 검산된 품목 수 > 품목 수)
 function betterReceipt(a, b) {
   if (!a) return b; if (!b) return a;
@@ -7974,6 +8278,27 @@ function handleQuickReceipt(e) {
     try {
       photo = await compressImage(ev.target.result, 1400, 0.8);
     } catch(err) { showToast('사진 처리 실패: ' + err.message); return; }
+    showOcrOverlay('영수증 읽는 중...');
+    // ① PaddleOCR (한국어 인식이 훨씬 정확) → 실패하면 ② 기존 Tesseract
+    var paddleOk = false;
+    try {
+      if (!_pdDet) setOcrProgress(3, '처음 한 번만 인식 데이터(약 30MB)를 받아요 · 와이파이 권장');
+      await pdLoad(function(p){ setOcrProgress(3 + p * 37, _pdDet ? '' : '인식 데이터 받는 중... ' + Math.round(p * 100) + '%'); });
+      setOcrProgress(40, '글자 인식 중...');
+      var ptxt = await paddleRecognize(ev.target.result, 1600, function(p){ setOcrProgress(40 + p * 60, '글자 인식 중...'); });
+      parsed = parseReceiptText(ptxt);
+      if (!parsed.sumMatch) {
+        showOcrOverlay('한 번 더 확인 중...');
+        var ptxt2 = await paddleRecognize(ev.target.result, 2240, function(p){ setOcrProgress(40 + p * 60, '더 크게 읽는 중...'); });
+        var pp2 = parseReceiptText(ptxt2), pm = null;
+        try { pm = mergeReceiptResults(parsed, pp2); } catch(me) { pm = null; }
+        parsed = (pm && pm.sumMatch) ? pm : betterReceipt(parsed, pp2);
+      }
+      paddleOk = !!(parsed && parsed.items && parsed.items.length);
+    } catch(perr) {
+      console.error('PaddleOCR 실패, Tesseract로 전환:', perr);
+    }
+    if (!paddleOk) {
     showOcrOverlay('영수증 읽는 중...');
     setOcrProgress(5, _ocrWorker ? '' : '처음 한 번은 인식 데이터(약 2MB)를 받아요');
     var passLabel = '글자 인식 중...';
@@ -8001,12 +8326,13 @@ function handleQuickReceipt(e) {
     } catch(err) {
       console.error('OCR 실패:', err);
     }
+    }
     _ocrProgressCb = null;
     hideOcrOverlay();
 
-    // 품목을 찾았으면 → 품목 확인창 (품목마다 따로 저장)
-    if (parsed && parsed.items && parsed.items.length) { openReceiptReview(parsed, photo); return; }
-    openReceiptSingleForm(parsed, photo);
+    // 품목 확인창 (품목마다 따로 저장). 못 읽었어도 창을 열어 ✨AI 인식/직접 입력 가능
+    if (!parsed) parsed = { vendor: '', date: '', total: 0, items: [], itemsSum: 0, sumMatch: false };
+    openReceiptReview(parsed, photo, ev.target.result);
   };
   r.readAsDataURL(file);
 }
@@ -8033,8 +8359,10 @@ function openReceiptSingleForm(parsed, photo) {
 var _rcParsed = null;
 var _rcPhoto = '';
 function _rcEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function openReceiptReview(parsed, photo) {
+var _rcPhotoSrc = '';   // AI 인식용 원본 사진
+function openReceiptReview(parsed, photo, photoSrc) {
   _rcParsed = parsed; _rcPhoto = photo || '';
+  if (photoSrc) _rcPhotoSrc = photoSrc;
   var ov = document.getElementById('receipt-review-modal');
   if (!ov) {
     ov = document.createElement('div');
@@ -8046,7 +8374,7 @@ function openReceiptReview(parsed, photo) {
   }
   var cnt = parsed.items.length;
   var h = '<div class="modal-sheet">'
-    + '<div class="modal-header"><div class="modal-title">🧾 영수증 품목 확인 (' + cnt + '개)</div>'
+    + '<div class="modal-header"><div class="modal-title">' + (parsed.aiRead ? '✨' : '🧾') + ' 영수증 품목 확인 (' + cnt + '개)</div>'
     + '<button class="modal-close" onclick="closeReceiptReview()">✕</button></div>'
     + '<div class="modal-body">'
     + '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">'
@@ -8055,7 +8383,9 @@ function openReceiptReview(parsed, photo) {
     + '<div class="form-group" style="margin-bottom:8px;"><label class="form-label">구매처</label><input class="form-input" id="rc-vendor" value="' + _rcEsc(parsed.vendor) + '" placeholder="구매처"></div>'
     + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">구매일 *</label><input class="form-input" id="rc-date" type="date" value="' + _rcEsc(parsed.date || localToday()) + '"></div>'
     + '</div></div>'
-    + '<div id="rc-sum-box" style="padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:10px;"></div>'
+    + '<div id="rc-sum-box" style="padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:8px;"></div>'
+    + '<button type="button" class="btn btn-secondary" style="width:100%;margin-bottom:10px;" onclick="receiptAiRead()">' + (parsed.aiRead ? '✨ AI로 한 번 더 읽기' : '✨ AI로 정밀 인식 (결과가 이상할 때)') + '</button>'
+    + (cnt ? '' : '<div style="text-align:center;font-size:13px;color:var(--text2);padding:14px 0;">품목을 읽지 못했어요.<br>✨ AI 정밀 인식을 누르거나 + 품목 추가로 직접 입력하세요.</div>')
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 6px;font-size:12px;color:var(--text2);">'
     + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rc-all" checked onchange="toggleReceiptAll(this.checked)"> 전체 선택</label>'
     + '<span>수량 × 단가 = 금액</span></div>'
@@ -8121,7 +8451,7 @@ function ocrKey(s) { return String(s || '').toUpperCase().replace(/[^0-9A-Z가-�
 function ocrSimilar(a, b) {
   if (a === b) return 1;
   var n = a.length, m = b.length;
-  if (!n || !m || Math.abs(n - m) > Math.max(n, m) * 0.3) return 0;
+  if (!n || !m || Math.abs(n - m) > Math.max(2, Math.max(n, m) * 0.3)) return 0;
   var prev = [], cur = [], i, j;
   for (j = 0; j <= m; j++) prev[j] = j;
   for (i = 1; i <= n; i++) {
@@ -8131,7 +8461,7 @@ function ocrSimilar(a, b) {
   }
   return 1 - prev[m] / Math.max(n, m);
 }
-function applyOcrLearned(name) {
+function applyOcrNameDict(name) {
   var k = ocrKey(name);
   if (k.length < 3) return { name: name, learned: false };
   if (_ocrDict[k]) return { name: _ocrDict[k], learned: true };
@@ -8147,6 +8477,53 @@ function applyOcrLearned(name) {
   if (best && bestSc >= 0.85 && ocrKey(best) !== k) return { name: best, learned: true };
   return { name: name, learned: false };
 }
+// 단어 단위 학습: "소절밸브 → 조절밸브"처럼 고친 단어를 기억해 다른 품목에도 적용
+var _ocrWords = {};
+function ocrTokens(s) { return String(s || '').match(/[0-9A-Za-z가-힣]+/g) || []; }
+function ocrWordRe(w) { return new RegExp('(^|[^0-9A-Za-z가-힣])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=[^0-9A-Za-z가-힣]|$)', 'g'); }
+function applyOcrWords(name) {
+  var out = String(name || ''), hit = false;
+  Object.keys(_ocrWords).sort(function(a, b){ return b.length - a.length; }).forEach(function(w) {
+    var re = ocrWordRe(w);
+    if (re.test(out)) { out = out.replace(ocrWordRe(w), function(m, pre){ return pre + _ocrWords[w]; }); hit = true; }
+  });
+  return { name: out, learned: hit };
+}
+function applyOcrLearned(name) {
+  var r = applyOcrNameDict(name);
+  if (r.learned) return r;
+  return applyOcrWords(name);
+}
+// 고치기 전/후 이름에서 바뀐 단어 쌍 찾기 (단어 수가 같은 구간만, 비슷한 단어끼리만)
+function diffOcrWords(before, after) {
+  var A = ocrTokens(before), B = ocrTokens(after), n = A.length, m = B.length, i, j, pairs = [];
+  var dp = []; for (i = 0; i <= n; i++) { dp.push([]); for (j = 0; j <= m; j++) dp[i].push(0); }
+  for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) dp[i][j] = A[i] === B[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  var gA = [], gB = [];
+  function flush() {
+    if (gA.length && gA.length === gB.length) gA.forEach(function(a, k) {
+      var b = gB[k];
+      if (a === b || a.length < 2 || /^\d+$/.test(a)) return;        // 숫자만인 단어는 규격·수량일 수 있어 제외
+      if (ocrSimilar(a.toUpperCase(), b.toUpperCase()) < 0.34) return; // 완전히 다른 말로 바꾼 건 단어 오인식이 아님
+      pairs.push([a, b]);
+    });
+    gA = []; gB = [];
+  }
+  i = 0; j = 0;
+  while (i < n || j < m) {
+    if (i < n && j < m && A[i] === B[j]) { flush(); i++; j++; }
+    else if (j >= m || (i < n && dp[i+1][j] >= dp[i][j+1])) { gA.push(A[i]); i++; }
+    else { gB.push(B[j]); j++; }
+  }
+  flush();
+  return pairs;
+}
+async function saveOcrLearning() {
+  try {
+    if (!_uid) return;
+    await db.collection('users').doc(_uid).set({ ocrDict: JSON.stringify(_ocrDict), ocrWords: JSON.stringify(_ocrWords) }, { merge: true });
+  } catch(e) { console.error('saveOcrLearning:', e); }
+}
 async function learnOcrNames(rows) {
   var changed = false;
   rows.forEach(function(r) {
@@ -8158,13 +8535,69 @@ async function learnOcrNames(rows) {
       if (_ocrDict[k] !== r.name) { _ocrDict[k] = r.name; changed = true; }
     }
   });
+  // 단어 단위: 확인창에 보였던 이름 → 저장한 이름에서 바뀐 단어
+  rows.forEach(function(r) {
+    if (!r.name || !r.init || r.name === r.init) return;
+    diffOcrWords(r.init, r.name).forEach(function(p) {
+      if (_ocrWords[p[0]] !== p[1]) { _ocrWords[p[0]] = p[1]; changed = true; }
+    });
+  });
+  var wk = Object.keys(_ocrWords);
+  if (wk.length > 500) wk.slice(0, wk.length - 500).forEach(function(k){ delete _ocrWords[k]; });
   if (!changed) return;
   var keys = Object.keys(_ocrDict);
   if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(function(k){ delete _ocrDict[k]; });
-  try {
-    if (!_uid) return;
-    await db.collection('users').doc(_uid).set({ ocrDict: JSON.stringify(_ocrDict) }, { merge: true });
-  } catch(e) { console.error('saveOcrDict:', e); }
+  await saveOcrLearning();
+}
+
+// ── 학습 목록 관리 ──
+function openOcrLearnList() {
+  var ov = document.getElementById('ocr-learn-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay';
+    ov.id = 'ocr-learn-modal';
+    ov.style.zIndex = '1000';
+    ov.onclick = function(ev){ handleOverlayClick(ev, 'ocr-learn-modal'); };
+    document.body.appendChild(ov);
+  }
+  var words = Object.keys(_ocrWords), names = Object.keys(_ocrDict);
+  function row(from, to, kind, key) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg2);font-size:13px;">'
+      + '<div style="flex:1;min-width:0;word-break:break-all;"><span style="color:var(--text2);text-decoration:line-through;">' + _rcEsc(from) + '</span> → <b>' + _rcEsc(to) + '</b></div>'
+      + '<button type="button" onclick="removeOcrLearn(\'' + kind + '\',\'' + encodeURIComponent(key) + '\')" style="flex-shrink:0;border:none;background:none;color:var(--red,#ef4444);font-size:15px;cursor:pointer;">✕</button></div>';
+  }
+  ov.innerHTML = '<div class="modal-sheet">'
+    + '<div class="modal-header"><div class="modal-title">📚 영수증 인식 학습 목록</div>'
+    + '<button class="modal-close" onclick="closeModal(\'ocr-learn-modal\')">✕</button></div>'
+    + '<div class="modal-body">'
+    + '<div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:12px;">영수증 확인창에서 이름을 고쳐 저장하면 자동으로 여기에 쌓여요. 다음 영수증부터 자동으로 고쳐지고 📚 표시가 붙어요. 잘못 배운 건 ✕로 지우세요.</div>'
+    + '<div class="form-label" style="margin-bottom:6px;">✏️ 단어 고침 (' + words.length + ') <span style="font-weight:400;color:var(--text2);">— 모든 품목에 적용</span></div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:8px;">'
+    + '<input class="form-input" id="ocr-w-from" placeholder="잘못 읽힌 단어" style="flex:1;min-width:0;padding:8px;font-size:13px;">'
+    + '<input class="form-input" id="ocr-w-to" placeholder="바른 단어" style="flex:1;min-width:0;padding:8px;font-size:13px;">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="addOcrWordManual()" style="flex-shrink:0;">추가</button></div>'
+    + (words.length ? words.map(function(w){ return row(w, _ocrWords[w], 'w', w); }).join('') : '<div style="font-size:12px;color:var(--text3);padding:6px 0 10px;">아직 없어요</div>')
+    + '<div class="form-label" style="margin:14px 0 6px;">🏷️ 품목명 통째로 고침 (' + names.length + ') <span style="font-weight:400;color:var(--text2);">— 같은 품목에만 적용</span></div>'
+    + (names.length ? names.map(function(k){ return row(k, _ocrDict[k], 'n', k); }).join('') : '<div style="font-size:12px;color:var(--text3);padding:6px 0;">아직 없어요</div>')
+    + '</div></div>';
+  ov.classList.add('open');
+}
+async function removeOcrLearn(kind, encKey) {
+  var key = decodeURIComponent(encKey);
+  if (kind === 'w') delete _ocrWords[key]; else delete _ocrDict[key];
+  openOcrLearnList();
+  await saveOcrLearning();
+}
+async function addOcrWordManual() {
+  var f = document.getElementById('ocr-w-from').value.trim(), t = document.getElementById('ocr-w-to').value.trim();
+  if (!f || !t) { showToast('두 칸 모두 입력해주세요'); return; }
+  if (!/^[0-9A-Za-z가-힣]+$/.test(f)) { showToast('잘못 읽힌 단어는 띄어쓰기·기호 없이 한 단어로 입력해주세요'); return; }
+  if (f === t) return;
+  _ocrWords[f] = t;
+  openOcrLearnList();
+  await saveOcrLearning();
+  showToast('✓ 추가됨: ' + f + ' → ' + t);
 }
 
 // 합계 차액만큼 행 추가 (못 읽은 품목 채우기용)

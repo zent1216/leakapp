@@ -1851,6 +1851,10 @@ async function loadUserData(uid) {
         _catalog = Array.isArray(parsedCat) ? parsedCat : [];
       } catch { _catalog = []; }
       try {
+        var parsedOd = d.ocrDict ? JSON.parse(d.ocrDict) : {};
+        _ocrDict = (parsedOd && typeof parsedOd === 'object' && !Array.isArray(parsedOd)) ? parsedOd : {};
+      } catch { _ocrDict = {}; }
+      try {
         var parsedQe = d.quickEstimates ? JSON.parse(d.quickEstimates) : [];
         _quickEstimates = Array.isArray(parsedQe) ? parsedQe : [];
       } catch { _quickEstimates = []; }
@@ -7565,10 +7569,33 @@ function parseReceiptText(text, todayStr) {
     if (vm && korCount(vm[1]) >= 2) res.vendor = vm[1].trim();
   }
   if (!res.vendor) {
-    for (var t = 0; t < Math.min(3, lines.length); t++) {
-      var s0 = lines[t].replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^\s가-힣A-Za-z0-9&]/g, '').trim();
-      if (korCount(s0) >= 2 && !/영수증|매출전표|전표|거래명세|카드|특별시|광역시|[시군구]\s/.test(s0) && !/\d{3,}/.test(s0)) { res.vendor = s0; break; }
+    // 라벨이 없으면: 품목표 위쪽 줄들 중 '가게 이름'다운 줄을 점수로 고름
+    //  - 품목 헤더/합계/날짜/전화/사업자번호/주소 줄은 제외
+    //  - 주소 줄 바로 위·아래, 상호에 자주 쓰는 단어(배관·설비·자재·철물·상사…)면 가산점
+    var ADDR = /(특별시|광역시|특별자치|[가-힣]{1,4}[시도군구]\s|[가-힣0-9]+(로|길)\s*\d|[가-힣]+[동읍면리]\s*\d|\d+\s*층|번지|주\s*소)/;
+    var SKIP = /(영수증|매출전표|전표|거래명세|카드|승인|사업자|등록번호|대\s*표|TEL|Tel|tel|전화|FAX|팩스|주\s*소|일\s*시|날\s*짜|No\.|번호|계좌|은행|감사합니다|고객|담당|POS|포스)/;
+    var BIZ = /(배관|설비|자재|철물|건재|상사|상회|산업|유통|마트|종합|건설|기업|공사|판매|센터|몰|도매|주식회사|\(주\)|㈜|전기|타일|욕실|위생|보일러|샷시|인테리어|공구|하우징|닷컴)/;
+    var headIdx = lines.length;
+    // 품목 헤더(상품명 수량 단가…)가 여러 번 잡히면 마지막 것 기준 (맨 위 잡줄이 헤더로 오인되는 경우 대비)
+    for (var hi = 0; hi < Math.min(lines.length, 18); hi++) if (HEAD.test(lines[hi])) headIdx = hi;
+    var lim = Math.min(headIdx, 12), best = null, bestSc = -99;
+    for (var t = 0; t < lim; t++) {
+      var rawL = lines[t];
+      if (HEAD.test(rawL) || FOOT.test(rawL) || SKIP.test(rawL) || ADDR.test(rawL)) continue;
+      if (/20\d{2}\s*[-.\/년]\s*\d/.test(rawL) || /\d{2,4}\s*-\s*\d{3,4}\s*-\s*\d{4}/.test(rawL)) continue;
+      var s0 = rawL.replace(/\(.*?\)|\[.*?\]|<.*?>/g, ' ').replace(/[^\s가-힣A-Za-z0-9&㈜]/g, ' ').replace(/\s+/g, ' ').trim();
+      var kc = korCount(s0);
+      if (kc < 2 || (s0.match(/\d/g) || []).length > 3) continue;
+      if (kc / s0.replace(/\s/g, '').length < 0.5) continue;               // 한글 비율이 낮으면 잡문자
+      var sc = 0;
+      if (BIZ.test(s0)) sc += 4;
+      if ((t > 0 && ADDR.test(lines[t-1])) || (t + 1 < lines.length && ADDR.test(lines[t+1]))) sc += 2;
+      if (t === 0) sc += 1.5;
+      if (s0.length <= 12) sc += 1; else if (s0.length > 20) sc -= 2;
+      sc -= t * 0.2;
+      if (sc > bestSc) { bestSc = sc; best = s0; }
     }
+    if (best) res.vendor = best.replace(/\s*(대표|사장).*$/, '').trim();
   }
 
   // 2) 날짜 (연도가 이상하게 읽히면 올해로 보정)
@@ -7586,13 +7613,27 @@ function parseReceiptText(text, todayStr) {
 
   // 3) 품목 영역: 헤더(상품명 수량 단가) 다음 ~ 합계류 라벨 전
   var start = 0, end = lines.length;
-  for (var h = 0; h < lines.length; h++) if (HEAD.test(lines[h])) { start = h + 1; break; }
+  for (var h = 0; h < Math.min(lines.length, 18); h++) if (HEAD.test(lines[h])) start = h + 1;
   if (!start) { for (var h2 = 0; h2 < lines.length; h2++) if (/20\d{2}\s*[-.\/년]/.test(lines[h2])) { start = h2 + 1; break; } }
   for (var f = start; f < lines.length; f++) if (FOOT.test(lines[f]) && korCount(lines[f]) >= 2) { end = f; break; }
 
+  // 자주 틀리는 글자 보정: "08파이프"/"18소켓" → "PB파이프", "P8CAP" → "PBCAP"
+  var PIPEW = '(파이프|관|소켓|엘보|캡|티|밸브|니플|니쁠|유니온|레듀샤|레듀서|부싱|어댑터|아답타|플러그|앵글|행거|클립|슬리브|수전|직관|롤|이경|연결|마개|전산)';
+  function fixOcrName(s) {
+    s = s.replace(/따이프|파이브|빠이프/g, '파이프').replace(/뱀브|벨브|밸부|밸보/g, '밸브').replace(/앨보|엘부/g, '엘보').replace(/쏘켓|소캣/g, '소켓');
+    s = s.replace(new RegExp('(^|[^A-Za-z0-9])(?:[01IlP|?][8B]|P[3E]|P6)(?=\\s?' + PIPEW + ')', 'g'), '$1PB');
+    s = s.replace(new RegExp('(^|[^A-Za-z0-9])(?:PP[8B]|PPH|PPK)(?=\\s?' + PIPEW + ')', 'g'), '$1PPR');
+    // 영문 품번 안에 숫자 1개가 끼면 글자로 (P8CAP → PBCAP, C0UPLER → COUPLER)
+    s = s.replace(/\b([A-Z]{1,6})([0158])([A-Z]{2,6})(\d*)\b/g, function(m, a, d, b, n){ return a + ({ '0': 'O', '1': 'I', '5': 'S', '8': 'B' })[d] + b + n; });
+    return s;
+  }
   function cleanName(s) {
     s = s.replace(/^[^가-힣A-Za-z0-9(]+/, '');                               // 앞 기호(*, ※, × 등)
-    s = s.replace(/^[A-Za-z0-9]{2,}[.]?\s+(?=.*[가-힣])/, '');                 // 앞 품번 코드(PB15, PBCP15.)
+    s = s.replace(/^(?:[A-Za-z]?[a-z][A-Za-z0-9]?|[A-Za-z][0-9]|[0-9][A-Za-z])\s+(?=[가-힣])/, '');   // 앞 잡글자(Se, S7, 1S)
+    s = fixOcrName(s);
+    // 앞 품번 코드(PB15, PBCP15., 80015) 제거 — 'PB', 'PPR' 같은 순수 영문 약어는 유지
+    s = s.replace(/^(?:(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{3,}|\d{2,}|[A-Z]{4,})[.]?\s+(?=[^가-힣]{0,12}[가-힣])/, '');
+    s = fixOcrName(s);
     s = s.replace(/(\s+([\d,.]{3,}|[A-Za-z~=*|"“”']{1,2}|[^\s가-힣A-Za-z0-9()]+))+$/, ''); // 뒤 잡문자
     return s.trim();
   }
@@ -7999,13 +8040,14 @@ function openReceiptReview(parsed, photo) {
     ov = document.createElement('div');
     ov.className = 'modal-overlay';
     ov.id = 'receipt-review-modal';
-    ov.onclick = function(ev){ handleOverlayClick(ev, 'receipt-review-modal'); };
+    ov.style.zIndex = '1000';   // 하단 탭바 위로 (탭바를 눌러도 창에 영향 없게)
+    // 바깥을 눌러도 닫히지 않음 (수정 중 실수로 닫혀 내용이 사라지는 것 방지)
     document.body.appendChild(ov);
   }
   var cnt = parsed.items.length;
   var h = '<div class="modal-sheet">'
     + '<div class="modal-header"><div class="modal-title">🧾 영수증 품목 확인 (' + cnt + '개)</div>'
-    + '<button class="modal-close" onclick="closeModal(\'receipt-review-modal\')">✕</button></div>'
+    + '<button class="modal-close" onclick="closeReceiptReview()">✕</button></div>'
     + '<div class="modal-body">'
     + '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">'
     + (photo ? '<img src="' + photo + '" onclick="viewReceiptReviewPhoto()" style="width:64px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;">' : '')
@@ -8025,7 +8067,10 @@ function openReceiptReview(parsed, photo) {
     + '<button type="button" class="btn btn-primary" style="flex:2;" id="rc-save-btn" onclick="saveReceiptItems()">저장</button>'
     + '</div></div></div>';
   ov.innerHTML = h;
-  document.getElementById('rc-items').innerHTML = parsed.items.map(function(it){ return receiptRowHtml(it); }).join('');
+  document.getElementById('rc-items').innerHTML = parsed.items.map(function(it){
+    var fx = applyOcrLearned(it.name);
+    return receiptRowHtml(Object.assign({}, it, { name: fx.name, orig: it.name, learned: fx.learned }));
+  }).join('');
   updateReceiptSum();
   ov.classList.add('open');
 }
@@ -8035,7 +8080,8 @@ function receiptRowHtml(it) {
   return '<div class="rc-row" style="border:1px solid ' + (warn ? 'var(--orange,#f59e0b)' : 'var(--border)') + ';border-radius:10px;padding:8px;margin-bottom:6px;background:var(--bg2);">'
     + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
     + '<input type="checkbox" class="rc-chk" checked onchange="updateReceiptSum()" style="width:18px;height:18px;flex-shrink:0;">'
-    + '<input class="form-input rc-name" value="' + _rcEsc(it.name) + '" placeholder="품목명" style="flex:1;padding:6px 8px;font-size:13px;">'
+    + '<input class="form-input rc-name" value="' + _rcEsc(it.name) + '" data-orig="' + _rcEsc(it.orig || '') + '" data-init="' + _rcEsc(it.name) + '" placeholder="품목명" style="flex:1;padding:6px 8px;font-size:13px;">'
+    + (it.learned ? '<span title="전에 고친 이름으로 자동 수정됨" style="flex-shrink:0;font-size:13px;">📚</span>' : '')
     + (warn ? '<span title="확인 필요" style="flex-shrink:0;">⚠️</span>' : '')
     + '<button type="button" onclick="this.closest(\'.rc-row\').remove();updateReceiptSum();" style="flex-shrink:0;border:none;background:none;color:var(--text2);font-size:15px;cursor:pointer;padding:2px 4px;">✕</button>'
     + '</div>'
@@ -8060,6 +8106,67 @@ function addReceiptRow() {
   if (last) { var n = last.querySelector('.rc-name'); if (n) n.focus(); }
   updateReceiptSum();
 }
+// 품목 확인창 닫기: 내용이 있으면 한 번 확인
+function closeReceiptReview() {
+  var rows = document.querySelectorAll('#rc-items .rc-row').length;
+  if (rows && !confirm('저장하지 않고 닫을까요?\n(읽은 품목과 수정한 내용이 사라져요)')) return;
+  closeModal('receipt-review-modal');
+}
+
+// ── OCR 품목명 학습 ──
+// 확인창에서 품목명을 고쳐 저장하면 "읽힌 이름 → 고친 이름"을 기억해 두었다가
+// 다음에 같은(비슷한) 이름이 읽히면 자동으로 바꿔줌. 전에 저장한 자재명·카탈로그와도 비교.
+var _ocrDict = {};
+function ocrKey(s) { return String(s || '').toUpperCase().replace(/[^0-9A-Z가-힣]/g, ''); }
+function ocrSimilar(a, b) {
+  if (a === b) return 1;
+  var n = a.length, m = b.length;
+  if (!n || !m || Math.abs(n - m) > Math.max(n, m) * 0.3) return 0;
+  var prev = [], cur = [], i, j;
+  for (j = 0; j <= m; j++) prev[j] = j;
+  for (i = 1; i <= n; i++) {
+    cur = [i];
+    for (j = 1; j <= m; j++) cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[m] / Math.max(n, m);
+}
+function applyOcrLearned(name) {
+  var k = ocrKey(name);
+  if (k.length < 3) return { name: name, learned: false };
+  if (_ocrDict[k]) return { name: _ocrDict[k], learned: true };
+  var best = null, bestSc = 0;
+  Object.keys(_ocrDict).forEach(function(dk) { var sc = ocrSimilar(k, dk); if (sc > bestSc) { bestSc = sc; best = _ocrDict[dk]; } });
+  if (best && bestSc >= 0.8) return { name: best, learned: true };
+  // 전에 저장한 자재명/카탈로그 이름과 거의 같으면 그 이름으로
+  var seen = {}; best = null; bestSc = 0;
+  (_materials || []).map(function(m){ return m.name; }).concat((_catalog || []).map(function(c){ return c.name; })).forEach(function(nm) {
+    var nk = ocrKey(nm); if (!nk || seen[nk]) return; seen[nk] = 1;
+    var sc = ocrSimilar(k, nk); if (sc > bestSc) { bestSc = sc; best = nm; }
+  });
+  if (best && bestSc >= 0.85 && ocrKey(best) !== k) return { name: best, learned: true };
+  return { name: name, learned: false };
+}
+async function learnOcrNames(rows) {
+  var changed = false;
+  rows.forEach(function(r) {
+    if (!r.orig || !r.name) return;
+    var k = ocrKey(r.orig);
+    if (k.length < 3) return;
+    if (r.name !== r.init || _ocrDict[k]) {           // 직접 고친 이름 (또는 학습된 이름을 다시 고친 경우)
+      if (ocrKey(r.name) === k) { if (_ocrDict[k]) { delete _ocrDict[k]; changed = true; } return; }
+      if (_ocrDict[k] !== r.name) { _ocrDict[k] = r.name; changed = true; }
+    }
+  });
+  if (!changed) return;
+  var keys = Object.keys(_ocrDict);
+  if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(function(k){ delete _ocrDict[k]; });
+  try {
+    if (!_uid) return;
+    await db.collection('users').doc(_uid).set({ ocrDict: JSON.stringify(_ocrDict) }, { merge: true });
+  } catch(e) { console.error('saveOcrDict:', e); }
+}
+
 // 합계 차액만큼 행 추가 (못 읽은 품목 채우기용)
 function addReceiptDiffRow(diff) {
   var box = document.getElementById('rc-items'); if (!box || !diff) return;
@@ -8078,6 +8185,8 @@ function collectReceiptRows(onlyChecked) {
     if (onlyChecked && !row.querySelector('.rc-chk').checked) return;
     out.push({
       name: row.querySelector('.rc-name').value.trim(),
+      orig: row.querySelector('.rc-name').getAttribute('data-orig') || '',
+      init: row.querySelector('.rc-name').getAttribute('data-init') || '',
       qty: parseAmountStr(row.querySelector('.rc-qty').value) || 1,
       price: parseAmountStr(row.querySelector('.rc-price').value),
       amount: parseAmountStr(row.querySelector('.rc-amount').value)
@@ -8160,6 +8269,7 @@ async function saveReceiptItems() {
       });
     });
     await saveMaterials();
+    learnOcrNames(rows);
     closeModal('receipt-review-modal');
     renderMaterialList();
     updateMainStats();
@@ -8488,7 +8598,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 <!-- 자재 구매 등록/수정 모달 -->
-<div class="modal-overlay" id="material-purchase-modal" onclick="handleOverlayClick(event,'material-purchase-modal')">
+<div class="modal-overlay" id="material-purchase-modal">
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title" id="mat-form-title">📦 자재 구매 등록</div>

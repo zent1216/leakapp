@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.147 · 2026.09.29</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.148 · 2026.09.29</div>
   </div>
 </div>
 
@@ -3186,7 +3186,7 @@ function updateMainStats() {
   const el3 = document.getElementById('ms-revenue');
   if (el3) el3.textContent = fmtShort((commission > 0 ? netRevenue : revenue) - monthMat);
   const label3 = document.getElementById('ms-revenue-label');
-  if (label3) label3.textContent = (commission > 0 || dm) ? '이번달 순수익' : '이번달 수입';
+  if (label3) label3.textContent = '이번달 순수익';
 
   // 이번달 매출 (수수료 차감 전 총 매출)
   const elMonthSales = document.getElementById('ms-month-sales');
@@ -3633,13 +3633,15 @@ function showDetail(id) {
     html += '<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;"><span>VAT 포함 합계</span><span style="color:var(--accent);">' + fmtMoney(total + Math.round(total*0.1)) + '</span></div>';
   }
   // 수수료 내역 표시
-  if (j.commissions && j.commissions.length > 0) {
+  // 수수료가 없어도 순수익은 항상 표시
+  {
+    var _comms = j.commissions || [];
+    var _cardFee = (typeof cardFeeOf === 'function') ? cardFeeOf(j) : 0;
     html += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">';
-    html += '<div style="font-size:11px;color:var(--purple);margin-bottom:4px;">🔒 내부 (수수료)</div>';
-    j.commissions.forEach(function(c) {
+    if (_comms.length || _cardFee > 0) html += '<div style="font-size:11px;color:var(--purple);margin-bottom:4px;">🔒 내부 (수수료)</div>';
+    _comms.forEach(function(c) {
       html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;"><span style="color:var(--text2);">' + (c.name||'-') + '</span><span style="color:var(--red);">-' + fmtMoney(c.amount||0) + '</span></div>';
     });
-    var _cardFee = (typeof cardFeeOf === 'function') ? cardFeeOf(j) : 0;
     if (_cardFee > 0) {
       html += '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;"><span style="color:var(--text2);">💳 카드수수료</span><span style="color:var(--red);">-' + fmtMoney(_cardFee) + '</span></div>';
     }
@@ -5939,8 +5941,8 @@ function renderStats() {
           + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>' : '')
         + ((dMat && mMat > 0) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
           + '<span style="color:var(--text2);">자재 구매</span><span style="color:var(--mat);">-'+fmtMoney(mMat)+'</span></div>' : '')
-        + ((mComm > 0 || (dMat && mMat > 0)) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
-          + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>' : '')
+        + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
+          + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>'
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
         + (function(){ var mm = dMat ? 0 : mMat; return mm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">자재 구매</span><span style="color:var(--mat);">-'+fmtMoney(mm)+'</span></div>' : ''; })()
         + mDone.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(j=>{
@@ -5952,7 +5954,7 @@ function renderStats() {
             + '</div>'
             + '<div style="text-align:right;">'
             + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobTotal(j))+'</div>'
-            + (hasComm ? '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0))+'</div>' : '')
+            + '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0))+'</div>'
             + ((j.payType==='card'||j.cashReceipt) ? '<div style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</div>' : '')
             + '</div>'
             + '</div>';

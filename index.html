@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.148 · 2026.09.29</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.149 · 2026.09.30</div>
   </div>
 </div>
 
@@ -821,28 +821,33 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
           <option>외벽 누수</option><option>욕실 방수</option><option>지하 누수</option><option>하수 역류</option><option>하수 배관</option><option>베란다 방수</option><option>메인관 누수</option><option>공용부 누수</option><option>스프링쿨러 누수</option><option>기타</option>
         </select>
       </div>
+      <button type="button" class="btn btn-secondary" onclick="polishJobTexts(['before','action','after','opinion'])" style="width:100%;margin-bottom:10px;color:var(--accent);border-color:rgba(79,142,247,0.4);">✨ 아래 4칸 한번에 AI로 다듬기</button>
       <div class="form-group"><label class="form-label">조치 전 상황</label><textarea class="form-textarea" id="f-before" placeholder="누수 발생 원인 및 상황"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-before',60)" style="flex:1;">➕ 칸 늘리기</button>
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-before',-60)" style="flex:1;">➖ 칸 줄이기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="polishJobTexts(['before'])" style="flex:1;color:var(--accent);">✨ AI 다듬기</button>
         </div>
       </div>
       <div class="form-group"><label class="form-label">조치 내용</label><textarea class="form-textarea" id="f-action" placeholder="작업 내용 기록" style="min-height:180px;"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-action',60)" style="flex:1;">➕ 칸 늘리기</button>
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-action',-60)" style="flex:1;">➖ 칸 줄이기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="polishJobTexts(['action'])" style="flex:1;color:var(--accent);">✨ AI 다듬기</button>
         </div>
       </div>
       <div class="form-group"><label class="form-label">조치 후 상태</label><textarea class="form-textarea" id="f-after-desc" placeholder="완료 후 상태"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-after-desc',60)" style="flex:1;">➕ 칸 늘리기</button>
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-after-desc',-60)" style="flex:1;">➖ 칸 줄이기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="polishJobTexts(['after'])" style="flex:1;color:var(--accent);">✨ AI 다듬기</button>
         </div>
       </div>
       <div class="form-group"><label class="form-label">전문가 소견</label><textarea class="form-textarea" id="f-expert-opinion" placeholder="기술자 소견"></textarea>
         <div style="display:flex;gap:6px;margin-top:6px;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-expert-opinion',60)" style="flex:1;">➕ 칸 늘리기</button>
           <button type="button" class="btn btn-secondary btn-sm" onclick="resizeBox('f-expert-opinion',-60)" style="flex:1;">➖ 칸 줄이기</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="polishJobTexts(['opinion'])" style="flex:1;color:var(--accent);">✨ AI 다듬기</button>
         </div>
       </div>
     </div>
@@ -8297,6 +8302,141 @@ async function receiptAiRead() {
       showToast('⚠️ AI 인식 실패: ' + msg.slice(0, 60));
     }
   }
+}
+
+// ══════════════════════════════════════════
+//  ✨ AI 문장 다듬기 (조치 전 / 조치 내용 / 조치 후 / 전문가 소견)
+//  Gemini(Firebase AI Logic) 사용 — 영수증 AI 인식과 같은 설정
+// ══════════════════════════════════════════
+var POLISH_FIELDS = [
+  { key: 'before', id: 'f-before', label: '조치 전 상황' },
+  { key: 'action', id: 'f-action', label: '조치 내용' },
+  { key: 'after', id: 'f-after-desc', label: '조치 후 상태' },
+  { key: 'opinion', id: 'f-expert-opinion', label: '전문가 소견' }
+];
+var _polishBusy = false, _polishLastKeys = null;
+function polishBusyUi(on, text) {
+  var ov = document.getElementById('polish-busy');
+  if (!on) { if (ov) ov.remove(); return; }
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'polish-busy';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:var(--bg2);border-radius:14px;padding:22px 20px;max-width:300px;width:100%;text-align:center;color:var(--text);">'
+    + '<div style="font-size:30px;margin-bottom:8px;">✨</div><div style="font-size:15px;font-weight:600;">' + text + '</div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-top:8px;">보통 3~10초 걸려요</div></div>';
+}
+function gmErrorNotice(e) {
+  var msg = String(e && (e.message || e));
+  if (/api.?not.?enabled|firebasevertexai|firebaseml|AI Logic|PERMISSION_DENIED|403|api-not-enabled/i.test(msg)) {
+    alert('AI 기능을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.');
+  } else if (/quota|429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
+    showToast('⚠️ AI 무료 사용량을 잠시 초과했어요. 잠시 후 다시 시도해주세요');
+  } else if (!navigator.onLine) {
+    showToast('인터넷 연결이 필요해요');
+  } else {
+    showToast('⚠️ AI 실패: ' + msg.slice(0, 60));
+  }
+}
+// JSON 응답 받기 (모델 이름 문제면 다음 모델로)
+async function gmGenerateJson(parts, schema) {
+  var m = await gmModules(), lastErr = null, list = _gmModel ? [_gmModel] : GM_MODELS;
+  for (var i = 0; i < list.length; i++) {
+    try {
+      var model = m.aiMod.getGenerativeModel(m.ai, { model: list[i], generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.3 } });
+      var r = await model.generateContent(parts);
+      var j = JSON.parse(r.response.text());
+      _gmModel = list[i];
+      return j;
+    } catch(e) {
+      lastErr = e;
+      if (!/not.?found|404|not supported|unsupported|is not available/i.test(String(e && (e.message || e)))) break;
+    }
+  }
+  throw lastErr || new Error('AI 응답 실패');
+}
+// keys: 다듬을 칸 목록 (나머지 칸은 참고용으로만 같이 보냄)
+async function polishJobTexts(keys) {
+  if (_polishBusy) return;
+  var cur = {}, targets = [];
+  POLISH_FIELDS.forEach(function(f) { var el = document.getElementById(f.id); cur[f.key] = el ? el.value.trim() : ''; });
+  keys.forEach(function(k) { if (cur[k]) targets.push(k); });
+  if (!targets.length) { showToast(keys.length > 1 ? '다듬을 내용을 먼저 적어주세요' : '이 칸에 내용을 먼저 적어주세요'); return; }
+  if (!navigator.onLine) { showToast('인터넷 연결이 필요해요'); return; }
+  _polishBusy = true; _polishLastKeys = keys;
+  polishBusyUi(true, '✨ AI가 문장 다듬는 중...');
+  try {
+    var m = await gmModules(), S = m.aiMod.Schema, props = {};
+    targets.forEach(function(k) { props[k] = S.string(); });
+    var schema = S.object({ properties: props });
+    var typeEl = document.getElementById('f-type');
+    var label = function(k) { return POLISH_FIELDS.filter(function(f){ return f.key === k; })[0].label; };
+    var prompt = '당신은 누수탐지·배관·방수 설비 업체의 작업 보고서를 다듬는 편집자입니다.\n'
+      + '아래 현장 기록을 고객에게 전달하는 소견서/보고서에 그대로 쓸 수 있게 다듬어 주세요.\n\n'
+      + '규칙:\n'
+      + '- 공손한 보고서체(~확인되었습니다, ~조치하였습니다, ~권장드립니다)\n'
+      + '- 맞춤법·띄어쓰기·어색한 표현 교정, 문장을 자연스럽게 연결\n'
+      + '- 원문에 없는 사실(원인, 부위, 수치, 자재, 기간, 보증 등)을 절대 지어내지 말 것. 숫자·위치·자재명·규격은 그대로 유지\n'
+      + '- 전문 용어는 정확하게(예: 동관, PB관, 엑셀관, 분배기, 수전, 방수층, 코킹, 가압 테스트, 청음/가스 탐지)\n'
+      + '- 너무 길게 늘리지 말고 원문 분량의 1~1.5배 이내, 필요하면 줄바꿈으로 구분\n'
+      + '- 각 칸의 역할에 맞게: 조치 전 상황=발견된 문제와 원인, 조치 내용=수행한 작업, 조치 후 상태=결과 확인, 전문가 소견=평가와 권장사항\n'
+      + '- 요청한 칸만 JSON으로 돌려주세요: ' + targets.join(', ') + '\n\n'
+      + '누수 유형: ' + (typeEl ? typeEl.value : '') + '\n';
+    POLISH_FIELDS.forEach(function(f) {
+      if (!cur[f.key]) return;
+      prompt += '\n[' + f.key + ' = ' + f.label + (targets.indexOf(f.key) >= 0 ? ' · 다듬기 대상' : ' · 참고만') + ']\n' + cur[f.key] + '\n';
+    });
+    var res = await gmGenerateJson([prompt], schema);
+    polishBusyUi(false);
+    var out = targets.map(function(k) { return { key: k, label: label(k), orig: cur[k], text: String(res[k] || '').trim() }; }).filter(function(x){ return x.text; });
+    if (!out.length) { showToast('AI가 결과를 주지 않았어요. 다시 시도해주세요'); return; }
+    openPolishReview(out);
+  } catch(e) {
+    polishBusyUi(false);
+    console.error('AI 다듬기:', e);
+    gmErrorNotice(e);
+  } finally {
+    _polishBusy = false;
+  }
+}
+// 원문/수정본 비교창
+function openPolishReview(items) {
+  var ov = document.getElementById('polish-review-modal');
+  if (!ov) {
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'polish-review-modal';
+    ov.style.zIndex = '1000';   // 바깥 눌러도 안 닫힘, 탭바 위
+    document.body.appendChild(ov);
+  }
+  var h = '<div class="modal-sheet"><div class="modal-header"><div class="modal-title">✨ AI 다듬기 결과</div>'
+    + '<button class="modal-close" onclick="closeModal(\'polish-review-modal\')">✕</button></div><div class="modal-body">'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;">수정본은 직접 고칠 수 있어요. 체크한 칸만 적용돼요. 사실과 다른 내용이 없는지 꼭 확인해주세요.</div>';
+  items.forEach(function(it, i) {
+    h += '<div class="pl-item" data-key="' + it.key + '" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--bg2);">'
+      + '<label style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" class="pl-chk" checked style="width:18px;height:18px;">' + _rcEsc(it.label) + '</label>'
+      + '<div style="font-size:11px;color:var(--text3);margin-bottom:3px;">원문</div>'
+      + '<div style="font-size:12px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:8px;white-space:pre-wrap;margin-bottom:8px;">' + _rcEsc(it.orig) + '</div>'
+      + '<div style="font-size:11px;color:var(--accent);margin-bottom:3px;">✨ 수정본</div>'
+      + '<textarea class="form-textarea pl-text" style="min-height:' + Math.min(260, 70 + Math.ceil(it.text.length / 26) * 20) + 'px;font-size:13px;">' + _rcEsc(it.text) + '</textarea>'
+      + '</div>';
+  });
+  h += '<div style="display:flex;gap:8px;margin-top:6px;">'
+    + '<button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeModal(\'polish-review-modal\');polishJobTexts(_polishLastKeys||[])">🔄 다시 다듬기</button>'
+    + '<button type="button" class="btn btn-primary" style="flex:1.4;" onclick="applyPolish()">적용</button></div>'
+    + '</div></div>';
+  ov.innerHTML = h;
+  ov.classList.add('open');
+}
+function applyPolish() {
+  var n = 0;
+  document.querySelectorAll('#polish-review-modal .pl-item').forEach(function(box) {
+    if (!box.querySelector('.pl-chk').checked) return;
+    var f = POLISH_FIELDS.filter(function(x){ return x.key === box.getAttribute('data-key'); })[0];
+    var el = f && document.getElementById(f.id);
+    if (el) { el.value = box.querySelector('.pl-text').value; el.dispatchEvent(new Event('input', { bubbles: true })); n++; }
+  });
+  closeModal('polish-review-modal');
+  showToast(n ? '✓ ' + n + '칸 적용됨 · 작업 저장을 눌러야 최종 저장돼요' : '적용한 칸이 없어요');
 }
 
 // 두 번 읽은 결과 중 더 나은 것 고르기 (합계 일치 > 검산된 품목 수 > 품목 수)

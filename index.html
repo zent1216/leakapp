@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.149 · 2026.09.30</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.152 · 2026.09.30</div>
   </div>
 </div>
 
@@ -8197,6 +8197,7 @@ async function paddleRecognize(dataUrl, maxSide, onProg) {
 // ══════════════════════════════════════════
 var _gmModel = null, _gmMods = null;
 var GM_SDK = 'https://www.gstatic.com/firebasejs/12.12.0/';
+var GM_RECAPTCHA_SITE_KEY = '6LcuKdctAAAAAEWnzHKtKkEqjGNWYU20VLJlSJfP';   // reCAPTCHA Enterprise(Fraud Defense) 사이트 키
 var GM_MODELS = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 async function gmModules() {
   if (_gmMods) return _gmMods;
@@ -8204,6 +8205,13 @@ async function gmModules() {
   var aiMod = await import(GM_SDK + 'firebase-ai.js');
   var app;
   try { app = appMod.getApp('ai-receipt'); } catch(e) { app = appMod.initializeApp(firebaseConfig, 'ai-receipt'); }
+  // 앱 체크(App Check): AI 요청이 우리 앱에서 온 것임을 증명 (2026.11.2부터 필수)
+  if (GM_RECAPTCHA_SITE_KEY) {
+    try {
+      var acMod = await import(GM_SDK + 'firebase-app-check.js');
+      acMod.initializeAppCheck(app, { provider: new acMod.ReCaptchaEnterpriseProvider(GM_RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
+    } catch(ace) { console.error('App Check 초기화 실패:', ace); }
+  }
   var ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend() });
   _gmMods = { ai: ai, aiMod: aiMod };
   return _gmMods;
@@ -8294,8 +8302,9 @@ async function receiptAiRead() {
     clearInterval(tick); hideOcrOverlay();
     console.error('Gemini OCR:', e);
     var msg = String(e && (e.message || e));
-    if (/api.?not.?enabled|firebasevertexai|firebaseml|AI Logic|PERMISSION_DENIED|403|api-not-enabled/i.test(msg)) {
-      alert('AI 인식을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.');
+    if (/app.?check/i.test(msg)) { gmErrorNotice(e); }
+    else if (/api.?not.?enabled|firebasevertexai|firebaseml|AI Logic|PERMISSION_DENIED|403|api-not-enabled/i.test(msg)) {
+      alert('AI 인식을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.\n\n(오류: ' + msg.slice(0, 120) + ')');
     } else if (/quota|429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
       showToast('⚠️ AI 무료 사용량을 잠시 초과했어요. 잠시 후 다시 시도해주세요');
     } else {
@@ -8329,8 +8338,12 @@ function polishBusyUi(on, text) {
 }
 function gmErrorNotice(e) {
   var msg = String(e && (e.message || e));
+  if (/app.?check/i.test(msg)) {
+    alert('AI가 "앱 체크(App Check)" 인증 때문에 막혀 있어요.\n\n' + (GM_RECAPTCHA_SITE_KEY ? 'Firebase 콘솔 → App Check → 앱 탭에서 leakapp-web에 reCAPTCHA 비밀 키가 등록됐는지, reCAPTCHA 도메인에 zent1216.github.io가 있는지 확인해주세요.' : '앱 체크 등록(reCAPTCHA 키)이 아직 앱에 반영되지 않았어요. 개발 담당에게 사이트 키를 전달해 주세요.') + '\n\n(오류: ' + msg.slice(0, 120) + ')');
+    return;
+  }
   if (/api.?not.?enabled|firebasevertexai|firebaseml|AI Logic|PERMISSION_DENIED|403|api-not-enabled/i.test(msg)) {
-    alert('AI 기능을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.');
+    alert('AI 기능을 쓰려면 한 번 설정이 필요해요.\n\nFirebase 콘솔(console.firebase.google.com) → leakapp 프로젝트 → AI Logic(AI 서비스) → "시작하기" → "Gemini Developer API" 선택 후 완료\n\n설정 후 몇 분 뒤 다시 눌러주세요.\n\n(오류: ' + msg.slice(0, 120) + ')');
   } else if (/quota|429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
     showToast('⚠️ AI 무료 사용량을 잠시 초과했어요. 잠시 후 다시 시도해주세요');
   } else if (!navigator.onLine) {

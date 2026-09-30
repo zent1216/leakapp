@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" onclick="openChangelog()" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;cursor:pointer;">설비관리 매니저 v1.2 · 2026.10.01 <span style="text-decoration:underline;">업데이트 내역 ›</span></div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.3 · 2026.10.01 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
   </div>
 </div>
 
@@ -8745,6 +8745,7 @@ function applyPolish() {
 // ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
 // 새 버전을 낼 때 맨 위에 한 줄씩 추가
 var APP_CHANGELOG = [
+  ['v1.3', '10.01', ['업데이트 내역은 "업데이트 내역 ›" 글자를 눌렀을 때만 열림']],
   ['v1.2', '10.01', ['AI 다듬기 속도 개선 (4칸 한번에 약 25초 → 5초 수준)', '바쁘거나 하루 한도가 찬 AI 모델은 잠시 건너뛰고 바로 다른 모델 사용']],
   ['v1.1', '10.01', ['메인 화면 버전 글자를 누르면 업데이트 내역을 볼 수 있어요']],
   ['v1.0', '10.01', ['✨ AI 기능 도입 기념 정식 버전', 'AI 작업이 멈추던 문제 해결 (시간 제한·자동 재시도·취소 버튼)']],

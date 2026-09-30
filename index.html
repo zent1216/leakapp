@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.158 · 2026.10.01</div>
+    <div id="app-version-label" onclick="openChangelog()" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;cursor:pointer;">설비관리 매니저 v1.2 · 2026.10.01 <span style="text-decoration:underline;">업데이트 내역 ›</span></div>
   </div>
 </div>
 
@@ -8373,8 +8373,11 @@ async function ensureAiKey() {
   return true;
 }
 var _gmAbort = null;   // 진행 중인 AI 요청 (취소용)
+// 모델별 쉬는 시간: 하루 무료 한도 초과(429)나 과부하(503)·응답 없음이면 잠시 건너뜀 → 매번 기다리지 않게
+var _gmCooldown = {};
+function gmCool(model, ms) { _gmCooldown[model] = Date.now() + ms; if (_gmModel === model) _gmModel = null; }
 function gmCancel() { if (_gmAbort) { _gmAbort.cancelled = true; try { _gmAbort.ctrl.abort(); } catch(e) {} } }
-async function gmRestJson(parts, schema, temperature) {
+async function gmRestJson(parts, schema, temperature, fast) {
   var body = {
     contents: [{ role: 'user', parts: parts.map(function(p) {
       if (typeof p === 'string') return { text: p };
@@ -8383,13 +8386,17 @@ async function gmRestJson(parts, schema, temperature) {
     }) }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: temperature || 0 }
   };
-  var lastErr = null, list = _gmModel ? [_gmModel].concat(GM_MODELS.filter(function(x){ return x !== _gmModel; })) : GM_MODELS;
+  // fast: AI의 '생각하는 단계'를 끔 → 문장 다듬기가 25초 → 5초 수준으로 빨라짐
+  if (fast) body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  var lastErr = null, list = _gmModel ? [_gmModel].concat(GM_MODELS.filter(function(x){ return x !== _gmModel; })) : GM_MODELS.slice();
+  var avail = list.filter(function(m){ return !(_gmCooldown[m] > Date.now()); });
+  if (avail.length) list = avail;   // 전부 쉬는 중이면 그냥 전부 시도
   for (var i = 0; i < list.length; i++) {
     var res, j;
     // 모델마다 최대 35초 기다리고, 넘으면 다음(더 빠른) 모델로
     var ctrl = new AbortController(), job = { ctrl: ctrl, cancelled: false };
     _gmAbort = job;
-    var timer = setTimeout(function(){ try { ctrl.abort(); } catch(e) {} }, 35000);
+    var timer = setTimeout(function(){ try { ctrl.abort(); } catch(e) {} }, i === 0 ? 35000 : 20000);
     try {
       res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + list[i] + ':generateContent', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GM_API_KEY }, body: JSON.stringify(body), signal: ctrl.signal
@@ -8398,7 +8405,7 @@ async function gmRestJson(parts, schema, temperature) {
     } catch(e) {
       clearTimeout(timer);
       if (job.cancelled) throw new Error('CANCELLED');
-      if (e && e.name === 'AbortError') { lastErr = new Error('AI 응답이 너무 오래 걸려요 (' + list[i] + ')'); _gmModel = null; continue; }
+      if (e && e.name === 'AbortError') { lastErr = new Error('AI 응답이 너무 오래 걸려요 (' + list[i] + ')'); gmCool(list[i], 5 * 60000); continue; }
       throw new Error('AI 서버 연결 실패 (인터넷 확인): ' + (e.message || e));
     }
     clearTimeout(timer);
@@ -8408,8 +8415,11 @@ async function gmRestJson(parts, schema, temperature) {
       return JSON.parse(txt);
     }
     var em = (j && j.error) ? '[' + j.error.code + '] ' + (j.error.message || '') : ('[' + res.status + '] 응답 없음');
+    if (res.status === 400 && body.generationConfig.thinkingConfig) { delete body.generationConfig.thinkingConfig; i--; continue; }   // 생각 끄기를 지원 안 하는 모델이면 빼고 다시
     lastErr = new Error(em);
     if (_gmModel === list[i]) _gmModel = null;
+    if (res.status === 429) gmCool(list[i], /PerDay/i.test(JSON.stringify(j || {})) ? 6 * 3600000 : 60000);
+    else if (res.status === 503) gmCool(list[i], 5 * 60000);
     // 모델 이름 문제(404)나 일시 과부하(503)·모델별 사용량 초과(429)면 다음 모델로
     if (!(res.status === 404 || res.status === 503 || res.status === 429 || /not.?found|no longer available|not supported|is not available|high demand|overloaded/i.test(em))) break;
   }
@@ -8568,7 +8578,7 @@ function polishBusyUi(on, text) {
   }
   ov.innerHTML = '<div style="background:var(--bg2);border-radius:14px;padding:22px 20px;max-width:300px;width:100%;text-align:center;color:var(--text);">'
     + '<div style="font-size:30px;margin-bottom:8px;">✨</div><div style="font-size:15px;font-weight:600;">' + text + '</div>'
-    + '<div id="polish-busy-sub" style="font-size:11px;color:var(--text2);margin-top:8px;">보통 5~20초 걸려요</div>'
+    + '<div id="polish-busy-sub" style="font-size:11px;color:var(--text2);margin-top:8px;">보통 5~10초 걸려요</div>'
     + '<button type="button" onclick="gmCancel();polishBusyUi(false);" style="margin-top:14px;padding:8px 22px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;">취소</button></div>';
   var t0 = Date.now();
   clearInterval(window._polishTick);
@@ -8576,7 +8586,7 @@ function polishBusyUi(on, text) {
     var el = document.getElementById('polish-busy-sub');
     if (!el) { clearInterval(window._polishTick); return; }
     var sec = Math.round((Date.now() - t0) / 1000);
-    el.textContent = sec < 20 ? '보통 5~20초 걸려요 · ' + sec + '초' : (sec < 35 ? 'AI 서버가 바빠서 조금 더 걸려요 · ' + sec + '초' : '다른 AI 모델로 다시 시도 중 · ' + sec + '초');
+    el.textContent = sec < 15 ? '보통 5~10초 걸려요 · ' + sec + '초' : (sec < 35 ? 'AI 서버가 바빠서 조금 더 걸려요 · ' + sec + '초' : '다른 AI 모델로 다시 시도 중 · ' + sec + '초');
   }, 1000);
 }
 function gmErrShort(msg) { return String(msg).replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim().slice(0, 160); }
@@ -8609,7 +8619,7 @@ function gmErrorNotice(e) {
 }
 // JSON 응답 받기 (모델 이름 문제면 다음 모델로)
 async function gmGenerateJson(parts, schema, temp) {
-  if (GM_API_KEY) return await gmRestJson(parts, schema, temp || 0.3);
+  if (GM_API_KEY) return await gmRestJson(parts, schema, temp || 0.3, true);
   var m = await gmModules(), lastErr = null, list = _gmModel ? [_gmModel] : GM_MODELS;
   for (var i = 0; i < list.length; i++) {
     try {
@@ -8730,6 +8740,67 @@ function applyPolish() {
   });
   closeModal('polish-review-modal');
   showToast(n ? '✓ ' + n + '칸 적용됨 · 작업 저장을 눌러야 최종 저장돼요' : '적용한 칸이 없어요');
+}
+
+// ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
+// 새 버전을 낼 때 맨 위에 한 줄씩 추가
+var APP_CHANGELOG = [
+  ['v1.2', '10.01', ['AI 다듬기 속도 개선 (4칸 한번에 약 25초 → 5초 수준)', '바쁘거나 하루 한도가 찬 AI 모델은 잠시 건너뛰고 바로 다른 모델 사용']],
+  ['v1.1', '10.01', ['메인 화면 버전 글자를 누르면 업데이트 내역을 볼 수 있어요']],
+  ['v1.0', '10.01', ['✨ AI 기능 도입 기념 정식 버전', 'AI 작업이 멈추던 문제 해결 (시간 제한·자동 재시도·취소 버튼)']],
+  ['v0.157', '09.30', ['AI 다듬기: 📑 전문 소견서체(자세히) / ✏️ 간결하게 선택']],
+  ['v0.156', '09.30', ['AI 키를 계정에 저장 (처음 한 번만 입력)']],
+  ['v0.155', '09.30', ['견적서·소견서가 길면 자동으로 2장 이상 나눔', '모아보내기 PDF 찌그러짐 해결']],
+  ['v0.153', '09.30', ['AI 무료 키 연결, AI 오류 원인 안내 개선']],
+  ['v0.149', '09.30', ['새 작업 기록칸(조치 전·내용·후·소견) ✨ AI 다듬기']],
+  ['v0.148', '09.29', ['수수료 없는 현장도 순수익 항상 표시']],
+  ['v0.147', '09.29', ['자재비 색상을 핑크로 통일 (메인·실적·자재)']],
+  ['v0.145', '09.29', ['실적관리: 순수익에서 자재 구매비 빼기 체크']],
+  ['v0.144', '09.29', ['실적관리 자재비를 영수증 기준으로 (이번 달 / 올해 누적 / 월별)']],
+  ['v0.143', '09.29', ['메인 화면 맨 아래 버전 표시']],
+  ['v142', '09.29', ['영수증 인식 엔진 교체 (PaddleOCR, 훨씬 정확)', '영수증 ✨ AI 정밀 인식']],
+  ['v141', '09.29', ['영수증 품목명 단어 학습 + 학습 목록 관리']],
+  ['v140', '09.29', ['영수증 확인창 실수로 닫힘 방지', '구매처 인식 개선, 품목명 자동 보정·학습']],
+  ['v139', '09.29', ['영수증 여러 품목 인식 → 품목마다 따로 저장']],
+  ['v138', '09.29', ['자재관리: 📷 영수증 찍어서 등록 (자동 인식)']],
+  ['v137', '', ['빠른입력: 전화번호 여러 개 차례로 인식']],
+  ['v136', '', ['메인 금액 카드 접기/펼치기 (계정에 저장)']],
+  ['v135', '', ['새벽 시간에 날짜가 하루 밀리던 문제 수정']],
+  ['v134', '', ['자재 등록에 영수증 사진 첨부']],
+  ['v133', '', ['공사완료확인서에 작업 기간 반영']],
+  ['v132', '', ['작업 날짜 여러 개 추가', '현장 달력 상태별 색상 (의뢰·완료·미수·드롭)']],
+  ['v131', '', ['블랙리스트: "미정" 같은 이름 오경고 수정']],
+  ['v130', '', ['모아보내기 버튼을 미리보기에서도 표시']],
+  ['v129', '', ['문서 화면 상단을 2줄로 정리']],
+  ['v120~128', '', ['블랙리스트 기능 (고객/의뢰처, 이름·전화 경고, 수정·삭제)']],
+  ['v118', '', ['상태 "실패" → "드롭"으로 변경']],
+  ['v117', '', ['앱 이름 "설비관리 매니저"로 변경']],
+  ['v115', '', ['현장 목록에 조치 전/후 사진 개수 표시']],
+  ['v114', '', ['작업 상세에 전화 버튼']],
+  ['v113', '', ['문서 편집 "💾 저장 (원본 반영)"']],
+  ['v111', '', ['VAT 포함 금액으로 입력하기 (카드·현금영수증)']]
+];
+function openChangelog() {
+  var ov = document.getElementById('changelog-modal');
+  if (!ov) {
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'changelog-modal';
+    ov.style.zIndex = '1000';
+    ov.onclick = function(ev){ handleOverlayClick(ev, 'changelog-modal'); };
+    document.body.appendChild(ov);
+  }
+  var h = '<div class="modal-sheet"><div class="modal-header"><div class="modal-title">📋 업데이트 내역</div>'
+    + '<button class="modal-close" onclick="closeModal(\'changelog-modal\')">✕</button></div><div class="modal-body">';
+  APP_CHANGELOG.forEach(function(v, i) {
+    h += '<div style="padding:10px 0;border-bottom:1px solid var(--border);">'
+      + '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;"><b style="font-size:14px;color:' + (i === 0 ? 'var(--accent)' : 'var(--text)') + ';">' + v[0] + '</b>'
+      + (i === 0 ? '<span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:0 6px;">현재</span>' : '')
+      + '<span style="font-size:11px;color:var(--text3);margin-left:auto;">' + v[1] + '</span></div>'
+      + v[2].map(function(t){ return '<div style="font-size:13px;color:var(--text2);line-height:1.6;">· ' + t + '</div>'; }).join('')
+      + '</div>';
+  });
+  h += '</div></div>';
+  ov.innerHTML = h;
+  ov.classList.add('open');
 }
 
 // 두 번 읽은 결과 중 더 나은 것 고르기 (합계 일치 > 검산된 품목 수 > 품목 수)

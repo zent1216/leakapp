@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.157 · 2026.09.30</div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v0.158 · 2026.10.01</div>
   </div>
 </div>
 
@@ -8372,6 +8372,8 @@ async function ensureAiKey() {
   showToast('✓ AI 키 저장됨');
   return true;
 }
+var _gmAbort = null;   // 진행 중인 AI 요청 (취소용)
+function gmCancel() { if (_gmAbort) { _gmAbort.cancelled = true; try { _gmAbort.ctrl.abort(); } catch(e) {} } }
 async function gmRestJson(parts, schema, temperature) {
   var body = {
     contents: [{ role: 'user', parts: parts.map(function(p) {
@@ -8381,15 +8383,25 @@ async function gmRestJson(parts, schema, temperature) {
     }) }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: temperature || 0 }
   };
-  var lastErr = null, list = _gmModel ? [_gmModel] : GM_MODELS;
+  var lastErr = null, list = _gmModel ? [_gmModel].concat(GM_MODELS.filter(function(x){ return x !== _gmModel; })) : GM_MODELS;
   for (var i = 0; i < list.length; i++) {
     var res, j;
+    // 모델마다 최대 35초 기다리고, 넘으면 다음(더 빠른) 모델로
+    var ctrl = new AbortController(), job = { ctrl: ctrl, cancelled: false };
+    _gmAbort = job;
+    var timer = setTimeout(function(){ try { ctrl.abort(); } catch(e) {} }, 35000);
     try {
       res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + list[i] + ':generateContent', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GM_API_KEY }, body: JSON.stringify(body)
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GM_API_KEY }, body: JSON.stringify(body), signal: ctrl.signal
       });
       j = await res.json();
-    } catch(e) { throw new Error('AI 서버 연결 실패 (인터넷 확인): ' + (e.message || e)); }
+    } catch(e) {
+      clearTimeout(timer);
+      if (job.cancelled) throw new Error('CANCELLED');
+      if (e && e.name === 'AbortError') { lastErr = new Error('AI 응답이 너무 오래 걸려요 (' + list[i] + ')'); _gmModel = null; continue; }
+      throw new Error('AI 서버 연결 실패 (인터넷 확인): ' + (e.message || e));
+    }
+    clearTimeout(timer);
     if (res.ok && j.candidates && j.candidates[0] && j.candidates[0].content) {
       var txt = (j.candidates[0].content.parts || []).map(function(p){ return p.text || ''; }).join('');
       _gmModel = list[i];
@@ -8397,6 +8409,7 @@ async function gmRestJson(parts, schema, temperature) {
     }
     var em = (j && j.error) ? '[' + j.error.code + '] ' + (j.error.message || '') : ('[' + res.status + '] 응답 없음');
     lastErr = new Error(em);
+    if (_gmModel === list[i]) _gmModel = null;
     // 모델 이름 문제(404)나 일시 과부하(503)·모델별 사용량 초과(429)면 다음 모델로
     if (!(res.status === 404 || res.status === 503 || res.status === 429 || /not.?found|no longer available|not supported|is not available|high demand|overloaded/i.test(em))) break;
   }
@@ -8490,7 +8503,8 @@ async function receiptAiRead() {
   if (!navigator.onLine) { showToast('인터넷 연결이 필요해요'); return; }
   if (!(await ensureAiKey())) return;
   showOcrOverlay('✨ AI가 영수증 읽는 중...');
-  setOcrProgress(30, '보통 5~15초 걸려요');
+  setOcrProgress(30, '보통 10~30초 걸려요');
+  (function(){ var sub = document.getElementById('ocr-overlay-sub'); if (sub && !document.getElementById('ocr-ai-cancel')) sub.insertAdjacentHTML('afterend', '<button type="button" id="ocr-ai-cancel" onclick="gmCancel()" style="margin-top:12px;padding:7px 20px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;">취소</button>'); })();
   var tick = setInterval(function(){ var b = document.getElementById('ocr-overlay-bar'); if (b) { var w = parseFloat(b.style.width) || 30; setOcrProgress(Math.min(92, w + 3)); } }, 700);
   try {
     var j = await geminiReadReceipt(_rcPhotoSrc);
@@ -8546,7 +8560,7 @@ function polishRestyle(st) {
 }
 function polishBusyUi(on, text) {
   var ov = document.getElementById('polish-busy');
-  if (!on) { if (ov) ov.remove(); return; }
+  if (!on) { if (ov) ov.remove(); clearInterval(window._polishTick); return; }
   if (!ov) {
     ov = document.createElement('div'); ov.id = 'polish-busy';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -8554,11 +8568,22 @@ function polishBusyUi(on, text) {
   }
   ov.innerHTML = '<div style="background:var(--bg2);border-radius:14px;padding:22px 20px;max-width:300px;width:100%;text-align:center;color:var(--text);">'
     + '<div style="font-size:30px;margin-bottom:8px;">✨</div><div style="font-size:15px;font-weight:600;">' + text + '</div>'
-    + '<div style="font-size:11px;color:var(--text2);margin-top:8px;">보통 3~10초 걸려요</div></div>';
+    + '<div id="polish-busy-sub" style="font-size:11px;color:var(--text2);margin-top:8px;">보통 5~20초 걸려요</div>'
+    + '<button type="button" onclick="gmCancel();polishBusyUi(false);" style="margin-top:14px;padding:8px 22px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;">취소</button></div>';
+  var t0 = Date.now();
+  clearInterval(window._polishTick);
+  window._polishTick = setInterval(function(){
+    var el = document.getElementById('polish-busy-sub');
+    if (!el) { clearInterval(window._polishTick); return; }
+    var sec = Math.round((Date.now() - t0) / 1000);
+    el.textContent = sec < 20 ? '보통 5~20초 걸려요 · ' + sec + '초' : (sec < 35 ? 'AI 서버가 바빠서 조금 더 걸려요 · ' + sec + '초' : '다른 AI 모델로 다시 시도 중 · ' + sec + '초');
+  }, 1000);
 }
 function gmErrShort(msg) { return String(msg).replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim().slice(0, 160); }
 function gmErrorNotice(e) {
   var msg = String(e && (e.message || e));
+  if (msg === 'CANCELLED') { showToast('취소했어요'); return; }
+  if (/너무 오래 걸려요/.test(msg)) { showToast('⚠️ AI 서버가 지금 바빠요. 잠시 후 다시 눌러주세요'); return; }
   if (/API key not valid|API_KEY_INVALID|api key expired|key was reported as leaked|\[401\]|\[400\].*key/i.test(msg) && !/app.?check/i.test(msg)) {
     saveAiKey('');
     alert('AI 키가 올바르지 않거나 사용이 중지됐어요. 다음에 AI 버튼을 누르면 키를 다시 입력받아요.\n\n(오류: ' + gmErrShort(msg) + ')');

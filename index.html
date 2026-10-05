@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.4 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.5.1 · 2026.10.06 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span><span id="menu-edit-link" onclick="toggleMenuEdit(true)" style="text-decoration:underline;cursor:pointer;padding:4px 2px;margin-left:8px;">✏️ 메뉴 편집</span></div>
   </div>
 </div>
 
@@ -1846,6 +1846,7 @@ async function loadUserData(uid) {
         _uiPrefs = (parsedUi && typeof parsedUi === 'object') ? parsedUi : {};
       } catch { _uiPrefs = {}; }
       applyMoneyStatsCollapse();
+      try { initMainReorder(); } catch(e) { console.error('initMainReorder:', e); }
       try {
         const parsedTypes = d.leakTypes ? JSON.parse(d.leakTypes) : null;
         if (Array.isArray(parsedTypes) && parsedTypes.length) _leakTypes = parsedTypes;
@@ -8774,6 +8775,8 @@ function applyPolish() {
 // ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
 // 새 버전을 낼 때 맨 위에 한 줄씩 추가
 var APP_CHANGELOG = [
+  ['v1.5.1', '10.06', ['메뉴 순서 변경을 "✏️ 메뉴 편집" 모드에서만 하도록 변경 (평소엔 길게 눌러도 안 움직임)', '편집 중 "초기화"로 처음 배치로 되돌리기']],
+  ['v1.5.0', '10.06', ['홈 화면 메뉴 순서를 드래그로 변경 (큰 메뉴끼리 / 작은 버튼끼리, 계정에 저장)']],
   ['v1.4.4', '10.05', ['홈 화면 자재 관리 버튼을 위로 (AS 관리와 자리 바꿈)']],
   ['v1.4.3', '10.05', ['실적관리·메인 매출을 실제로 받은 금액(VAT 포함) 기준으로 표시 (VAT 포함 입력 시 1원 단위 숫자 안 나옴)', '미수금도 받을 금액(VAT 포함)으로 표시']],
   ['v1.4.2', '10.05', ['실적관리 VAT 칸의 면제 기준(4,800만원) 안내 줄 삭제']],
@@ -8835,6 +8838,138 @@ function openChangelog() {
   h += '</div></div>';
   ov.innerHTML = h;
   ov.classList.add('open');
+}
+
+// ══════════════════════════════════════════
+//  메인 메뉴 순서 바꾸기 (✏️ 메뉴 편집 모드에서만 드래그)
+//  큰 메뉴 카드끼리, 작은 버튼끼리만 이동 · 순서는 계정(uiPrefs)에 저장
+// ══════════════════════════════════════════
+var _menuDefault = null, _menuDrag = null, _menuSuppressClick = false, _menuEdit = false;
+function menuContainers() {
+  return [document.querySelector('#page-main .main-menu-grid'), document.querySelector('#page-main .bottom-btns')].filter(Boolean);
+}
+function menuKeyOf(el) { return el.getAttribute('data-mkey') || el.getAttribute('onclick') || el.textContent.trim(); }
+function initMainReorder() {
+  var cs = menuContainers(); if (cs.length < 2) return;
+  if (!_menuDefault) {
+    _menuDefault = cs.map(function(c){ return Array.prototype.map.call(c.children, function(el){ el.setAttribute('data-mkey', menuKeyOf(el)); return menuKeyOf(el); }); });
+    cs.forEach(function(c, ci) {
+      Array.prototype.forEach.call(c.children, function(el) {
+        el.style.webkitUserSelect = 'none'; el.style.userSelect = 'none'; el.style.webkitTouchCallout = 'none';
+        el.addEventListener('touchstart', function(e){ menuPressStart(e, el, c, e.touches[0]); }, { passive: true });
+        el.addEventListener('mousedown', function(e){ if (e.button === 0) menuPressStart(e, el, c, e); });
+        el.addEventListener('contextmenu', function(e){ if (_menuDrag) e.preventDefault(); });
+      });
+    });
+    document.addEventListener('touchmove', menuMove, { passive: false });
+    document.addEventListener('mousemove', menuMove);
+    document.addEventListener('touchend', menuEnd); document.addEventListener('touchcancel', menuEnd);
+    document.addEventListener('mouseup', menuEnd);
+    // 드래그 직후의 클릭(화면 이동)은 막음
+    document.addEventListener('click', function(e){
+      if (_menuSuppressClick || (_menuEdit && e.target.closest && e.target.closest('[data-mkey]'))) { e.stopPropagation(); e.preventDefault(); _menuSuppressClick = false; }
+    }, true);
+  }
+  applyMainOrder();
+}
+function applyMainOrder() {
+  var cs = menuContainers(); if (cs.length < 2 || !_menuDefault) return;
+  var saved = (_uiPrefs && _uiPrefs.menuOrder) || null;
+  cs.forEach(function(c, ci) {
+    var order = (saved && saved[ci]) || _menuDefault[ci];
+    var map = {}; Array.prototype.forEach.call(c.children, function(el){ map[menuKeyOf(el)] = el; });
+    order.forEach(function(k){ if (map[k]) { c.appendChild(map[k]); delete map[k]; } });
+    Object.keys(map).forEach(function(k){ c.appendChild(map[k]); });   // 새로 생긴 메뉴는 맨 뒤
+  });
+}
+function menuPressStart(e, el, c, pt) {
+  if (_menuDrag || !_menuEdit) return;   // 편집 모드가 아니면 아무 일도 안 함
+  if (e.type === 'mousedown') e.preventDefault();
+  var st = { el: el, c: c, x0: pt.clientX, y0: pt.clientY, active: false };
+  st.start = function() {
+    if (st.active) return;
+    st.active = true;
+    var r = el.getBoundingClientRect();
+    st.offX = st.x0 - r.left; st.offY = st.y0 - r.top;
+    el.style.transition = 'transform .08s, box-shadow .15s';
+    el.style.position = 'relative'; el.style.zIndex = '50';
+    el.style.boxShadow = '0 10px 28px rgba(0,0,0,0.55)';
+    el.style.transform = 'scale(1.05)';
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch(x) {} }
+  };
+  _menuDrag = st;
+}
+function menuMove(e) {
+  var st = _menuDrag; if (!st) return;
+  var pt = e.touches ? e.touches[0] : e; if (!pt) return;
+  if (!st.active) {
+    // 편집 모드: 조금만 움직여도 바로 드래그 시작
+    if (Math.abs(pt.clientX - st.x0) > 6 || Math.abs(pt.clientY - st.y0) > 6) st.start(); else return;
+  }
+  if (e.cancelable) e.preventDefault();
+  var el = st.el;
+  // 손가락 아래에 있는 같은 그룹의 다른 메뉴와 자리 바꿈
+  el.style.visibility = 'hidden';
+  var under = document.elementFromPoint(pt.clientX, pt.clientY);
+  el.style.visibility = '';
+  var target = under && under.closest ? under.closest('[data-mkey]') : null;
+  if (target && target !== el && target.parentElement === st.c) {
+    var kids = Array.prototype.slice.call(st.c.children);
+    if (kids.indexOf(target) > kids.indexOf(el)) st.c.insertBefore(el, target.nextSibling); else st.c.insertBefore(el, target);
+  }
+  // 카드가 손가락을 따라오게
+  el.style.transform = 'none';
+  var r = el.getBoundingClientRect();
+  el.style.transform = 'translate(' + (pt.clientX - st.offX - r.left) + 'px,' + (pt.clientY - st.offY - r.top) + 'px) scale(1.05)';
+}
+function menuEnd() {
+  var st = _menuDrag; _menuDrag = null; if (!st) return;
+  if (!st.active) return;
+  var el = st.el;
+  el.style.transform = ''; el.style.boxShadow = ''; el.style.zIndex = ''; el.style.position = ''; el.style.transition = '';
+  _menuSuppressClick = true; setTimeout(function(){ _menuSuppressClick = false; }, 400);
+  saveMainOrder();
+}
+async function saveMainOrder() {
+  var cs = menuContainers();
+  var order = cs.map(function(c){ return Array.prototype.map.call(c.children, menuKeyOf); });
+  var isDefault = JSON.stringify(order) === JSON.stringify(_menuDefault);
+  if (isDefault) delete _uiPrefs.menuOrder; else _uiPrefs.menuOrder = order;
+  try { if (_uid) await db.collection('users').doc(_uid).set({uiPrefs: JSON.stringify(_uiPrefs)}, {merge: true}); } catch(e) { console.error('saveUiPrefs:', e); }
+}
+function resetMainOrder() {
+  if (!confirm('메뉴 순서를 처음 배치로 되돌릴까요?')) return;
+  delete _uiPrefs.menuOrder;
+  applyMainOrder();
+  saveMainOrder();
+  showToast('처음 배치로 되돌렸어요');
+}
+// ✏️ 메뉴 편집 모드 켜기/끄기
+function toggleMenuEdit(on) {
+  if (!_menuDefault) initMainReorder();
+  _menuEdit = !!on;
+  menuContainers().forEach(function(c) {
+    Array.prototype.forEach.call(c.children, function(el) {
+      el.style.outline = on ? '2px dashed rgba(79,142,247,0.7)' : '';
+      el.style.outlineOffset = on ? '-2px' : '';
+      el.style.touchAction = on ? 'none' : '';
+      var h = el.querySelector(':scope > .menu-drag-handle');
+      if (on && !h) { h = document.createElement('span'); h.className = 'menu-drag-handle'; h.textContent = '⠿'; h.style.cssText = 'position:absolute;top:4px;right:8px;font-size:14px;color:var(--accent);pointer-events:none;'; if (getComputedStyle(el).position === 'static') el.style.position = 'relative'; el.appendChild(h); }
+      if (!on && h) h.remove();
+    });
+  });
+  var lbl = document.getElementById('app-version-label');
+  if (lbl) lbl.style.paddingBottom = on ? '150px' : '';   // 편집 바에 아래 버튼이 가리지 않게
+  var bar = document.getElementById('menu-edit-bar');
+  if (on && !bar) {
+    bar = document.createElement('div'); bar.id = 'menu-edit-bar';
+    bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:1001;width:calc(100% - 32px);max-width:448px;background:var(--bg2);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,0.5);font-size:12px;color:var(--text);';
+    bar.innerHTML = '<span style="flex:1;">✏️ 메뉴를 끌어서 순서를 바꾸세요<br><span style="color:var(--text3);font-size:11px;">큰 메뉴끼리 · 작은 버튼끼리만 이동돼요</span></span>'
+      + '<button type="button" onclick="resetMainOrder()" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;">초기화</button>'
+      + '<button type="button" onclick="toggleMenuEdit(false)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--accent);color:white;font-size:12px;font-weight:700;cursor:pointer;">완료</button>';
+    document.body.appendChild(bar);
+  }
+  if (!on && bar) { bar.remove(); showToast('메뉴 배치를 저장했어요'); }
 }
 
 // 두 번 읽은 결과 중 더 나은 것 고르기 (합계 일치 > 검산된 품목 수 > 품목 수)

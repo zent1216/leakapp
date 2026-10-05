@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.0 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.2 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
   </div>
 </div>
 
@@ -6083,11 +6083,6 @@ function renderStats() {
           + '<div style="font-size:18px;font-weight:700;color:var(--purple);font-family:IBM Plex Mono,monospace;">'+fmtMoney(v.received)+'</div>'
           + '<div style="font-size:10px;color:'+(v.pay>0?'var(--text2)':'var(--green)')+';margin-top:2px;">실제 납부: '+typeTxt+'</div>'
           + (vatKeepYear > 0 ? '<div style="font-size:10px;color:var(--green);margin-top:2px;">→ 순수익에 +'+fmtMoney(vatKeepYear)+' 반영</div>' : '')
-          + (v.type !== 'general' ? (function(){
-              // 납부면제 기준(연 공급대가 4,800만원) 대비 올해 매출
-              var supplyTotal = totalRev + v.received, lim = 48000000, pct = Math.round(supplyTotal / lim * 100);
-              return '<div style="font-size:10px;color:' + (pct >= 80 ? 'var(--orange)' : 'var(--text3)') + ';margin-top:4px;">면제 기준 4,800만원 중 ' + fmtShort(supplyTotal) + ' (' + pct + '%)' + (pct >= 100 ? ' ⚠️ 초과' : pct >= 80 ? ' ⚠️' : '') + '</div>';
-            })() : '')
           + '</div>';
       })()
     + '<div class="stat-card" style="grid-column:1/-1;">'
@@ -8772,7 +8767,8 @@ function applyPolish() {
 // ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
 // 새 버전을 낼 때 맨 위에 한 줄씩 추가
 var APP_CHANGELOG = [
-  ['v1.4.0', '10.05', ['받은 VAT 중 내가 갖는 몫을 순수익에 반영 (사업자 정보의 과세 유형 기준: 면제=전부, 간이=납부액 뺀 차액, 일반=반영 안 함)', '실적관리 VAT 칸에 납부면제 기준(연 4,800만원) 대비 올해 매출 표시']],
+  ['v1.4.2', '10.05', ['실적관리 VAT 칸의 면제 기준(4,800만원) 안내 줄 삭제']],
+  ['v1.4.0', '10.05', ['받은 VAT 중 내가 갖는 몫을 순수익에 반영 (사업자 정보의 과세 유형 기준: 면제=전부, 간이=납부액 뺀 차액, 일반=반영 안 함)', '실적관리 VAT 칸에 순수익 반영 금액 표시']],
   ['v1.3', '10.01', ['업데이트 내역은 "업데이트 내역 ›" 글자를 눌렀을 때만 열림']],
   ['v1.2', '10.01', ['AI 다듬기 속도 개선 (4칸 한번에 약 25초 → 5초 수준)', '바쁘거나 하루 한도가 찬 AI 모델은 잠시 건너뛰고 바로 다른 모델 사용']],
   ['v1.1', '10.01', ['메인 화면 버전 글자를 누르면 업데이트 내역을 볼 수 있어요']],

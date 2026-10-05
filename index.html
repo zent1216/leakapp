@@ -715,12 +715,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       </button>
     </div>
     <div class="bottom-btns">
-      <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
-      <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
+      <button class="bottom-btn" onclick="goPage('page-contacts')">📇 고객 연락처</button>
+      <button class="bottom-btn" onclick="goPage('page-as')">🛠️ AS 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.3 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.4 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
   </div>
 </div>
 
@@ -8774,6 +8774,7 @@ function applyPolish() {
 // ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
 // 새 버전을 낼 때 맨 위에 한 줄씩 추가
 var APP_CHANGELOG = [
+  ['v1.4.4', '10.05', ['홈 화면 자재 관리 버튼을 위로 (AS 관리와 자리 바꿈)']],
   ['v1.4.3', '10.05', ['실적관리·메인 매출을 실제로 받은 금액(VAT 포함) 기준으로 표시 (VAT 포함 입력 시 1원 단위 숫자 안 나옴)', '미수금도 받을 금액(VAT 포함)으로 표시']],
   ['v1.4.2', '10.05', ['실적관리 VAT 칸의 면제 기준(4,800만원) 안내 줄 삭제']],
   ['v1.4.0', '10.05', ['받은 VAT 중 내가 갖는 몫을 순수익에 반영 (사업자 정보의 과세 유형 기준: 면제=전부, 간이=납부액 뺀 차액, 일반=반영 안 함)', '실적관리 VAT 칸에 순수익 반영 금액 표시']],

@@ -720,7 +720,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       <button class="bottom-btn" onclick="goPage('page-materials')">📦 자재 관리</button>
       <button class="bottom-btn" onclick="goPage('page-biz')">⚙️ 사업자 정보</button>
     </div>
-    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.2 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
+    <div id="app-version-label" style="text-align:center;font-size:11px;color:var(--text3);padding:16px 0 84px;">설비관리 매니저 v1.4.3 · 2026.10.05 <span id="changelog-link" onclick="openChangelog()" style="text-decoration:underline;cursor:pointer;padding:4px 2px;">업데이트 내역 ›</span></div>
   </div>
 </div>
 
@@ -3198,11 +3198,11 @@ function updateMainStats() {
 
   // 이번달 매출 (수수료 차감 전 총 매출)
   const elMonthSales = document.getElementById('ms-month-sales');
-  if (elMonthSales) elMonthSales.textContent = fmtShort(revenue);
+  if (elMonthSales) elMonthSales.textContent = fmtShort(doneJobs.reduce(function(s,j){ return s + jobReceived(j); }, 0));   // 받은 금액(VAT 포함)
 
   // 미수금 총액 (전체 미수 상태 작업의 매출 합계)
   const unpaidJobs = _jobs.filter(function(j){ return j.status === 'unpaid'; });
-  const unpaidTotal = unpaidJobs.reduce(function(s,j){ return s + jobTotal(j); }, 0);
+  const unpaidTotal = unpaidJobs.reduce(function(s,j){ return s + jobReceived(j); }, 0);   // 받을 돈(VAT 포함)
   const elUnpaid = document.getElementById('ms-unpaid-total');
   if (elUnpaid) {
     elUnpaid.textContent = fmtShort(unpaidTotal) + (unpaidJobs.length ? ' (' + unpaidJobs.length + '건)' : '');
@@ -5970,6 +5970,10 @@ function vatKeepOfJob(j) {
   if (t === 'simple') return Math.max(0, vat - Math.round(base * 0.04));
   return 0;
 }
+// 실제로 받은(받을) 금액 = 공급가 + VAT(카드·현금영수증 현장)
+function jobReceived(j) { var b = jobTotal(j); return b + ((j.payType === 'card' || j.cashReceipt) ? Math.round(b * 0.1) : 0); }
+// 받은 VAT 중 납부할 몫 (면제 0 / 간이 4% / 일반 전액)
+function vatPayOfJob(j) { if (!(j.payType === 'card' || j.cashReceipt)) return 0; return Math.round(jobTotal(j) * 0.1) - vatKeepOfJob(j); }
 function vatKeepSum(jobs) { return jobs.reduce(function(s, j){ return s + vatKeepOfJob(j); }, 0); }
 function vatKeepLabel() { var t = (_biz && _biz['tax-type']) || 'exempt'; return t === 'simple' ? 'VAT 차액 (간이)' : 'VAT (납부 면제분)'; }
 
@@ -6042,6 +6046,8 @@ function renderStats() {
   const yearJobs = _jobs.filter(j=>(j.date||'').startsWith(selYear));
   const doneJobs = yearJobs.filter(j=>j.status==='done');
   const totalRev = doneJobs.reduce((s,j)=>s+jobTotal(j), 0);
+  const totalRecv = doneJobs.reduce((s,j)=>s+jobReceived(j), 0);   // 실제로 받은 금액(VAT 포함)
+  const totalVatPay = doneJobs.reduce((s,j)=>s+vatPayOfJob(j), 0);
   const totalComm = doneJobs.reduce((s,j)=>s+(j.commission||0), 0);
   const netRev = totalRev - totalComm;
   // VAT 신고 대상 매출 (VAT 발행 현장의 매출 합계 = 국세청 보고 금액)
@@ -6062,14 +6068,14 @@ function renderStats() {
     + '<span>순수익에서 <b>자재 구매비</b> 빼기</span><span style="margin-left:auto;font-size:10px;color:var(--text3);">메인 화면에도 적용</span></label>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
     + '<div class="stat-card">'
-    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev)+'</div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 전체 매출 <span style="font-size:10px;color:var(--text3);">(받은 금액)</span></div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRecv)+'</div>'
     + '<div style="font-size:11px;color:var(--purple);margin-top:2px;">VAT 신고매출 '+fmtMoney(totalRevVatReport)+' ('+vatReportJobs.length+'건)</div>'
     + '</div>'
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 순수익</div>'
-    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRev - totalComm - (dMat ? matYear : 0) + vatKeepYear)+'</div>'
-    + '<div style="font-size:10px;color:var(--text3);margin-top:2px;">' + (dMat ? '수수료·자재비 차감' : '수수료 차감') + (vatKeepYear > 0 ? '<br><span style="color:var(--purple);">+ ' + vatKeepLabel() + ' ' + fmtMoney(vatKeepYear) + '</span>' : '') + '</div>'
+    + '<div style="font-size:18px;font-weight:700;color:var(--green);font-family:IBM Plex Mono,monospace;">'+fmtMoney(totalRecv - totalComm - totalVatPay - (dMat ? matYear : 0))+'</div>'
+    + '<div style="font-size:10px;color:var(--text3);margin-top:2px;">수수료' + (dMat ? '·자재비' : '') + (totalVatPay > 0 ? '·VAT 납부' : '') + ' 차감</div>'
     + '</div>'
     + '<div class="stat-card">'
     + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">연간 수수료</div>'
@@ -6082,7 +6088,7 @@ function renderStats() {
           + '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">총 VAT (받은 부가세)</div>'
           + '<div style="font-size:18px;font-weight:700;color:var(--purple);font-family:IBM Plex Mono,monospace;">'+fmtMoney(v.received)+'</div>'
           + '<div style="font-size:10px;color:'+(v.pay>0?'var(--text2)':'var(--green)')+';margin-top:2px;">실제 납부: '+typeTxt+'</div>'
-          + (vatKeepYear > 0 ? '<div style="font-size:10px;color:var(--green);margin-top:2px;">→ 순수익에 +'+fmtMoney(vatKeepYear)+' 반영</div>' : '')
+          + (vatKeepYear > 0 ? '<div style="font-size:10px;color:var(--green);margin-top:2px;">→ 내지 않는 '+fmtMoney(vatKeepYear)+'은 순수익에 포함</div>' : '')
           + '</div>';
       })()
     + '<div class="stat-card" style="grid-column:1/-1;">'
@@ -6108,19 +6114,20 @@ function renderStats() {
       const mRev = mDone.reduce((s,j)=>s+jobTotal(j),0);
       const mComm = mDone.reduce((s,j)=>s+(j.commission||0),0);
       const mMat = matSumBy(selYear+'-'+m);
-      const mVatKeep = vatKeepSum(mDone);
-      const mNet = mRev - mComm - (dMat ? mMat : 0) + mVatKeep;
+      const mRecv = mDone.reduce((s,j)=>s+jobReceived(j),0);
+      const mVatPay = mDone.reduce((s,j)=>s+vatPayOfJob(j),0);
+      const mNet = mRecv - mComm - mVatPay - (dMat ? mMat : 0);
       return '<div class="month-row">'
         + '<div class="month-header"><span class="month-name">'+(i+1)+'월 ('+mDone.length+'건)</span>'
-        + '<span class="month-total">'+fmtMoney(mRev)+'</span></div>'
+        + '<span class="month-total">'+fmtMoney(mRecv)+'</span></div>'
         + '<div class="month-jobs">'
         // 수수료/순수익 요약
         + (mComm > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
           + '<span style="color:var(--text2);">수수료</span><span style="color:var(--red);">-'+fmtMoney(mComm)+'</span></div>' : '')
         + ((dMat && mMat > 0) ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
           + '<span style="color:var(--text2);">자재 구매</span><span style="color:var(--mat);">-'+fmtMoney(mMat)+'</span></div>' : '')
-        + (mVatKeep > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
-          + '<span style="color:var(--text2);">' + vatKeepLabel() + '</span><span style="color:var(--purple);">+'+fmtMoney(mVatKeep)+'</span></div>' : '')
+        + (mVatPay > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">'
+          + '<span style="color:var(--text2);">VAT 납부 예정</span><span style="color:var(--purple);">-'+fmtMoney(mVatPay)+'</span></div>' : '')
         + '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;">'
           + '<span style="color:var(--text2);">순수익</span><span style="color:var(--green);">'+fmtMoney(mNet)+'</span></div>'
         + (function(){ var mv = calcVatTotal(mDone); return mv > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">VAT</span><span style="color:var(--purple);">'+fmtMoney(mv)+'</span></div>' : ''; }())
@@ -6133,9 +6140,9 @@ function renderStats() {
             + (hasComm ? '<span style="font-size:10px;color:var(--purple);margin-left:6px;">['+( j.commissionName||'수수료')+']</span>' : '')
             + '</div>'
             + '<div style="text-align:right;">'
-            + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobTotal(j))+'</div>'
-            + '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobTotal(j)-(j.commission||0)+vatKeepOfJob(j))+'</div>'
-            + ((j.payType==='card'||j.cashReceipt) ? '<div style="font-size:11px;color:var(--purple);">VAT '+fmtMoney(Math.round(jobTotal(j)*0.1))+'</div>' : '')
+            + '<div style="font-size:13px;color:var(--accent);font-family:IBM Plex Mono,monospace;">'+fmtMoney(jobReceived(j))+'</div>'
+            + '<div style="font-size:11px;color:var(--green);">순 '+fmtMoney(jobReceived(j)-(j.commission||0)-vatPayOfJob(j))+'</div>'
+            + ((j.payType==='card'||j.cashReceipt) ? '<div style="font-size:10px;color:var(--purple);">VAT 포함 ('+(j.payType==='card'?'카드':'현금영수증')+')</div>' : '')
             + '</div>'
             + '</div>';
         }).join('')
@@ -8767,6 +8774,7 @@ function applyPolish() {
 // ── 업데이트 내역 (메인 화면 맨 아래 버전 글자를 누르면 표시) ──
 // 새 버전을 낼 때 맨 위에 한 줄씩 추가
 var APP_CHANGELOG = [
+  ['v1.4.3', '10.05', ['실적관리·메인 매출을 실제로 받은 금액(VAT 포함) 기준으로 표시 (VAT 포함 입력 시 1원 단위 숫자 안 나옴)', '미수금도 받을 금액(VAT 포함)으로 표시']],
   ['v1.4.2', '10.05', ['실적관리 VAT 칸의 면제 기준(4,800만원) 안내 줄 삭제']],
   ['v1.4.0', '10.05', ['받은 VAT 중 내가 갖는 몫을 순수익에 반영 (사업자 정보의 과세 유형 기준: 면제=전부, 간이=납부액 뺀 차액, 일반=반영 안 함)', '실적관리 VAT 칸에 순수익 반영 금액 표시']],
   ['v1.3', '10.01', ['업데이트 내역은 "업데이트 내역 ›" 글자를 눌렀을 때만 열림']],
